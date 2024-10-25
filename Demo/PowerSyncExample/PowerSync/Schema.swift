@@ -1,5 +1,5 @@
 import Foundation
-import PowerSync
+import PowerSyncSwift
 
 let LISTS_TABLE = "lists"
 let TODOS_TABLE = "todos"
@@ -8,40 +8,32 @@ let lists = Table(
     name: LISTS_TABLE,
     columns: [
         // ID column is automatically included
-        Column(name: "name", type: ColumnType.text),
-        Column(name: "created_at", type: ColumnType.text),
-        Column(name: "owner_id", type: ColumnType.text)
-    ],
-    indexes: [],
-    localOnly: false,
-    insertOnly: false,
-    viewNameOverride: LISTS_TABLE
+        .text("name"),
+        .text("created_at"),
+        .text("owner_id")
+    ]
 )
 
 let todos = Table(
     name: TODOS_TABLE,
     // ID column is automatically included
     columns: [
-        Column(name: "list_id", type: ColumnType.text),
-        Column(name: "photo_id", type: ColumnType.text),
-        Column(name: "description", type: ColumnType.text),
+        Column.text("list_id"),
+        Column.text("photo_id"),
+        Column.text("description"),
         // 0 or 1 to represent false or true
-        Column(name: "completed", type: ColumnType.integer),
-        Column(name: "created_at", type: ColumnType.text),
-        Column(name: "completed_at", type: ColumnType.text),
-        Column(name: "created_by", type: ColumnType.text),
-        Column(name: "completed_by", type: ColumnType.text)
-        
+        Column.integer("completed"),
+        Column.text("created_at"),
+        Column.text("completed_at"),
+        Column.text("created_by"),
+        Column.text("completed_by")
     ],
     indexes: [
         Index(
             name: "list_id",
-            columns: [IndexedColumn(column: "list_id", ascending: true, columnDefinition: nil, type: nil)]
+            columns: [IndexedColumn.ascending("list_id")]
         )
-    ],
-    localOnly: false,
-    insertOnly: false,
-    viewNameOverride: TODOS_TABLE
+    ]
 )
 
-let AppSchema = Schema(tables: [lists, todos])
+let AppSchema = Schema(lists, todos)

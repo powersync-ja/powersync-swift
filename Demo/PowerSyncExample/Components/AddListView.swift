@@ -13,9 +13,9 @@ struct AddListView: View {
                 Task.detached {
                     do {
                         try await powerSync.insertList(newList)
-                        completion(.success(true))
+                        await completion(.success(true))
                     } catch {
-                        completion(.failure(error))
+                        await completion(.failure(error))
                         throw error
                     }
                 }

@@ -1,7 +1,5 @@
 import PowerSync
 
-public typealias Schema = PowerSync.Schema
-typealias KmpPowerSyncDatabase = PowerSync.PowerSyncDatabase
 public typealias PowerSyncBackendConnector = PowerSync.PowerSyncBackendConnector
 public typealias CrudEntry = PowerSync.CrudEntry
 public typealias CrudBatch = PowerSync.CrudBatch

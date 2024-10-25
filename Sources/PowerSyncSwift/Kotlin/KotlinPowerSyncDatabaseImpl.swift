@@ -1,9 +1,7 @@
 import Foundation
 import PowerSync
 
-/// Implementation of PowerSyncDatabaseProtocol that initially wraps the KMP implementation
-/// and allows for gradual migration to pure Swift code
-final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
+final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     private let kmpDatabase: PowerSync.PowerSyncDatabase
     
     var currentStatus: SyncStatus {
@@ -17,12 +15,11 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         let factory = PowerSync.DatabaseDriverFactory()
         self.kmpDatabase = PowerSyncDatabase(
             factory: factory,
-            schema: schema,
+            schema: KotlinAdapter.Schema.toKotlin(schema),
             dbFilename: dbFilename
         )
     }
 
-    
     func waitForFirstSync() async throws {
         try await kmpDatabase.waitForFirstSync()
     }
@@ -33,7 +30,6 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         retryDelayMs: Int64 = 5000,
         params: [String: JsonParam?] = [:]
     ) async throws {
-        // Convert Swift types to KMP types
         try await kmpDatabase.connect(
             connector: connector,
             crudThrottleMs: crudThrottleMs,
@@ -63,7 +59,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
     
     func execute(sql: String, parameters: [Any]?) async throws -> Int64 {
-        Int64(try await kmpDatabase.execute(sql: sql, parameters: parameters))
+        Int64(truncating: try await kmpDatabase.execute(sql: sql, parameters: parameters))
     }
     
     func get<RowType>(

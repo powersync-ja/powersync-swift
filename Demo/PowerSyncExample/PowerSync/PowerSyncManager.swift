@@ -8,14 +8,14 @@ class PowerSyncManager {
     let schema = AppSchema
     var db: PowerSyncDatabaseProtocol!
 
+    // openDb must be called before connect
     func openDb() {
         db = PowerSyncDatabase(schema: schema, dbFilename: "powersync-swift.sqlite")
     }
-
-    // openDb must be called before connect
+    
     func connect() async {
         do {
-            try await db.connect(connector: connector, crudThrottleMs: 1000, retryDelayMs:5000, params: [:])
+            try await db.connect(connector: connector)
         } catch {
             print("Unexpected error: \(error.localizedDescription)") // Catches any other error
         }
@@ -30,12 +30,12 @@ class PowerSyncManager {
     }
 
     func signOut() async throws -> Void {
-        try await db.disconnectAndClear(clearLocal: true)
+        try await db.disconnectAndClear()
         try await connector.client.auth.signOut()
     }
 
     func watchLists(_ callback: @escaping (_ lists: [ListContent]) -> Void ) async {
-        for await lists in self.db.watch(
+        for await lists in self.db.watch<[ListContent]>(
             sql: "SELECT * FROM \(LISTS_TABLE)",
             parameters: [],
             mapper: { cursor in

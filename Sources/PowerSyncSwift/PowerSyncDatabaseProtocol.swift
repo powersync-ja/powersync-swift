@@ -91,3 +91,27 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     /// - Parameter clearLocal: Set to false to preserve data in local-only tables.
     func disconnectAndClear(clearLocal: Bool) async throws
 }
+
+public extension PowerSyncDatabaseProtocol {
+    func connect(
+        connector: PowerSyncBackendConnector,
+        crudThrottleMs: Int64 = 1000,
+        retryDelayMs: Int64 = 5000,
+        params: [String: JsonParam?] = [:]
+    ) async throws {
+        try await connect(
+            connector: connector,
+            crudThrottleMs: crudThrottleMs,
+            retryDelayMs: retryDelayMs,
+            params: params
+        )
+    }
+    
+    func disconnectAndClear(clearLocal: Bool = true) async throws {
+        try await disconnectAndClear(clearLocal: clearLocal)
+    }
+    
+    func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
+        try await getCrudBatch(limit: 100)
+    }
+}

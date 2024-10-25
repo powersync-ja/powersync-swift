@@ -15,9 +15,9 @@ struct AddTodoListView: View {
                 Task.detached {
                     do {
                         try await powerSync.insertTodo(newTodo, listId)
-                        completion(.success(true))
+                        await completion(.success(true))
                     } catch {
-                        completion(.failure(error))
+                        await completion(.failure(error))
                         throw error
                     }
                 }

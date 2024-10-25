@@ -21,7 +21,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
             guard let self = self else { return }
 
             for await (event, session) in self.client.auth.authStateChanges {
-                guard [.initialSession, .signedIn, .signedOut].contains(event) else { throw AuthError.sessionNotFound }
+                guard [.initialSession, .signedIn, .signedOut].contains(event) else { throw AuthError.sessionMissing }
 
                 self.session = session
             }
@@ -40,7 +40,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
         session = try await client.auth.session
 
         if (self.session == nil) {
-            throw AuthError.sessionNotFound
+            throw AuthError.sessionMissing
         }
 
         let token = session!.accessToken
@@ -49,7 +49,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
         return PowerSyncCredentials(endpoint: self.powerSyncEndpoint, token: token, userId: currentUserID)
     }
 
-    override func uploadData(database: any PowerSyncDatabase) async throws {
+    override func uploadData(database: PowerSyncDatabase) async throws {
 
         guard let transaction = try await database.getNextCrudTransaction() else { return }
 
