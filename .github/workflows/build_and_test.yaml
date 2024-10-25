@@ -9,13 +9,6 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build
+      - name: Build and Test
         run: |
-          xcodebuild build \
-            -scheme PowerSyncSwift \
-            -destination "platform=iOS Simulator,name=iPhone 16"
-      - name: Test
-        run: |
-          xcodebuild test \
-            -scheme PowerSyncSwift \
-            -destination "platform=iOS Simulator,name=iPhone 16"
+          xcodebuild test -scheme PowerSyncSwift -destination "platform=iOS Simulator,name=iPhone 16"
