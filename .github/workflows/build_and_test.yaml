@@ -1,0 +1,14 @@
+name: Build and test
+
+on:
+  push
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and Test
+        run: |
+          xcodebuild test -scheme PowerSyncSwift -destination "platform=iOS Simulator,name=iPhone 15"
