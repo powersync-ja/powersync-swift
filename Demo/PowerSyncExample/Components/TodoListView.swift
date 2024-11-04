@@ -3,7 +3,7 @@ import IdentifiedCollections
 import SwiftUINavigation
 
 struct TodoListView: View {
-    @Environment(PowerSyncManager.self) private var powerSync
+    @Environment(SystemManager.self) private var system
     let listId: String
 
     @State private var todos: IdentifiedArrayOf<Todo> = []
@@ -65,7 +65,7 @@ struct TodoListView: View {
         }
         .task {
             Task {
-                await powerSync.watchTodos(listId) { tds in
+                await system.watchTodos(listId) { tds in
                     withAnimation {
                         self.todos = IdentifiedArrayOf(uniqueElements: tds)
                     }
@@ -79,7 +79,7 @@ struct TodoListView: View {
         updatedTodo.isComplete.toggle()
         do {
             error = nil
-            try await powerSync.updateTodo(updatedTodo)
+            try await system.updateTodo(updatedTodo)
         } catch {
             self.error = error
         }
@@ -90,7 +90,7 @@ struct TodoListView: View {
             error = nil
             let todosToDelete = offset.map { todos[$0] }
 
-            try await powerSync.deleteTodo(id: todosToDelete[0].id)
+            try await system.deleteTodo(id: todosToDelete[0].id)
 
         } catch {
             self.error = error
@@ -102,6 +102,6 @@ struct TodoListView: View {
     NavigationStack {
         TodoListView(
             listId: UUID().uuidString.lowercased()
-        ).environment(PowerSyncManager())
+        ).environment(SystemManager())
     }
 }

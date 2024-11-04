@@ -7,7 +7,7 @@ private enum ActionState<Success, Failure: Error> {
 }
 
 struct SignUpScreen: View {
-    @Environment(PowerSyncManager.self) private var powerSync
+    @Environment(SystemManager.self) private var system
     @Environment(AuthModel.self) private var authModel
     @Environment(NavigationModel.self) private var navigationModel
 
@@ -56,7 +56,7 @@ struct SignUpScreen: View {
     private func signUpButtonTapped() async {
         do {
             actionState = .inFlight
-            try await powerSync.connector.client.auth.signUp(
+            try await system.connector.client.auth.signUp(
                 email: email,
                 password: password,
                 redirectTo: Constants.redirectToURL
@@ -75,6 +75,6 @@ struct SignUpScreen: View {
 #Preview {
     NavigationStack {
         SignUpScreen()
-            .environment(PowerSyncManager())
+            .environment(SystemManager())
     }
 }

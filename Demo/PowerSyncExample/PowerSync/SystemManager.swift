@@ -2,8 +2,7 @@ import Foundation
 import PowerSyncSwift
 
 @Observable
-@MainActor
-class PowerSyncManager {
+class SystemManager {
     let connector = SupabaseConnector()
     let schema = AppSchema
     var db: PowerSyncDatabaseProtocol!

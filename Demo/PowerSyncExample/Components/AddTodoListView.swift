@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 struct AddTodoListView: View {
-    @Environment(PowerSyncManager.self) private var powerSync
+    @Environment(SystemManager.self) private var system
     
     @Binding var newTodo: NewTodo
     let listId: String
@@ -14,7 +14,7 @@ struct AddTodoListView: View {
             Button("Save") {
                 Task.detached {
                     do {
-                        try await powerSync.insertTodo(newTodo, listId)
+                        try await system.insertTodo(newTodo, listId)
                         await completion(.success(true))
                     } catch {
                         await completion(.failure(error))
@@ -37,5 +37,5 @@ struct AddTodoListView: View {
         ),
         listId: UUID().uuidString.lowercased()
     ){ _ in
-    }.environment(PowerSyncManager())
+    }.environment(SystemManager())
 }

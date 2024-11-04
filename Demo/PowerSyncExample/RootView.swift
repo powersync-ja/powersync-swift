@@ -2,7 +2,7 @@ import Auth
 import SwiftUI
 
 struct RootView: View {
-    @Environment(PowerSyncManager.self) var powerSync
+    @Environment(SystemManager.self) var system
 
     @State private var authModel = AuthModel()
     @State private var navigationModel = NavigationModel()
@@ -28,8 +28,8 @@ struct RootView: View {
             }
         }
         .task {
-            if(powerSync.db == nil) {
-                powerSync.openDb()
+            if(system.db == nil) {
+                system.openDb()
             }
         }
         .environment(authModel)
@@ -40,5 +40,5 @@ struct RootView: View {
 
 #Preview {
     RootView()
-        .environment(PowerSyncManager())
+        .environment(SystemManager())
 }

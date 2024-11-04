@@ -6,7 +6,7 @@ struct PowerSyncExampleApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environment(PowerSyncManager())
+                .environment(SystemManager())
         }
     }
 }

@@ -3,7 +3,7 @@ import IdentifiedCollections
 import SwiftUINavigation
 
 struct ListView: View {
-    @Environment(PowerSyncManager.self) private var powerSync
+    @Environment(SystemManager.self) private var system
 
     @State private var lists: IdentifiedArrayOf<ListContent> = []
     @State private var error: Error?
@@ -64,7 +64,7 @@ struct ListView: View {
         }
         .task {
             Task {
-                await powerSync.watchLists { ls in
+                await system.watchLists { ls in
                     withAnimation {
                         self.lists = IdentifiedArrayOf(uniqueElements: ls)
                     }
@@ -78,7 +78,7 @@ struct ListView: View {
             error = nil
             let listsToDelete = offset.map { lists[$0] }
 
-            try await powerSync.deleteList(id: listsToDelete[0].id)
+            try await system.deleteList(id: listsToDelete[0].id)
 
         } catch {
             self.error = error
@@ -89,6 +89,6 @@ struct ListView: View {
 #Preview {
     NavigationStack {
         ListView()
-            .environment(PowerSyncManager())
+            .environment(SystemManager())
     }
 }

@@ -3,7 +3,7 @@ import Auth
 import SwiftUI
 
 struct HomeScreen: View {
-    @Environment(PowerSyncManager.self) private var powerSync
+    @Environment(SystemManager.self) private var system
     @Environment(AuthModel.self) private var authModel
     @Environment(NavigationModel.self) private var navigationModel
 
@@ -15,7 +15,7 @@ struct HomeScreen: View {
             ToolbarItem(placement: .cancellationAction) {
               Button("Sign out") {
                 Task { 
-                    try await powerSync.signOut()
+                    try await system.signOut()
                     authModel.isAuthenticated = false
                     navigationModel.path = NavigationPath()
                 }
@@ -23,8 +23,8 @@ struct HomeScreen: View {
             }
           }
           .task {
-              if(powerSync.db.currentStatus.connected == false) {
-                  await powerSync.connect()
+              if(system.db.currentStatus.connected == false) {
+                  await system.connect()
               }
           }
           .navigationBarBackButtonHidden(true)
@@ -34,6 +34,6 @@ struct HomeScreen: View {
 #Preview {
     NavigationStack{
         HomeScreen()
-            .environment(PowerSyncManager())
+            .environment(SystemManager())
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AddListView: View {
-    @Environment(PowerSyncManager.self) private var powerSync
+    @Environment(SystemManager.self) private var system
     
     @Binding var newList: NewListContent
     let completion: (Result<Bool, Error>) -> Void
@@ -12,7 +12,7 @@ struct AddListView: View {
             Button("Save") {
                 Task.detached {
                     do {
-                        try await powerSync.insertList(newList)
+                        try await system.insertList(newList)
                         await completion(.success(true))
                     } catch {
                         await completion(.failure(error))
@@ -34,5 +34,5 @@ struct AddListView: View {
             )
         )
     ) { _ in
-    }.environment(PowerSyncManager())
+    }.environment(SystemManager())
 }

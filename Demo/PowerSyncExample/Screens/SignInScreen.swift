@@ -7,7 +7,7 @@ private enum ActionState<Success, Failure: Error> {
 }
 
 struct SignInScreen: View {
-    @Environment(PowerSyncManager.self) private var powerSync
+    @Environment(SystemManager.self) private var system
     @Environment(AuthModel.self) private var authModel
     @Environment(NavigationModel.self) private var navigationModel
 
@@ -60,7 +60,7 @@ struct SignInScreen: View {
     private func signInButtonTapped() async {
         do {
             actionState = .inFlight
-            try await powerSync.connector.client.auth.signIn(email: email, password: password)
+            try await system.connector.client.auth.signIn(email: email, password: password)
             actionState = .result(.success(()))
             authModel.isAuthenticated = true
             navigationModel.path = NavigationPath()
@@ -75,6 +75,6 @@ struct SignInScreen: View {
 #Preview {
     NavigationStack {
         SignInScreen()
-            .environment(PowerSyncManager())
+            .environment(SystemManager())
     }
 }
