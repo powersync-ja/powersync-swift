@@ -2,7 +2,6 @@ import Auth
 import SwiftUI
 import Supabase
 import PowerSyncSwift
-import PowerSync
 import AnyCodable
 
 @Observable
@@ -16,7 +15,6 @@ class SupabaseConnector: PowerSyncBackendConnector {
 
     override init() {
         super.init()
-
         observeAuthStateChangesTask = Task { [weak self] in
             guard let self = self else { return }
 
@@ -49,7 +47,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
         return PowerSyncCredentials(endpoint: self.powerSyncEndpoint, token: token, userId: currentUserID)
     }
 
-    override func uploadData(database: PowerSyncDatabase) async throws {
+    override func uploadData(database: PowerSyncDatabaseProtocol) async throws {
 
         guard let transaction = try await database.getNextCrudTransaction() else { return }
 
@@ -75,7 +73,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
                 }
             }
 
-            try await transaction.complete.invoke(p1: nil)
+            _ = try await transaction.complete.invoke(p1: nil)
 
         } catch {
             print("Data upload error - retrying last entry: \(lastEntry!), \(error)")
