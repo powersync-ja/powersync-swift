@@ -117,30 +117,18 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         }
     }
     
-    func writeTransaction<R>(callback: @escaping (any PowerSyncTransactionProtocol) async throws -> R) async throws -> R {
-        let wrappedCallback = SuspendTaskWrapper { [kmpDatabase] in
-            // Create a wrapper that converts the KMP transaction to our Swift protocol
-            if let kmpTransaction = kmpDatabase as? PowerSyncTransactionProtocol {
-                return try await callback(kmpTransaction)
-            } else {
-                throw PowerSyncError.invalidTransaction
-            }
-        }
-        
-        return try await kmpDatabase.writeTransaction(callback: wrappedCallback) as! R
+    @MainActor
+    public func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) async throws -> R) async throws -> R {
+        return try await kmpDatabase.writeTransaction(callback: SuspendTaskWrapper { transaction in
+            return try await callback(transaction)
+        }) as! R
     }
     
-    func readTransaction<R>(callback: @escaping (any PowerSyncTransactionProtocol) async throws -> R) async throws -> R {
-        let wrappedCallback = SuspendTaskWrapper { [kmpDatabase] in
-            // Create a wrapper that converts the KMP transaction to our Swift protocol
-            if let kmpTransaction = kmpDatabase as? PowerSyncTransactionProtocol {
-                return try await callback(kmpTransaction)
-            } else {
-                throw PowerSyncError.invalidTransaction
-            }
-        }
-        
-        return try await kmpDatabase.readTransaction(callback: wrappedCallback) as! R
+    @MainActor
+    public func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) async throws -> R) async throws -> R {
+        return try await kmpDatabase.writeTransaction(callback: SuspendTaskWrapper { transaction in
+            return try await callback(transaction)
+        }) as! R
     }
 }
 
@@ -148,21 +136,23 @@ enum PowerSyncError: Error {
     case invalidTransaction
 }
 
+@MainActor
 class SuspendTaskWrapper: KotlinSuspendFunction1 {
-    let handle: () async throws -> Any
+    let handle: (any PowerSyncTransaction) async throws -> Any
 
-    init(_ handle: @escaping () async throws -> Any) {
+    init(_ handle: @escaping (any PowerSyncTransaction) async throws -> Any) {
         self.handle = handle
     }
 
-    @MainActor
-    func invoke(p1: Any?, completionHandler: @escaping (Any?, Error?) -> Void) {
-        Task {
-            do {
-                let result = try await self.handle()
-                completionHandler(result, nil)
-            } catch {
-                completionHandler(nil, error)
+    nonisolated func __invoke(p1: Any?, completionHandler: @escaping (Any?, Error?) -> Void) {
+        DispatchQueue.main.async {
+            Task { @MainActor in
+                do {
+                    let result = try await self.handle(p1 as! any PowerSyncTransaction)
+                    completionHandler(result, nil)
+                } catch {
+                    completionHandler(nil, error)
+                }
             }
         }
     }
