@@ -14,7 +14,7 @@
 		6A7315882B9854220004CB17 /* PowerSyncExampleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7315872B9854220004CB17 /* PowerSyncExampleApp.swift */; };
 		6A73158C2B9854240004CB17 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6A73158B2B9854240004CB17 /* Assets.xcassets */; };
 		6A73158F2B9854240004CB17 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6A73158E2B9854240004CB17 /* Preview Assets.xcassets */; };
-		6A7315BB2B98BDD30004CB17 /* PowerSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7315BA2B98BDD30004CB17 /* PowerSyncManager.swift */; };
+		6A7315BB2B98BDD30004CB17 /* SystemManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7315BA2B98BDD30004CB17 /* SystemManager.swift */; };
 		6A9668FE2B9EE4FE00B05DCF /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 6A9668FD2B9EE4FE00B05DCF /* Auth */; };
 		6A9669002B9EE4FE00B05DCF /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 6A9668FF2B9EE4FE00B05DCF /* PostgREST */; };
 		6A9669022B9EE69500B05DCF /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 6A9669012B9EE69500B05DCF /* Supabase */; };
@@ -64,7 +64,7 @@
 		6A7315872B9854220004CB17 /* PowerSyncExampleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerSyncExampleApp.swift; sourceTree = "<group>"; };
 		6A73158B2B9854240004CB17 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6A73158E2B9854240004CB17 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		6A7315BA2B98BDD30004CB17 /* PowerSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerSyncManager.swift; sourceTree = "<group>"; };
+		6A7315BA2B98BDD30004CB17 /* SystemManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemManager.swift; sourceTree = "<group>"; };
 		6A9669032B9EE6FA00B05DCF /* SignInScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInScreen.swift; sourceTree = "<group>"; };
 		6ABD78662B9F2B4800558A41 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		6ABD786A2B9F2C1500558A41 /* TodoListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoListView.swift; sourceTree = "<group>"; };
@@ -218,7 +218,7 @@
 		B65C4D6F2C60D58500176007 /* PowerSync */ = {
 			isa = PBXGroup;
 			children = (
-				6A7315BA2B98BDD30004CB17 /* PowerSyncManager.swift */,
+				6A7315BA2B98BDD30004CB17 /* SystemManager.swift */,
 				6A4AD3842B9EE763005CBFD4 /* SupabaseConnector.swift */,
 				6ABD78772B9F2D2800558A41 /* Schema.swift */,
 				B66658642C62314B00159A81 /* Lists.swift */,
@@ -567,7 +567,7 @@
 				B66658632C621CA700159A81 /* AddTodoListView.swift in Sources */,
 				B666585D2C620E9E00159A81 /* WifiIcon.swift in Sources */,
 				6A9669042B9EE6FA00B05DCF /* SignInScreen.swift in Sources */,
-				6A7315BB2B98BDD30004CB17 /* PowerSyncManager.swift in Sources */,
+				6A7315BB2B98BDD30004CB17 /* SystemManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
