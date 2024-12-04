@@ -95,41 +95,60 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     }
     
     func testWatchTableChanges() async throws {
-         let expectation = XCTestExpectation(description: "Watch changes")
-         var results: [[String]] = []
-         
-         let stream = database.watch(
-             sql: "SELECT name FROM users ORDER BY id",
-             parameters: nil
-         ) { cursor in
-             cursor.getString(index: 0)!
-         }
-         
-         let watchTask = Task {
-             for await names in stream {
-                 results.append(names)
-                 if results.count == 2 {
-                     expectation.fulfill()
-                 }
-             }
-         }
-         
-         _ = try await database.execute(
-             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
-             parameters: ["1", "User 1", "user1@example.com"]
-         )
-         
-         _ = try await database.execute(
-             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
-             parameters: ["2", "User 2", "user2@example.com"]
-         )
-         
-         await fulfillment(of: [expectation], timeout: 5)
-         watchTask.cancel()
-         
-         XCTAssertEqual(results.count, 2)
-         XCTAssertEqual(results[1], ["User 1", "User 2"])
-     }
+        let expectation = XCTestExpectation(description: "Watch changes")
+        
+        // Create an actor to handle concurrent mutations
+        actor ResultsStore {
+            private var results: [[String]] = []
+            
+            func append(_ names: [String]) {
+                results.append(names)
+            }
+            
+            func getResults() -> [[String]] {
+                results
+            }
+            
+            func count() -> Int {
+                results.count
+            }
+        }
+        
+        let resultsStore = ResultsStore()
+        
+        let stream = database.watch(
+            sql: "SELECT name FROM users ORDER BY id",
+            parameters: nil
+        ) { cursor in
+            cursor.getString(index: 0)!
+        }
+        
+        let watchTask = Task {
+            for await names in stream {
+                await resultsStore.append(names)
+                if await resultsStore.count() == 2 {
+                    expectation.fulfill()
+                }
+            }
+        }
+        
+        _ = try await database.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "User 1", "user1@example.com"]
+        )
+        
+        _ = try await database.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["2", "User 2", "user2@example.com"]
+        )
+        
+        await fulfillment(of: [expectation], timeout: 5)
+        watchTask.cancel()
+        
+        let finalResults = await resultsStore.getResults()
+        XCTAssertEqual(finalResults.count, 2)
+        XCTAssertEqual(finalResults[1], ["User 1", "User 2"])
+    }
  
     func testWriteTransaction() async throws {
         try await database.writeTransaction { transaction in
