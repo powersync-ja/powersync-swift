@@ -18,6 +18,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             schema: schema,
             dbFilename: ":memory:"
         )
+        try await database.disconnectAndClear()
     }
     
     override func tearDown() async throws {
@@ -130,12 +131,16 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
          XCTAssertEqual(results[1], ["User 1", "User 2"])
      }
  
-    @MainActor
     func testWriteTransaction() async throws {
         try await database.writeTransaction { transaction in
             _ = try await transaction.execute(
                 sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                 parameters: ["1", "Test User", "test@example.com"]
+            )
+            
+            _ = try await transaction.execute(
+                sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+                parameters: ["2", "Test User 2", "test2@example.com"]
             )
         }
         
@@ -147,10 +152,9 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             cursor.getLong(index: 0)
         }
         
-        XCTAssertEqual(result as! Int, 1)
+        XCTAssertEqual(result as! Int, 2)
     }
 
-    @MainActor
     func testReadTransaction() async throws {
         _ = try await database.execute(
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
