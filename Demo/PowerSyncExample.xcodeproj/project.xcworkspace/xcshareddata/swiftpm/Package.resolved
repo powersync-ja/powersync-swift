@@ -1,5 +1,5 @@
 {
-  "originHash" : "5d7fb7f47b01e814cbc6b4a65dfe62c7af5a96a435a0288b747750c370fcd28a",
+  "originHash" : "25b8cd5d97789d7e497d6a5e0b04419a426018d83f0e80ab6817b213aa976748",
   "pins" : [
     {
       "identity" : "anycodable",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-kotlin.git",
       "state" : {
-        "revision" : "4186fa9a2004a4bc85a22c3f37bce4f3ebd4ff81",
-        "version" : "1.0.0-BETA5.0"
+        "revision" : "b547389faf77d0c79f30887b5d82489ee3f4de4b",
+        "version" : "1.0.0-BETA9.0"
       }
     },
     {
