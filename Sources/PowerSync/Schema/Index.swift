@@ -1,5 +1,5 @@
 import Foundation
-import PowerSync
+import PowerSyncKotlin
 
 public protocol IndexProtocol {
     var name: String { get }

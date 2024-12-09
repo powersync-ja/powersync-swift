@@ -1,5 +1,5 @@
 import Foundation
-import PowerSyncSwift
+import PowerSync
 
 @Observable
 class SystemManager {

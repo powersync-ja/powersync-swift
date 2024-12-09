@@ -1,5 +1,5 @@
 import Foundation
-import PowerSyncSwift
+import PowerSync
 
 let LISTS_TABLE = "lists"
 let TODOS_TABLE = "todos"

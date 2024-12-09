@@ -1,8 +1,8 @@
 import Foundation
-import PowerSync
+import PowerSyncKotlin
 
 final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
-    private let kotlinDatabase: PowerSync.PowerSyncDatabase
+    private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
 
     var currentStatus: SyncStatus {
         get { kotlinDatabase.currentStatus }
@@ -12,7 +12,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         schema: Schema,
         dbFilename: String
     ) {
-        let factory = PowerSync.DatabaseDriverFactory()
+        let factory = PowerSyncKotlin.DatabaseDriverFactory()
         self.kotlinDatabase = PowerSyncDatabase(
             factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),

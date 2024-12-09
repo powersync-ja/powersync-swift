@@ -1,6 +1,6 @@
 import Foundation
 import Combine
-import PowerSync
+import PowerSyncKotlin
 
 public protocol Queries {
     /// Execute a write query (INSERT, UPDATE, DELETE)

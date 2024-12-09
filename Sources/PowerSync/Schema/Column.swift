@@ -1,5 +1,5 @@
 import Foundation
-import PowerSync
+import PowerSyncKotlin
 
 public protocol ColumnProtocol: Equatable {
     var name: String { get }
