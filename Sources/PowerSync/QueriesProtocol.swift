@@ -4,6 +4,7 @@ import PowerSyncKotlin
 
 public protocol Queries {
     /// Execute a write query (INSERT, UPDATE, DELETE)
+    /// Using `RETURNING *` will result in an error.
     func execute(sql: String, parameters: [Any]?) async throws -> Int64
     
     /// Execute a read-only (SELECT) query and return a single result.
