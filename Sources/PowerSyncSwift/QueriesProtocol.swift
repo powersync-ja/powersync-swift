@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import PowerSync
 
 public protocol Queries {
     /// Execute a write query (INSERT, UPDATE, DELETE)
@@ -37,8 +38,42 @@ public protocol Queries {
     ) -> AsyncStream<[RowType]>
     
     /// Execute a write transaction with the given callback
-    func writeTransaction<R>(callback: @escaping (PowerSyncTransactionProtocol) async throws -> R) async throws -> R
-    
+    func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) async throws -> R) async throws -> R
+
     /// Execute a read transaction with the given callback
-    func readTransaction<R>(callback: @escaping (PowerSyncTransactionProtocol) async throws -> R) async throws -> R
+    func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) async throws -> R) async throws -> R
+}
+
+extension Queries {
+    public func execute(_ sql: String) async throws -> Int64 {
+        return try await execute(sql: sql, parameters: [])
+    }
+
+    public func get<RowType>(
+        _ sql: String,
+        mapper: @escaping (SqlCursor) -> RowType
+    ) async throws -> RowType {
+        return try await get(sql: sql, parameters: [], mapper: mapper)
+    }
+
+    public func getAll<RowType>(
+        _ sql: String,
+        mapper: @escaping (SqlCursor) -> RowType
+    ) async throws -> [RowType] {
+        return try await getAll(sql: sql, parameters: [], mapper: mapper)
+    }
+
+    public func getOptional<RowType>(
+        _ sql: String,
+        mapper: @escaping (SqlCursor) -> RowType
+    ) async throws -> RowType? {
+        return try await getOptional(sql: sql, parameters: [], mapper: mapper)
+    }
+
+    public func watch<RowType>(
+        _ sql: String,
+        mapper: @escaping (SqlCursor) -> RowType
+    ) -> AsyncStream<[RowType]> {
+        return watch(sql: sql, parameters: [], mapper: mapper)
+    }
 }
