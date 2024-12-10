@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		18F30B2A2CCA4CD900A58917 /* PowerSyncSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 18F30B292CCA4CD900A58917 /* PowerSyncSwift */; };
 		6A4AD3852B9EE763005CBFD4 /* SupabaseConnector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AD3842B9EE763005CBFD4 /* SupabaseConnector.swift */; };
 		6A4AD3892B9EEB21005CBFD4 /* _Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AD3882B9EEB21005CBFD4 /* _Secrets.swift */; };
 		6A4AD3902B9EF775005CBFD4 /* ErrorText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AD38F2B9EF775005CBFD4 /* ErrorText.swift */; };
@@ -40,6 +39,7 @@
 		B666587C2C63B88700159A81 /* SwiftUINavigationCore in Frameworks */ = {isa = PBXBuildFile; productRef = B666587B2C63B88700159A81 /* SwiftUINavigationCore */; };
 		B69F7D862C8EE27400565448 /* AnyCodable in Frameworks */ = {isa = PBXBuildFile; productRef = B69F7D852C8EE27400565448 /* AnyCodable */; };
 		B6B3698A2C64F4B30033C307 /* Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B369892C64F4B30033C307 /* Navigation.swift */; };
+		B6FFD5322D06DA8000EEE60F /* PowerSync in Frameworks */ = {isa = PBXBuildFile; productRef = B6FFD5312D06DA8000EEE60F /* PowerSync */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -116,9 +116,9 @@
 				B66658772C63B7BB00159A81 /* IdentifiedCollections in Frameworks */,
 				B69F7D862C8EE27400565448 /* AnyCodable in Frameworks */,
 				B666587C2C63B88700159A81 /* SwiftUINavigationCore in Frameworks */,
+				B6FFD5322D06DA8000EEE60F /* PowerSync in Frameworks */,
 				6A9669022B9EE69500B05DCF /* Supabase in Frameworks */,
 				6A9669002B9EE4FE00B05DCF /* PostgREST in Frameworks */,
-				18F30B2A2CCA4CD900A58917 /* PowerSyncSwift in Frameworks */,
 				6A9668FE2B9EE4FE00B05DCF /* Auth in Frameworks */,
 				B666587A2C63B88700159A81 /* SwiftUINavigation in Frameworks */,
 			);
@@ -481,7 +481,7 @@
 				B66658792C63B88700159A81 /* SwiftUINavigation */,
 				B666587B2C63B88700159A81 /* SwiftUINavigationCore */,
 				B69F7D852C8EE27400565448 /* AnyCodable */,
-				18F30B292CCA4CD900A58917 /* PowerSyncSwift */,
+				B6FFD5312D06DA8000EEE60F /* PowerSync */,
 			);
 			productName = PowerSyncExample;
 			productReference = 6A7315842B9854220004CB17 /* PowerSyncExample.app */;
@@ -832,11 +832,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		18F30B292CCA4CD900A58917 /* PowerSyncSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 18F30B282CCA4B3B00A58917 /* XCLocalSwiftPackageReference "../../powersync-swift" */;
-			productName = PowerSyncSwift;
-		};
 		6A9668FD2B9EE4FE00B05DCF /* Auth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 6A9668FC2B9EE4FE00B05DCF /* XCRemoteSwiftPackageReference "supabase-swift" */;
@@ -871,6 +866,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B69F7D842C8EE27300565448 /* XCRemoteSwiftPackageReference "AnyCodable" */;
 			productName = AnyCodable;
+		};
+		B6FFD5312D06DA8000EEE60F /* PowerSync */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 18F30B282CCA4B3B00A58917 /* XCLocalSwiftPackageReference "../../powersync-swift" */;
+			productName = PowerSync;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

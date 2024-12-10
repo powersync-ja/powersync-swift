@@ -1,7 +1,7 @@
 import Auth
 import SwiftUI
 import Supabase
-import PowerSyncSwift
+import PowerSync
 import AnyCodable
 
 @Observable

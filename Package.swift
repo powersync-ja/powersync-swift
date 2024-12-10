@@ -2,7 +2,7 @@
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
-let packageName = "PowerSyncSwift"
+let packageName = "PowerSync"
 
 let package = Package(
     name: packageName,
@@ -14,10 +14,10 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: packageName,
-            targets: ["PowerSyncSwift"]),
+            targets: ["PowerSync"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/powersync-ja/powersync-kotlin.git", exact: "1.0.0-BETA9.0"),
+        .package(url: "https://github.com/powersync-ja/powersync-kotlin.git", exact: "1.0.0-BETA11.0"),
         .package(url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git", "0.3.1"..<"0.4.0"),
     ],
     targets: [
@@ -26,12 +26,12 @@ let package = Package(
         .target(
             name: packageName,
             dependencies: [
-                .product(name: "PowerSync", package: "powersync-kotlin"),
+                .product(name: "PowerSyncKotlin", package: "powersync-kotlin"),
                 .product(name: "PowerSyncSQLiteCore", package: "powersync-sqlite-core-swift")
             ]),
         .testTarget(
-            name: "PowerSyncSwiftTests",
-            dependencies: ["PowerSyncSwift"]
+            name: "PowerSyncTests",
+            dependencies: ["PowerSync"]
         ),
     ]
 )

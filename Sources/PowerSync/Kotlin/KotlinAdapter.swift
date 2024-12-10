@@ -1,9 +1,9 @@
-import PowerSync
+import PowerSyncKotlin
 
 internal struct KotlinAdapter {
     struct Index {
-        static func toKotlin(_ index: IndexProtocol) -> PowerSync.Index {
-            PowerSync.Index(
+        static func toKotlin(_ index: IndexProtocol) -> PowerSyncKotlin.Index {
+            PowerSyncKotlin.Index(
                 name: index.name,
                 columns: index.columns.map { IndexedColumn.toKotlin($0) }
             )
@@ -11,8 +11,8 @@ internal struct KotlinAdapter {
     }
     
     struct IndexedColumn {
-        static func toKotlin(_ column: IndexedColumnProtocol) -> PowerSync.IndexedColumn {
-            return PowerSync.IndexedColumn(
+        static func toKotlin(_ column: IndexedColumnProtocol) -> PowerSyncKotlin.IndexedColumn {
+            return PowerSyncKotlin.IndexedColumn(
                 column: column.column,
                 ascending: column.ascending,
                 columnDefinition: nil,
@@ -22,8 +22,8 @@ internal struct KotlinAdapter {
     }
     
     struct Table {
-        static func toKotlin(_ table: TableProtocol) -> PowerSync.Table {
-            PowerSync.Table(
+        static func toKotlin(_ table: TableProtocol) -> PowerSyncKotlin.Table {
+            PowerSyncKotlin.Table(
                 name: table.name,
                 columns: table.columns.map {Column.toKotlin($0)},
                 indexes: table.indexes.map { Index.toKotlin($0) },
@@ -35,28 +35,28 @@ internal struct KotlinAdapter {
     }
     
     struct Column {
-        static func toKotlin(_ column: any ColumnProtocol) -> PowerSync.Column {
-            PowerSync.Column(
+        static func toKotlin(_ column: any ColumnProtocol) -> PowerSyncKotlin.Column {
+            PowerSyncKotlin.Column(
                 name: column.name,
                 type: columnType(from: column.type)
             )
         }
         
-        private static func columnType(from swiftType: ColumnData) -> PowerSync.ColumnType {
+        private static func columnType(from swiftType: ColumnData) -> PowerSyncKotlin.ColumnType {
             switch swiftType {
             case .text:
-                return PowerSync.ColumnType.text
+                return PowerSyncKotlin.ColumnType.text
             case .integer:
-                return PowerSync.ColumnType.integer
+                return PowerSyncKotlin.ColumnType.integer
             case .real:
-                return PowerSync.ColumnType.real
+                return PowerSyncKotlin.ColumnType.real
             }
         }
     }
     
     struct Schema {
-        static func toKotlin(_ schema: SchemaProtocol) -> PowerSync.Schema {
-            PowerSync.Schema(
+        static func toKotlin(_ schema: SchemaProtocol) -> PowerSyncKotlin.Schema {
+            PowerSyncKotlin.Schema(
                 tables: schema.tables.map { Table.toKotlin($0) }
             )
         }

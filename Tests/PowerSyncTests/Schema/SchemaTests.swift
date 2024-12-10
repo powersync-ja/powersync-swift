@@ -1,5 +1,5 @@
 import XCTest
-@testable import PowerSyncSwift
+@testable import PowerSync
 
 final class SchemaTests: XCTestCase {
     private func makeValidTable(name: String) -> Table {

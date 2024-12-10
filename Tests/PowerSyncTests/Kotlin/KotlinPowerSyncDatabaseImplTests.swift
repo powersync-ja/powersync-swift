@@ -1,5 +1,5 @@
 import XCTest
-@testable import PowerSyncSwift
+@testable import PowerSync
 
 final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     private var database: KotlinPowerSyncDatabaseImpl!

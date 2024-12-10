@@ -1,5 +1,5 @@
 import XCTest
-@testable import PowerSyncSwift
+@testable import PowerSync
 
 final class TableTests: XCTestCase {
     
