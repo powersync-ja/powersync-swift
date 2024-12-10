@@ -1,0 +1,59 @@
+name: Release PowerSync
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0 or 1.0.0-Beta.1)'
+        required: true
+        type: string
+      release_notes:
+        description: 'Release notes'
+        required: true
+        type: string
+
+jobs:
+  build:
+    uses: ./.github/workflows/build_and_test.yaml
+  release:
+    needs: build
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format and set prerelease flag
+        id: version_check
+        run: |
+          if [[ ${{ github.event.inputs.version }} =~ ^[0-9]+\.[0-9]+\.[0-9]+(-Beta\.[0-9]+)?$ ]]; then
+            if [[ ${{ github.event.inputs.version }} =~ -Beta\.[0-9]+$ ]]; then
+              echo "is_prerelease=true" >> $GITHUB_OUTPUT
+              echo "Version is valid Beta format"
+            else
+              echo "is_prerelease=false" >> $GITHUB_OUTPUT
+              echo "Version is valid release format"
+            fi
+          else
+            echo "Invalid version format. Must be either:"
+            echo "- Release version: X.Y.Z (e.g., 1.0.0)"
+            echo "- Beta version: X.Y.Z-Beta.N (e.g., 1.0.0-Beta.1)"
+            exit 1
+          fi
+
+      - name: Create Git tag
+        run: |
+          git tag v${{ github.event.inputs.version }}
+          git push origin v${{ github.event.inputs.version }}
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: v${{ github.event.inputs.version }}
+          name: PowerSync v${{ github.event.inputs.version }}
+          body: ${{ github.event.inputs.release_notes }}
+          draft: false
+          prerelease: ${{ steps.version_check.outputs.is_prerelease }}
+          token: ${{ secrets.GITHUB_TOKEN }}
