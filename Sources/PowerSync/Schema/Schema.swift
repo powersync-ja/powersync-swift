@@ -1,23 +1,30 @@
 public protocol SchemaProtocol {
+    ///
+    /// Tables used in Schema
+    ///
     var tables: [Table] { get }
+    ///
+    /// Validate tables
+    ///
     func validate() throws
 }
 
 public struct Schema: SchemaProtocol {
     public let tables: [Table]
-    
+
     public init(tables: [Table]) {
         self.tables = tables
     }
-    
-    // Convenience initializer with variadic parameters
+    ///
+    /// Convenience initializer with variadic parameters
+    ///
     public init(_ tables: Table...) {
         self.init(tables: tables)
     }
-    
+
     public func validate() throws {
         var tableNames = Set<String>()
-        
+
         for table in tables {
             if !tableNames.insert(table.name).inserted {
                 throw SchemaError.duplicateTableName(table.name)
@@ -30,4 +37,3 @@ public struct Schema: SchemaProtocol {
 public enum SchemaError: Error {
     case duplicateTableName(String)
 }
-

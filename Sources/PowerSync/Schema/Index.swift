@@ -2,7 +2,13 @@ import Foundation
 import PowerSyncKotlin
 
 public protocol IndexProtocol {
+    ///
+    /// Descriptive name of the index.
+    ///
     var name: String { get }
+    ///
+    /// List of columns used for the index.
+    ///
     var columns: [IndexedColumnProtocol] { get }
 }
 
