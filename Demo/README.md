@@ -14,11 +14,15 @@ Follow this guide to:
 
 ## Configure The App
 
-Open this directory in XCode.
+1. Open this directory in XCode.
 
-Open the “_Secrets” file and insert the credentials of your Supabase and PowerSync projects (more info can be found [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#test-everything-using-our-demo-app)).
+2. Open the “_Secrets” file and insert the credentials of your Supabase and PowerSync projects (more info can be found [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#test-everything-using-our-demo-app)).
 
-### Finish XCode configuration
+3. Enable CasePathMacros. We are using SwiftUI Navigation for the demo which requires this.
+
+### Troubleshooting
+
+If you run into build issues, try:
 
 1. Clear Swift caches
 
@@ -32,7 +36,6 @@ rm -rf ~/Library/org.swift.swiftpm
 - Reset Packages: File -> Packages -> Reset Package Caches
 - Clean Build: Product -> Clean Build Folder.
 
-3. Enable CasePathMacros. We are using SwiftUI Navigation for the demo which requires this.
 
 ## Run project
 
