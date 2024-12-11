@@ -29,10 +29,27 @@ The easiest way to test the PowerSync Swift SDK is to run our demo application.
 Add
 
 ```swift
-.package(url: "https://github.com/powersync-ja/powersync-swift", exact: "<version>")
+    dependencies: [
+        ...
+        .package(url: "https://github.com/powersync-ja/powersync-swift", exact: "<version>")
+    ],
+    targets: [
+        .target(
+            name: "YourTargetName",
+            dependencies: [
+                ...
+                .product(
+                    name: "PowerSync",
+                    package: "powersync-swift"
+                ),
+            ]
+        )
+    ]
 ```
 
 to your `Package.swift` file and pin the dependency to a specific version. The version is required because the package is in beta.
+
+to your `Package.swift` file and pin the dependency to a specific version. This is required because the package is in beta.
 
 ## Underlying Kotlin Dependency
 
