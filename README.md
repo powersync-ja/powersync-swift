@@ -6,8 +6,6 @@
 
 # PowerSync Swift
 
-The PowerSync Swift SDK is an extension of the [PowerSync Kotlin Multiplatform SDK](https://github.com/powersync-ja/powersync-kotlin), and uses the API tool [SKIE](https://skie.touchlab.co/) and KMMBridge to generate and publish a native Swift SDK. More details about this configuration can be found in our blog [here](https://www.powersync.com/blog/using-kotlin-multiplatform-with-kmmbridge-and-skie-to-publish-a-native-swift-sdk).
-
 The SDK reference for the PowerSync Swift SDK is available [here](https://docs.powersync.com/client-sdk-references/swift).
 
 ## Beta Release
@@ -31,11 +29,21 @@ The easiest way to test the PowerSync Swift SDK is to run our demo application.
 Add
 
 ```swift
-.package(url: "https://github.com/powersync-ja/powersync-swift", from: "<version>")
-```
-
-to your `Package.swift` file to consume the latest release automatically or pin the dependency to a specific version:
-
-```swift
 .package(url: "https://github.com/powersync-ja/powersync-swift", exact: "<version>")
 ```
+
+
+to your `Package.swift` file and pin the dependency to a specific version. This is required because the package is in beta.
+
+## Underlying Kotlin Dependency
+
+The PowerSync Swift SDK currently makes use of the [PowerSync Kotlin Multiplatform SDK](https://github.com/powersync-ja/powersync-kotlin) with the API tool [SKIE](https://skie.touchlab.co/) and KMMBridge under the hood to help generate and publish the native Swift SDK. We will move to an entirely Swift native API in v1 and do not expect there to be any breaking changes.
+
+
+## Migration from Alpha to Beta
+
+* The `PowerSyncDatabase` no longer needs a driver argument and it must be removed.
+* The interface for `PowerSyncDatabase` now uses `PowerSyncDatabaseProtocol` which may require some changes to databases uses.
+* If you were using `__uploadData` and `__fetchCredentials` in your `PowerSyncBackendConnector` you must remove the `__` and update the methods to `uploadData` and `fetchCredentials`.
+* `@MainThread` usage is no longer required and should be removed.
+* Implementing `SuspendTaskWrapper` for database transactions is no longer required and should be removed.
