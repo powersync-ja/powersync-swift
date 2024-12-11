@@ -6,7 +6,7 @@
 
 # PowerSync Swift
 
-The SDK reference for the PowerSync Swift SDK is available [here](https://docs.powersync.com/client-sdk-references/swift).
+This is the PowerSync SDK for Swift clients. The SDK reference is available [here](https://docs.powersync.com/client-sdk-references/swift).
 
 ## Beta Release
 
@@ -32,18 +32,14 @@ Add
 .package(url: "https://github.com/powersync-ja/powersync-swift", exact: "<version>")
 ```
 
-
-to your `Package.swift` file and pin the dependency to a specific version. This is required because the package is in beta.
+to your `Package.swift` file and pin the dependency to a specific version. The version is required because the package is in beta.
 
 ## Underlying Kotlin Dependency
 
-The PowerSync Swift SDK currently makes use of the [PowerSync Kotlin Multiplatform SDK](https://github.com/powersync-ja/powersync-kotlin) with the API tool [SKIE](https://skie.touchlab.co/) and KMMBridge under the hood to help generate and publish the native Swift SDK. We will move to an entirely Swift native API in v1 and do not expect there to be any breaking changes.
+The PowerSync Swift SDK currently makes use of the [PowerSync Kotlin Multiplatform SDK](https://github.com/powersync-ja/powersync-kotlin) with the API tool [SKIE](https://skie.touchlab.co/) and KMMBridge under the hood to help generate and publish a native Swift package. We will move to an entirely Swift native API in v1 and do not expect there to be any breaking changes. For more details, see the [Swift SDK reference](https://docs.powersync.com/client-sdk-references/swift).
 
 
 ## Migration from Alpha to Beta
 
-* The `PowerSyncDatabase` no longer needs a driver argument and it must be removed.
-* The interface for `PowerSyncDatabase` now uses `PowerSyncDatabaseProtocol` which may require some changes to databases uses.
-* If you were using `__uploadData` and `__fetchCredentials` in your `PowerSyncBackendConnector` you must remove the `__` and update the methods to `uploadData` and `fetchCredentials`.
-* `@MainThread` usage is no longer required and should be removed.
-* Implementing `SuspendTaskWrapper` for database transactions is no longer required and should be removed.
+See these [developer notes](https://docs.powersync.com/client-sdk-references/swift) if you are migrating from the alpha to the beta version of the Swift SDK.
+

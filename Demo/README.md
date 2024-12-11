@@ -14,7 +14,7 @@ Follow this guide to:
 
 ## Configure The App
 
-Open the project in XCode.
+Open this directory in XCode.
 
 Open the “_Secrets” file and insert the credentials of your Supabase and PowerSync projects (more info can be found [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#test-everything-using-our-demo-app)).
 
