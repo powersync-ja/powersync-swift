@@ -1,5 +1,9 @@
 import Foundation
 
+
+///
+/// Temporary credentials to connect to the PowerSync service.
+///
 public struct PowerSyncCredentials: Codable {
     /// PowerSync endpoint, e.g. "https://myinstance.powersync.co".
     public let endpoint: String

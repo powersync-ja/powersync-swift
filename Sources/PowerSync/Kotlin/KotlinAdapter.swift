@@ -9,7 +9,7 @@ internal struct KotlinAdapter {
             )
         }
     }
-    
+
     struct IndexedColumn {
         static func toKotlin(_ column: IndexedColumnProtocol) -> PowerSyncKotlin.IndexedColumn {
             return PowerSyncKotlin.IndexedColumn(
@@ -20,7 +20,7 @@ internal struct KotlinAdapter {
             )
         }
     }
-    
+
     struct Table {
         static func toKotlin(_ table: TableProtocol) -> PowerSyncKotlin.Table {
             PowerSyncKotlin.Table(
@@ -33,7 +33,7 @@ internal struct KotlinAdapter {
             )
         }
     }
-    
+
     struct Column {
         static func toKotlin(_ column: any ColumnProtocol) -> PowerSyncKotlin.Column {
             PowerSyncKotlin.Column(
@@ -41,7 +41,7 @@ internal struct KotlinAdapter {
                 type: columnType(from: column.type)
             )
         }
-        
+
         private static func columnType(from swiftType: ColumnData) -> PowerSyncKotlin.ColumnType {
             switch swiftType {
             case .text:
@@ -53,7 +53,7 @@ internal struct KotlinAdapter {
             }
         }
     }
-    
+
     struct Schema {
         static func toKotlin(_ schema: SchemaProtocol) -> PowerSyncKotlin.Schema {
             PowerSyncKotlin.Schema(
