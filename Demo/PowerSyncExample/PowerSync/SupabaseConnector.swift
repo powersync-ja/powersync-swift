@@ -112,6 +112,12 @@ class SupabaseConnector: PowerSyncBackendConnector {
         } catch {
             if let errorCode = PostgresFatalCodes.extractErrorCode(from: error),
                 PostgresFatalCodes.isFatalError(errorCode) {
+                    /// Instead of blocking the queue with these errors,
+                    /// discard the (rest of the) transaction.
+                    ///
+                    /// Note that these errors typically indicate a bug in the application.
+                    /// If protecting against data loss is important, save the failing records
+                    /// elsewhere instead of discarding, and/or notify the user.
                     print("Data upload error: \(error)")
                     print("Discarding entry: \(lastEntry!)")
                     _ = try await transaction.complete.invoke(p1: nil)
