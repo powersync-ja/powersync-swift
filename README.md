@@ -22,7 +22,7 @@ This SDK is currently in a beta release it is suitable for production use, given
 
 The easiest way to test the PowerSync Swift SDK is to run our demo application.
 
-- [Demo/PowerSyncExample](./Demo/PowerSyncExample/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector.
+- [Demo/PowerSyncExample](./Demo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector.
 
 ## Installation
 
@@ -59,4 +59,3 @@ The PowerSync Swift SDK currently makes use of the [PowerSync Kotlin Multiplatfo
 ## Migration from Alpha to Beta
 
 See these [developer notes](https://docs.powersync.com/client-sdk-references/swift#migrating-from-the-alpha-to-the-beta-sdk) if you are migrating from the alpha to the beta version of the Swift SDK.
-
