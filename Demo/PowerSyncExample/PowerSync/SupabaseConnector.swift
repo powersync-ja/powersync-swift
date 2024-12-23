@@ -4,11 +4,45 @@ import Supabase
 import PowerSync
 import AnyCodable
 
+private struct PostgresFatalCodes {
+    /// Postgres Response codes that we cannot recover from by retrying.
+    static let fatalResponseCodes: [String] = [
+        // Class 22 — Data Exception
+        // Examples include data type mismatch.
+        "22...",
+        // Class 23 — Integrity Constraint Violation.
+        // Examples include NOT NULL, FOREIGN KEY and UNIQUE violations.
+        "23...",
+        // INSUFFICIENT PRIVILEGE - typically a row-level security violation
+        "42501"
+    ]
+
+    static func isFatalError(_ code: String) -> Bool {
+        return fatalResponseCodes.contains { pattern in
+            code.range(of: pattern, options: [.regularExpression]) != nil
+        }
+    }
+
+    static func extractErrorCode(from error: any Error) -> String? {
+        // Look for code: Optional("XXXXX") pattern
+        let errorString = String(describing: error)
+        if let range = errorString.range(of: "code: Optional\\(\"([^\"]+)\"\\)", options: .regularExpression),
+            let codeRange = errorString[range].range(of: "\"([^\"]+)\"", options: .regularExpression) {
+                // Extract just the code from within the quotes
+                let code = errorString[codeRange].dropFirst().dropLast()
+                return String(code)
+            }
+        return nil
+    }
+}
+
+
 @Observable
 class SupabaseConnector: PowerSyncBackendConnector {
     let powerSyncEndpoint: String = Secrets.powerSyncEndpoint
     let client: SupabaseClient = SupabaseClient(supabaseURL: Secrets.supabaseURL, supabaseKey: Secrets.supabaseAnonKey)
     var session: Session?
+    private var errorCode: String?
 
     @ObservationIgnored
     private var observeAuthStateChangesTask: Task<Void, Error>?
@@ -76,6 +110,14 @@ class SupabaseConnector: PowerSyncBackendConnector {
             _ = try await transaction.complete.invoke(p1: nil)
 
         } catch {
+            if let errorCode = PostgresFatalCodes.extractErrorCode(from: error),
+                PostgresFatalCodes.isFatalError(errorCode) {
+                    print("Data upload error: \(error)")
+                    print("Discarding entry: \(lastEntry!)")
+                    _ = try await transaction.complete.invoke(p1: nil)
+                    return
+                }
+
             print("Data upload error - retrying last entry: \(lastEntry!), \(error)")
             throw error
         }
