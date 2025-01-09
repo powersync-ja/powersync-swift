@@ -18,7 +18,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/powersync-ja/powersync-kotlin.git", exact: "1.0.0-BETA11.0"),
-        .package(url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git", "0.3.1"..<"0.4.0"),
+        .package(url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git", "0.3.8"..<"0.4.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
