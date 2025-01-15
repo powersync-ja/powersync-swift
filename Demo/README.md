@@ -18,7 +18,7 @@ Follow this guide to:
 
 2. Open the “_Secrets” file and insert the credentials of your Supabase and PowerSync projects (more info can be found [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#test-everything-using-our-demo-app)).
 
-3. Enable CasePathMacros. We are using SwiftUI Navigation for the demo which requires this.
+3. You will need to enable `CasePathMacros` for SwiftUI Navigation. You can do this in settings, or just build the app and a dialog will be shown to enable `CasePathMacros`.
 
 ### Troubleshooting
 
