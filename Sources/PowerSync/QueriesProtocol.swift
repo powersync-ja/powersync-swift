@@ -39,10 +39,10 @@ public protocol Queries {
     ) -> AsyncStream<[RowType]>
     
     /// Execute a write transaction with the given callback
-    func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) async throws -> R) async throws -> R
+    func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) -> R) async throws -> R
 
     /// Execute a read transaction with the given callback
-    func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) async throws -> R) async throws -> R
+    func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) -> R) async throws -> R
 }
 
 extension Queries {

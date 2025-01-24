@@ -152,18 +152,17 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
  
     func testWriteTransaction() async throws {
         try await database.writeTransaction { transaction in
-            _ = try await transaction.execute(
+            _ = transaction.execute(
                 sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                 parameters: ["1", "Test User", "test@example.com"]
             )
             
-            _ = try await transaction.execute(
+            _ = transaction.execute(
                 sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                 parameters: ["2", "Test User 2", "test2@example.com"]
             )
         }
         
-
         let result = try await database.get(
             sql: "SELECT COUNT(*) FROM users",
             parameters: []
@@ -172,6 +171,33 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         }
         
         XCTAssertEqual(result as! Int, 2)
+    }
+    
+    func testWriteLongerTransaction() async throws {
+        let loopCount = 100
+        
+        try await database.writeTransaction { transaction in
+            for i in 1...loopCount {
+                _ = transaction.execute(
+                    sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+                    parameters: [String(i), "Test User \(i)", "test\(i)@example.com"]
+                )
+
+                _ = transaction.execute(
+                    sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+                    parameters: [String(i*10000), "Test User \(i)-2", "test\(i)-2@example.com"]
+                )
+            }
+        }
+        
+        let result = try await database.get(
+            sql: "SELECT COUNT(*) FROM users",
+            parameters: []
+        ) { cursor in
+            cursor.getLong(index: 0)
+        }
+        
+        XCTAssertEqual(result as! Int, 2 * loopCount)
     }
 
     func testReadTransaction() async throws {
@@ -182,7 +208,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         
         
         try await database.readTransaction { transaction in
-            let result = try await transaction.get(
+            let result = transaction.get(
                 sql: "SELECT COUNT(*) FROM users",
                 parameters: []
             ) { cursor in

@@ -123,38 +123,15 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         }
     }
 
-    public func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) async throws -> R) async throws -> R {
-        return try await kotlinDatabase.writeTransaction(callback: SuspendTaskWrapper { transaction in
-            return try await callback(transaction)
-        }) as! R
+    public func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) -> R) async throws -> R {
+        return try await kotlinDatabase.writeTransaction(callback: callback) as! R
     }
 
-    public func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) async throws -> R) async throws -> R {
-        return try await kotlinDatabase.writeTransaction(callback: SuspendTaskWrapper { transaction in
-            return try await callback(transaction)
-        }) as! R
+    public func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) -> R) async throws -> R {
+        return try await kotlinDatabase.readTransaction(callback: callback) as! R
     }
 }
 
 enum PowerSyncError: Error {
     case invalidTransaction
-}
-
-class SuspendTaskWrapper: KotlinSuspendFunction1 {
-    let handle: (any PowerSyncTransaction) async throws -> Any
-
-    init(_ handle: @escaping (any PowerSyncTransaction) async throws -> Any) {
-        self.handle = handle
-    }
-
-    func __invoke(p1: Any?, completionHandler: @escaping (Any?, Error?) -> Void) {
-        Task {
-            do {
-                let result = try await self.handle(p1 as! any PowerSyncTransaction)
-                completionHandler(result, nil)
-            } catch {
-                completionHandler(nil, error)
-            }
-        }
-    }
 }
