@@ -59,11 +59,11 @@ class SystemManager {
 
     func deleteList(id: String) async throws {
         try await db.writeTransaction(callback: { transaction in
-            _ = try await transaction.execute(
+            _ = transaction.execute(
                 sql: "DELETE FROM \(LISTS_TABLE) WHERE id = ?",
                 parameters: [id]
             )
-            _ = try await transaction.execute(
+            _ = transaction.execute(
                 sql: "DELETE FROM \(TODOS_TABLE) WHERE list_id = ?",
                 parameters: [id]
             )
@@ -117,7 +117,7 @@ class SystemManager {
 
     func deleteTodo(id: String) async throws {
         try await db.writeTransaction(callback: { transaction in
-            _ = try await transaction.execute(
+            _ = transaction.execute(
                     sql: "DELETE FROM \(TODOS_TABLE) WHERE id = ?",
                     parameters: [id]
                 )

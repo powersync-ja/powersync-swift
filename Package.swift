@@ -17,7 +17,7 @@ let package = Package(
             targets: ["PowerSync"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/powersync-ja/powersync-kotlin.git", exact: "1.0.0-BETA15.0"),
+        .package(name: "PowerSyncKotlin", path: "../powersync-kotlin"),
         .package(url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git", "0.3.8"..<"0.4.0")
     ],
     targets: [
@@ -26,7 +26,7 @@ let package = Package(
         .target(
             name: packageName,
             dependencies: [
-                .product(name: "PowerSyncKotlin", package: "powersync-kotlin"),
+                .product(name: "PowerSyncKotlin", package: "PowerSyncKotlin"),
                 .product(name: "PowerSyncSQLiteCore", package: "powersync-sqlite-core-swift")
             ]),
         .testTarget(
