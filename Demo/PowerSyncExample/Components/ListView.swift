@@ -63,11 +63,9 @@ struct ListView: View {
             }
         }
         .task {
-            Task {
-                await system.watchLists { ls in
-                    withAnimation {
-                        self.lists = IdentifiedArrayOf(uniqueElements: ls)
-                    }
+            await system.watchLists { ls in
+                withAnimation {
+                    self.lists = IdentifiedArrayOf(uniqueElements: ls)
                 }
             }
         }
