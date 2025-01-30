@@ -64,11 +64,9 @@ struct TodoListView: View {
             }
         }
         .task {
-            Task {
-                await system.watchTodos(listId) { tds in
-                    withAnimation {
-                        self.todos = IdentifiedArrayOf(uniqueElements: tds)
-                    }
+            await system.watchTodos(listId) { tds in
+                withAnimation {
+                    self.todos = IdentifiedArrayOf(uniqueElements: tds)
                 }
             }
         }

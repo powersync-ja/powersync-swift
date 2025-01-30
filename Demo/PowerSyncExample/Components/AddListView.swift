@@ -10,7 +10,7 @@ struct AddListView: View {
         Section {
             TextField("Name", text: $newList.name)
             Button("Save") {
-                Task.detached {
+                Task {
                     do {
                         try await system.insertList(newList)
                         await completion(.success(true))

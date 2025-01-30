@@ -12,7 +12,7 @@ struct AddTodoListView: View {
         Section {
             TextField("Description", text: $newTodo.description)
             Button("Save") {
-                Task.detached {
+                Task{
                     do {
                         try await system.insertTodo(newTodo, listId)
                         await completion(.success(true))
