@@ -38,9 +38,9 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             parameters: ["1"]
         ) { cursor in
             (
-                cursor.getString(index: 0)!,
-                cursor.getString(index: 1)!,
-                cursor.getString(index: 2)!
+                try cursor.getString(name: "id"),
+                try cursor.getString(name: "name"),
+                try cursor.getString(name: "email")
             )
         }
 
@@ -84,7 +84,10 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "SELECT id, name FROM users ORDER BY id",
             parameters: nil
         ) { cursor in
-            (cursor.getString(index: 0)!, cursor.getString(index: 1)!)
+            (
+                try cursor.getString(name: "id"),
+                try cursor.getString(name: "name")
+            )
         }
 
         XCTAssertEqual(users.count, 2)
