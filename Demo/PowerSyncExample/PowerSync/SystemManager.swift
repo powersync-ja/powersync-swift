@@ -39,10 +39,10 @@ class SystemManager {
             parameters: [],
             mapper: { cursor in
                 ListContent(
-                    id: cursor.getString(index: 0)!,
-                    name: cursor.getString(index: 1)!,
-                    createdAt: cursor.getString(index: 2)!,
-                    ownerId: cursor.getString(index: 3)!
+                    id: try cursor.getString(name: "id"),
+                    name: try cursor.getString(name: "name"),
+                    createdAt: try cursor.getString(name: "created_at"),
+                    ownerId: try cursor.getString(name: "owner_id")
                 )
             }
         ) {
@@ -77,15 +77,15 @@ class SystemManager {
             parameters: [listId],
             mapper: { cursor in
                 return Todo(
-                    id: cursor.getString(index: 0)!,
-                    listId: cursor.getString(index: 1)!,
-                    photoId: cursor.getString(index: 2),
-                    description: cursor.getString(index: 3)!,
-                    isComplete: cursor.getBoolean(index: 4)! as! Bool,
-                    createdAt: cursor.getString(index: 5),
-                    completedAt: cursor.getString(index: 6),
-                    createdBy: cursor.getString(index: 7),
-                    completedBy: cursor.getString(index: 8)
+                    id: try cursor.getString(name: "id"),
+                    listId: try cursor.getString(name: "list_id"),
+                    photoId: try cursor.getStringOptional(name: "photo_id"),
+                    description: try cursor.getString(name: "description"),
+                    isComplete: try cursor.getBoolean(name: "completed"),
+                    createdAt: try cursor.getString(name: "created_at"),
+                    completedAt: try cursor.getStringOptional(name: "completed_at"),
+                    createdBy: try cursor.getStringOptional(name: "created_by"),
+                    completedBy: try cursor.getStringOptional(name: "completed_by")
                 )
             }
         ) {
