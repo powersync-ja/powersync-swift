@@ -3,6 +3,7 @@
 ## 1.0.0-Beta.4
 * Allow cursor to use column name to get value by including the following functions that accept a column name parameter:
 `getBoolean`,`getBooleanOptional`,`getString`,`getStringOptional`, `getLong`,`getLongOptional`, `getDouble`,`getDoubleOptional`
+* BREAKING CHANGE: This should not affect anyone but made `KotlinPowerSyncCredentials`, `KotlinPowerSyncDatabase` and `KotlinPowerSyncBackendConnector` as these should never have been public.
 
 
 ## 1.0.0-Beta.3
