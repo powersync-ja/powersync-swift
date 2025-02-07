@@ -1,6 +1,7 @@
 # PowerSync Swift SDK
 
 ## Releasing
+
 * Confirm every PR you want in the release has been merged into `main`.
 * Update `CHANGELOG.md` with the changes.
 * In GitHub actions on GitHub manually run the `Release PowerSync` action. You will be required to update the version and add release notes.
