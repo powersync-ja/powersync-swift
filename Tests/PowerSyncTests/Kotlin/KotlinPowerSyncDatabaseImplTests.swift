@@ -11,6 +11,15 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             Table(name: "users", columns: [
                 .text("name"),
                 .text("email")
+            ]),
+            Table(name: "tasks", columns: [
+                .text("user_id"),
+                .text("description"),
+                .text("tags")
+            ]),
+            Table(name: "comments", columns: [
+                .text("task_id"),
+                .text("comment"),
             ])
         ])
 
@@ -221,5 +230,65 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
             XCTAssertEqual(result as! Int, 1)
         }
+    }
+    
+    func testJoin() async throws {
+        struct JoinOutput: Equatable {
+            var name: String
+            var description: String
+            var comment: String
+        }
+        
+        
+        _ = try await database.writeTransaction { transaction in
+            _ = transaction.execute(
+                sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+                parameters: ["1", "Test User", "test@example.com"]
+            )
+
+            _ = transaction.execute(
+                sql: "INSERT INTO tasks (id, user_id, description) VALUES (?, ?, ?)",
+                parameters: ["1", "1", "task 1"]
+            )
+            
+            _ = transaction.execute(
+                sql: "INSERT INTO tasks (id, user_id, description) VALUES (?, ?, ?)",
+                parameters: ["2", "1", "task 2"]
+            )
+            
+            _ = transaction.execute(
+                sql: "INSERT INTO comments (id, task_id, comment) VALUES (?, ?, ?)",
+                parameters: ["1", "1", "comment 1"]
+            )
+            
+            _ = transaction.execute(
+                sql: "INSERT INTO comments (id, task_id, comment) VALUES (?, ?, ?)",
+                parameters: ["2", "1", "comment 2"]
+            )
+        }
+    
+        let result = try await database.getAll(
+                sql: """
+                        SELECT 
+                            users.name as name, 
+                            tasks.description as description, 
+                            comments.comment as comment
+                        FROM users 
+                        LEFT JOIN tasks ON users.id = tasks.user_id
+                        LEFT JOIN comments ON tasks.id = comments.task_id;
+                """,
+                parameters: []
+            ) { cursor in
+                JoinOutput(
+                    name: try cursor.getString(name: "name"),
+                    description: try cursor.getString(name: "description"),
+                    comment: try cursor.getStringOptional(name: "comment") ?? ""
+                )
+            }
+
+            XCTAssertEqual(result.count, 3)
+            XCTAssertEqual(result[0] , JoinOutput(name: "Test User", description: "task 1", comment: "comment 1"))
+            XCTAssertEqual(result[1] , JoinOutput(name: "Test User", description: "task 1", comment: "comment 2"))
+            XCTAssertEqual(result[2] , JoinOutput(name: "Test User", description: "task 2", comment: ""))
     }
 }
