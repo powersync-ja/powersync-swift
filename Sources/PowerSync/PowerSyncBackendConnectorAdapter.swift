@@ -15,9 +15,9 @@ class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector {
             return result?.kotlinCredentials
         } catch {
             if #available(iOS 14.0, *) {
-                Logger().error("Failed to fetch credentials: \(error.localizedDescription)")
+                Logger().error("🔴 Failed to fetch credentials: \(error.localizedDescription)")
             } else {
-                print("Failed to fetch credentials: \(error.localizedDescription)")
+                print("🔴 Failed to fetch credentials: \(error.localizedDescription)")
             }
             return nil
         }
@@ -29,9 +29,9 @@ class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector {
             return  try await swiftBackendConnector.uploadData(database: swiftDatabase)
         } catch {
             if #available(iOS 14.0, *) {
-                Logger().error("Failed to upload data: \(error)")
+                Logger().error("🔴 Failed to upload data: \(error)")
             } else {
-                print("Failed to upload data: \(error)")
+                print("🔴 Failed to upload data: \(error)")
             }
         }
     }
