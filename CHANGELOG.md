@@ -1,6 +1,13 @@
 # Changelog
 
+## 1.0.0-Beta.5
+
+* Implement improvements to errors originating in Kotlin so that they can be handled in Swift
+* Improve `__fetchCredentials`to log the error but not cause an app crash on error
+
+
 ## 1.0.0-Beta.4
+
 * Allow cursor to use column name to get value by including the following functions that accept a column name parameter:
 `getBoolean`,`getBooleanOptional`,`getString`,`getStringOptional`, `getLong`,`getLongOptional`, `getDouble`,`getDoubleOptional`
 * BREAKING CHANGE: This should not affect anyone but made `KotlinPowerSyncCredentials`, `KotlinPowerSyncDatabase` and `KotlinPowerSyncBackendConnector` private as these should never have been public.
