@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0-Beta.6
+
+* Allow `execute` to be handled
+* BREAKING CHANGE: `watch` queries are now throwable and therefore will need to be accompanied by a `try` e.g.
+
+```swift
+try database.watch()
+```
+
 ## 1.0.0-Beta.5
 
 * Implement improvements to errors originating in Kotlin so that they can be handled in Swift

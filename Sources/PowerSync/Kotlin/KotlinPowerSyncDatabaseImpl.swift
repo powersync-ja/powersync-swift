@@ -79,7 +79,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             mapper: mapper
         ) as! RowType
     }
-    
+
     func get<RowType>(
         sql: String,
         parameters: [Any]?,
@@ -93,7 +93,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             }
         ) as! RowType
     }
-    
+
     func getAll<RowType>(
         sql: String,
         parameters: [Any]?,
@@ -105,7 +105,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             mapper: mapper
         ) as! [RowType]
     }
-    
+
     func getAll<RowType>(
         sql: String,
         parameters: [Any]?,
@@ -131,7 +131,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             mapper: mapper
         ) as! RowType?
     }
-    
+
     func getOptional<RowType>(
         sql: String,
         parameters: [Any]?,
@@ -150,42 +150,50 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         sql: String,
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) -> RowType
-    ) -> AsyncStream<[RowType]> {
-        AsyncStream { continuation in
+    ) throws -> AsyncThrowingStream<[RowType], Error> {
+        AsyncThrowingStream { continuation in
             Task {
-                for await values in try self.kotlinDatabase.watch(
-                    sql: sql,
-                    parameters: parameters,
-                    mapper: mapper
-                ) {
-                    continuation.yield(values as! [RowType])
-                }
-                continuation.finish()
-            }
-        }
-    }
-    
-    func watch<RowType>(
-        sql: String,
-        parameters: [Any]?,
-        mapper: @escaping (SqlCursor) throws -> RowType
-    ) -> AsyncStream<[RowType]> {
-        AsyncStream { continuation in
-            Task {
-                for await values in try self.kotlinDatabase.watch(
-                    sql: sql,
-                    parameters: parameters,
-                    mapper: { cursor in
-                        try! mapper(cursor)
+                do {
+                    for await values in try self.kotlinDatabase.watch(
+                        sql: sql,
+                        parameters: parameters,
+                        mapper: mapper
+                    ) {
+                        continuation.yield(values as! [RowType])
                     }
-                ) {
-                    continuation.yield(values as! [RowType])
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
                 }
-                continuation.finish()
             }
         }
     }
-    
+
+    func watch<RowType>(
+        sql: String,
+        parameters: [Any]?,
+        mapper: @escaping (SqlCursor) throws -> RowType
+    ) throws -> AsyncThrowingStream<[RowType], Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    for await values in try self.kotlinDatabase.watch(
+                        sql: sql,
+                        parameters: parameters,
+                        mapper: { cursor in
+                            try! mapper(cursor)
+                        }
+                    ) {
+                        continuation.yield(values as! [RowType])
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
     public func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) -> R) async throws -> R {
         return try await kotlinDatabase.writeTransaction(callback: callback) as! R
     }

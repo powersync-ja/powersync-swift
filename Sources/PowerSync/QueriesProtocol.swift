@@ -59,7 +59,7 @@ public protocol Queries {
         sql: String,
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) -> RowType
-    ) -> AsyncStream<[RowType]>
+    ) throws -> AsyncThrowingStream<[RowType], Error>
 
     /// Execute a read-only (SELECT) query every time the source tables are modified
     /// and return the results as an array in a Publisher.
@@ -67,7 +67,7 @@ public protocol Queries {
         sql: String,
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) throws -> RowType
-    ) -> AsyncStream<[RowType]>
+    ) throws -> AsyncThrowingStream<[RowType], Error>
 
     /// Execute a write transaction with the given callback
     func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) -> R) async throws -> R
@@ -105,7 +105,7 @@ extension Queries {
     public func watch<RowType>(
         _ sql: String,
         mapper: @escaping (SqlCursor) -> RowType
-    ) -> AsyncStream<[RowType]> {
-        return watch(sql: sql, parameters: [], mapper: mapper)
+    ) throws -> AsyncThrowingStream<[RowType], Error> {
+        return try watch(sql: sql, parameters: [], mapper: mapper)
     }
 }
