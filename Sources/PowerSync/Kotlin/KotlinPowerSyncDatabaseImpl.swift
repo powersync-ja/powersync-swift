@@ -153,7 +153,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     ) -> AsyncStream<[RowType]> {
         AsyncStream { continuation in
             Task {
-                for await values in self.kotlinDatabase.watch(
+                for await values in try self.kotlinDatabase.watch(
                     sql: sql,
                     parameters: parameters,
                     mapper: mapper
@@ -172,7 +172,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     ) -> AsyncStream<[RowType]> {
         AsyncStream { continuation in
             Task {
-                for await values in self.kotlinDatabase.watch(
+                for await values in try self.kotlinDatabase.watch(
                     sql: sql,
                     parameters: parameters,
                     mapper: { cursor in

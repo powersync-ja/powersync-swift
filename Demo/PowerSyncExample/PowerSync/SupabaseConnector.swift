@@ -70,13 +70,13 @@ class SupabaseConnector: PowerSyncBackendConnector {
 
     override func fetchCredentials() async throws -> PowerSyncCredentials? {
         session = try await client.auth.session
-
+        
         if (self.session == nil) {
             throw AuthError.sessionMissing
         }
-
+        
         let token = session!.accessToken
-
+        
         // userId is for debugging purposes only
         return PowerSyncCredentials(endpoint: self.powerSyncEndpoint, token: token, userId: currentUserID)
     }
