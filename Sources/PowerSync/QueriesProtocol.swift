@@ -70,10 +70,10 @@ public protocol Queries {
     ) throws -> AsyncThrowingStream<[RowType], Error>
 
     /// Execute a write transaction with the given callback
-    func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) -> R) async throws -> R
+    func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R
 
     /// Execute a read transaction with the given callback
-    func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) -> R) async throws -> R
+    func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R
 }
 
 extension Queries {

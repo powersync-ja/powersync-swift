@@ -194,8 +194,42 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         }
     }
 
-    public func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) -> R) async throws -> R {
-        return try await kotlinDatabase.writeTransaction(callback: callback) as! R
+    public func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
+        var err: Error? = nil
+        let result = try await kotlinDatabase.writeTransaction { transaction in
+            do {
+                let res = try callback(transaction)
+                return res as R
+            } catch {
+                err = error
+                return TransactionResponse.rollback
+            }
+        }
+        
+        if(err != nil) {
+            throw err!
+        }
+        
+        return result as! R
+    }
+
+    public func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
+        var err: Error? = nil
+        let result = try await kotlinDatabase.readTransaction { transaction in
+            do {
+                let res = try callback(transaction)
+                return res as R
+            } catch {
+                err = error
+                return TransactionResponse.rollback
+            }
+        }
+        
+        if(err != nil) {
+            throw err!
+        }
+        
+        return result as! R
     }
 
     public func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) -> R) async throws -> R {
