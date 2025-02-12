@@ -14,7 +14,7 @@ public struct PowerSyncCredentials: Codable {
     /// User ID.
     public let userId: String?
 
-    public init(endpoint: String, token: String, userId: String?) {
+    public init(endpoint: String, token: String, userId: String? = nil) {
         self.endpoint = endpoint
         self.token = token
         self.userId = userId
