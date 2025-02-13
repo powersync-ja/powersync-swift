@@ -27,6 +27,21 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         try await super.tearDown()
     }
 
+    func testExecuteError() async throws {
+        do {
+            _ = try await database.execute(
+                sql: "INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)",
+                parameters: ["1", "Test User", "test@example.com"]
+            )
+            XCTFail("Expected an error to be thrown")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, """
+error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+no such table: usersfail
+""")
+        }
+    }
+
     func testInsertAndGet() async throws {
         _ = try await database.execute(
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
@@ -47,6 +62,27 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(user.0, "1")
         XCTAssertEqual(user.1, "Test User")
         XCTAssertEqual(user.2, "test@example.com")
+    }
+
+    func testGetError() async throws {
+        do {
+            let _ = try await database.get(
+                sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
+                parameters: ["1"]
+            ) { cursor in
+                (
+                    try cursor.getString(name: "id"),
+                    try cursor.getString(name: "name"),
+                    try cursor.getString(name: "email")
+                )
+            }
+            XCTFail("Expected an error to be thrown")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, """
+error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
+no such table: usersfail
+""")
+        }
     }
 
     func testGetOptional() async throws {
@@ -74,6 +110,27 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(existing, "Test User")
     }
 
+    func testGetOptionalError() async throws {
+        do {
+            let _ = try await database.getOptional(
+                sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
+                parameters: ["1"]
+            ) { cursor in
+                (
+                    try cursor.getString(name: "id"),
+                    try cursor.getString(name: "name"),
+                    try cursor.getString(name: "email")
+                )
+            }
+            XCTFail("Expected an error to be thrown")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, """
+error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
+no such table: usersfail
+""")
+        }
+    }
+
     func testGetAll() async throws {
         _ = try await database.execute(
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?), (?, ?, ?)",
@@ -95,6 +152,27 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(users[0].1, "User 1")
         XCTAssertEqual(users[1].0, "2")
         XCTAssertEqual(users[1].1, "User 2")
+    }
+
+    func testGetAllError() async throws {
+        do {
+            let _ = try await database.getAll(
+                sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
+                parameters: ["1"]
+            ) { cursor in
+                (
+                    try cursor.getString(name: "id"),
+                    try cursor.getString(name: "name"),
+                    try cursor.getString(name: "email")
+                )
+            }
+            XCTFail("Expected an error to be thrown")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, """
+error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
+no such table: usersfail
+""")
+        }
     }
 
     func testWatchTableChanges() async throws {
@@ -119,7 +197,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         let resultsStore = ResultsStore()
 
-        let stream = database.watch(
+        let stream = try database.watch(
             sql: "SELECT name FROM users ORDER BY id",
             parameters: nil
         ) { cursor in
@@ -127,7 +205,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         }
 
         let watchTask = Task {
-            for await names in stream {
+            for try await names in stream {
                 await resultsStore.append(names)
                 if await resultsStore.count() == 2 {
                     expectation.fulfill()
@@ -153,14 +231,37 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(finalResults[1], ["User 1", "User 2"])
     }
 
+    func testWatchError() async throws {
+        do {
+            let stream = try database.watch(
+                sql: "SELECT name FROM usersfail ORDER BY id",
+                parameters: nil
+            ) { cursor in
+                cursor.getString(index: 0)!
+            }
+
+            // Actually consume the stream to trigger the error
+            for try await _ in stream {
+                XCTFail("Should not receive any values")
+            }
+
+            XCTFail("Expected an error to be thrown")
+        } catch {
+        XCTAssertEqual(error.localizedDescription, """
+error while compiling: EXPLAIN SELECT name FROM usersfail ORDER BY id
+no such table: usersfail
+""")
+        }
+    }
+
     func testWriteTransaction() async throws {
         _ = try await database.writeTransaction { transaction in
-            _ = transaction.execute(
+            _ = try transaction.execute(
                 sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                 parameters: ["1", "Test User", "test@example.com"]
             )
 
-            _ = transaction.execute(
+            _ = try transaction.execute(
                 sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                 parameters: ["2", "Test User 2", "test2@example.com"]
             )
@@ -182,12 +283,12 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         _ = try await database.writeTransaction { transaction in
             for i in 1...loopCount {
-                _ = transaction.execute(
+                _ = try transaction.execute(
                     sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                     parameters: [String(i), "Test User \(i)", "test\(i)@example.com"]
                 )
 
-                _ = transaction.execute(
+                _ = try transaction.execute(
                     sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                     parameters: [String(i*10000), "Test User \(i)-2", "test\(i)-2@example.com"]
                 )
@@ -204,6 +305,51 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(result as! Int, 2 * loopCount)
     }
 
+    func testWriteTransactionError() async throws {
+        do {
+            _ = try await database.writeTransaction { transaction in
+                _ = try transaction.execute(
+                    sql: "INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)",
+                    parameters: ["2", "Test User 2", "test2@example.com"]
+                )
+            }
+        } catch {
+            XCTAssertEqual(error.localizedDescription, """
+error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+no such table: usersfail
+""")
+        }
+    }
+
+    func testWriteTransactionErrorPerformsRollBack() async throws {
+        do {
+            _ = try await database.writeTransaction { transaction in
+                _ = try transaction.execute(
+                    sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+                    parameters: ["1", "Test User", "test@example.com"]
+                )
+
+                _ = try transaction.execute(
+                    sql: "INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)",
+                    parameters: ["2", "Test User 2", "test2@example.com"]
+                )
+            }
+        } catch {
+            XCTAssertEqual(error.localizedDescription, """
+error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+no such table: usersfail
+""")
+        }
+
+        let result = try await database.getOptional(
+            sql: "SELECT COUNT(*) FROM users",
+            parameters: []
+        ) { cursor in try cursor.getLong(index: 0)
+        }
+
+        XCTAssertEqual(result, 0)
+    }
+
     func testReadTransaction() async throws {
         _ = try await database.execute(
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
@@ -212,7 +358,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
 
         _ = try await database.readTransaction { transaction in
-            let result = transaction.get(
+            let result = try transaction.get(
                 sql: "SELECT COUNT(*) FROM users",
                 parameters: []
             ) { cursor in
@@ -220,6 +366,24 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
 
             XCTAssertEqual(result as! Int, 1)
+        }
+    }
+
+    func testReadTransactionError() async throws {
+        do {
+            _ = try await database.readTransaction { transaction in
+                let result = try transaction.get(
+                    sql: "SELECT COUNT(*) FROM usersfail",
+                    parameters: []
+                ) { cursor in
+                    cursor.getLong(index: 0)
+                }
+            }
+        } catch {
+            XCTAssertEqual(error.localizedDescription, """
+error while compiling: SELECT COUNT(*) FROM usersfail
+no such table: usersfail
+""")
         }
     }
 }

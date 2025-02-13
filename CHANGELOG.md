@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.0-Beta.6
+
+* BREAKING CHANGE: `watch` queries are now throwable and therefore will need to be accompanied by a `try` e.g.
+
+```swift
+try database.watch()
+```
+
+* BREAKING CHANGE: `transaction` functions are now throwable and therefore will need to be accompanied by a `try` e.g.
+
+```swift
+try await database.writeTransaction { transaction in
+  try transaction.execute(...)
+}
+```
+* Allow `execute` errors to be handled
+* `userId` is now set to `nil` by default and therefore it is no longer required to be set to `nil` when instantiating `PowerSyncCredentials` and can therefore be left out.
+
 ## 1.0.0-Beta.5
 
 * Implement improvements to errors originating in Kotlin so that they can be handled in Swift

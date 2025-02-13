@@ -28,7 +28,7 @@ struct TodoListView: View {
             ForEach(todos) { todo in
                 TodoListRow(todo: todo) {
                     Task {
-                        await toggleCompletion(of: todo)
+                        try await toggleCompletion(of: todo)
                     }
                 }
             }
