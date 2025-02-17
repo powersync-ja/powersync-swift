@@ -34,19 +34,23 @@ class SystemManager {
     }
 
     func watchLists(_ callback: @escaping (_ lists: [ListContent]) -> Void ) async {
-        for await lists in self.db.watch<[ListContent]>(
-            sql: "SELECT * FROM \(LISTS_TABLE)",
-            parameters: [],
-            mapper: { cursor in
-                ListContent(
-                    id: try cursor.getString(name: "id"),
-                    name: try cursor.getString(name: "name"),
-                    createdAt: try cursor.getString(name: "created_at"),
-                    ownerId: try cursor.getString(name: "owner_id")
-                )
+        do {
+            for try await lists in try self.db.watch<ListContent>(
+                sql: "SELECT * FROM \(LISTS_TABLE)",
+                parameters: [],
+                mapper: { cursor in
+                    try ListContent(
+                        id: cursor.getString(name: "id"),
+                        name: cursor.getString(name: "name"),
+                        createdAt: cursor.getString(name: "created_at"),
+                        ownerId: cursor.getString(name: "owner_id")
+                    )
+                }
+            ) {
+                callback(lists)
             }
-        ) {
-            callback(lists)
+        } catch {
+            print("Error in watch: \(error)")
         }
     }
 
@@ -59,11 +63,11 @@ class SystemManager {
 
     func deleteList(id: String) async throws {
         _ = try await db.writeTransaction(callback: { transaction in
-            _ = transaction.execute(
+            _ = try transaction.execute(
                 sql: "DELETE FROM \(LISTS_TABLE) WHERE id = ?",
                 parameters: [id]
             )
-            _ = transaction.execute(
+            _ = try transaction.execute(
                 sql: "DELETE FROM \(TODOS_TABLE) WHERE list_id = ?",
                 parameters: [id]
             )
@@ -72,24 +76,28 @@ class SystemManager {
     }
 
     func watchTodos(_ listId: String, _ callback: @escaping (_ todos: [Todo]) -> Void ) async {
-        for await todos in self.db.watch(
-            sql: "SELECT * FROM \(TODOS_TABLE) WHERE list_id = ?",
-            parameters: [listId],
-            mapper: { cursor in
-                return Todo(
-                    id: try cursor.getString(name: "id"),
-                    listId: try cursor.getString(name: "list_id"),
-                    photoId: try cursor.getStringOptional(name: "photo_id"),
-                    description: try cursor.getString(name: "description"),
-                    isComplete: try cursor.getBoolean(name: "completed"),
-                    createdAt: try cursor.getString(name: "created_at"),
-                    completedAt: try cursor.getStringOptional(name: "completed_at"),
-                    createdBy: try cursor.getStringOptional(name: "created_by"),
-                    completedBy: try cursor.getStringOptional(name: "completed_by")
-                )
+        do {
+            for try await todos in try self.db.watch(
+                sql: "SELECT * FROM \(TODOS_TABLE) WHERE list_id = ?",
+                parameters: [listId],
+                mapper: { cursor in
+                    try Todo(
+                        id: cursor.getString(name: "id"),
+                        listId: cursor.getString(name: "list_id"),
+                        photoId: cursor.getStringOptional(name: "photo_id"),
+                        description: cursor.getString(name: "description"),
+                        isComplete: cursor.getBoolean(name: "completed"),
+                        createdAt: cursor.getString(name: "created_at"),
+                        completedAt: cursor.getStringOptional(name: "completed_at"),
+                        createdBy: cursor.getStringOptional(name: "created_by"),
+                        completedBy: cursor.getStringOptional(name: "completed_by")
+                    )
+                }
+            ) {
+                callback(todos)
             }
-        ) {
-            callback(todos)
+        } catch {
+            print("Error in watch: \(error)")
         }
     }
 
@@ -117,7 +125,7 @@ class SystemManager {
 
     func deleteTodo(id: String) async throws {
         _ = try await db.writeTransaction(callback: { transaction in
-            transaction.execute(
+            try transaction.execute(
                 sql: "DELETE FROM \(TODOS_TABLE) WHERE id = ?",
                 parameters: [id]
             )

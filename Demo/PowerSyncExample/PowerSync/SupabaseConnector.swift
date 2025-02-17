@@ -77,8 +77,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
 
         let token = session!.accessToken
 
-        // userId is for debugging purposes only
-        return PowerSyncCredentials(endpoint: self.powerSyncEndpoint, token: token, userId: currentUserID)
+        return PowerSyncCredentials(endpoint: self.powerSyncEndpoint, token: token)
     }
 
     override func uploadData(database: PowerSyncDatabaseProtocol) async throws {
