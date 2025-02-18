@@ -4,16 +4,14 @@ import PowerSyncKotlin
 final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
 
-    var currentStatus: SyncStatus {
-        get { kotlinDatabase.currentStatus }
-    }
+    var currentStatus: SyncStatus { kotlinDatabase.currentStatus }
 
     init(
         schema: Schema,
         dbFilename: String
     ) {
         let factory = PowerSyncKotlin.DatabaseDriverFactory()
-        self.kotlinDatabase = PowerSyncDatabase(
+        kotlinDatabase = PowerSyncDatabase(
             factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),
             dbFilename: dbFilename
@@ -65,7 +63,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
 
     func execute(sql: String, parameters: [Any]?) async throws -> Int64 {
-        Int64(truncating: try await kotlinDatabase.execute(sql: sql, parameters: parameters))
+        try Int64(truncating: await kotlinDatabase.execute(sql: sql, parameters: parameters))
     }
 
     func get<RowType>(
@@ -73,11 +71,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> RowType {
-        try await kotlinDatabase.get(
+        try safeCast(await kotlinDatabase.get(
             sql: sql,
             parameters: parameters,
             mapper: mapper
-        ) as! RowType
+        ), to: RowType.self)
     }
 
     func get<RowType>(
@@ -85,13 +83,17 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType {
-        try await kotlinDatabase.get(
-            sql: sql,
-            parameters: parameters,
-            mapper: { cursor in
-                try! mapper(cursor)
-            }
-        ) as! RowType
+        return try await wrapQueryCursorTyped(
+            mapper: mapper,
+            executor: { wrappedMapper in
+                try await self.kotlinDatabase.get(
+                    sql: sql,
+                    parameters: parameters,
+                    mapper: wrappedMapper
+                )
+            },
+            resultType: RowType.self
+        )
     }
 
     func getAll<RowType>(
@@ -99,11 +101,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> [RowType] {
-        try await kotlinDatabase.getAll(
+        try safeCast(await kotlinDatabase.getAll(
             sql: sql,
             parameters: parameters,
             mapper: mapper
-        ) as! [RowType]
+        ), to: [RowType].self)
     }
 
     func getAll<RowType>(
@@ -111,13 +113,17 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> [RowType] {
-        try await kotlinDatabase.getAll(
-            sql: sql,
-            parameters: parameters,
-            mapper: { cursor in
-                try! mapper(cursor)
-            }
-        ) as! [RowType]
+        try await wrapQueryCursorTyped(
+            mapper: mapper,
+            executor: { wrappedMapper in
+                try await self.kotlinDatabase.getAll(
+                    sql: sql,
+                    parameters: parameters,
+                    mapper: wrappedMapper
+                )
+            },
+            resultType: [RowType].self
+        )
     }
 
     func getOptional<RowType>(
@@ -125,11 +131,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> RowType? {
-        try await kotlinDatabase.getOptional(
+        try safeCast(await kotlinDatabase.getOptional(
             sql: sql,
             parameters: parameters,
             mapper: mapper
-        ) as! RowType?
+        ), to: RowType?.self)
     }
 
     func getOptional<RowType>(
@@ -137,13 +143,17 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType? {
-        try await kotlinDatabase.getOptional(
-            sql: sql,
-            parameters: parameters,
-            mapper: { cursor in
-                try! mapper(cursor)
-            }
-        ) as! RowType?
+        try await wrapQueryCursorTyped(
+            mapper: mapper,
+            executor: { wrappedMapper in
+                try await self.kotlinDatabase.getOptional(
+                    sql: sql,
+                    parameters: parameters,
+                    mapper: wrappedMapper
+                )
+            },
+            resultType: RowType?.self
+        )
     }
 
     func watch<RowType>(
@@ -159,7 +169,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
                         parameters: parameters,
                         mapper: mapper
                     ) {
-                        continuation.yield(values as! [RowType])
+                        try continuation.yield(safeCast(values, to: [RowType].self))
                     }
                     continuation.finish()
                 } catch {
@@ -177,14 +187,23 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    for await values in try self.kotlinDatabase.watch(
+                    var mapperError: Error?
+                    for try await values in try self.kotlinDatabase.watch(
                         sql: sql,
                         parameters: parameters,
-                        mapper: { cursor in
-                            try! mapper(cursor)
-                        }
+                        mapper: { cursor in do {
+                            return try mapper(cursor)
+                        } catch {
+                            mapperError = error
+                            // The value here does not matter. We will throw the exception later
+                            // This is not ideal, this is only a workaround until we expose fine grained access to Kotlin SDK internals.
+                            return nil as RowType?
+                        } }
                     ) {
-                        continuation.yield(values as! [RowType])
+                        if mapperError != nil {
+                            throw mapperError!
+                        }
+                        try continuation.yield(safeCast(values, to: [RowType].self))
                     }
                     continuation.finish()
                 } catch {
@@ -195,33 +214,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
 
     public func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
-        return try await kotlinDatabase.writeTransaction(callback: TransactionCallback(callback: callback)) as! R
+        return try safeCast(await kotlinDatabase.writeTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
     }
 
     public func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
-        return try await kotlinDatabase.readTransaction(callback: TransactionCallback(callback: callback)) as! R
+        return try safeCast(await kotlinDatabase.readTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
     }
 }
 
-class TransactionCallback<R>: PowerSyncKotlin.ThrowableTransactionCallback {
-    let callback: (PowerSyncTransaction) throws -> R
-
-    init(callback: @escaping (PowerSyncTransaction) throws -> R) {
-        self.callback = callback
-    }
-
-    func execute(transaction: PowerSyncKotlin.PowerSyncTransaction) throws -> Any{
-        do {
-            return try callback(transaction)
-        } catch let error {
-            return PowerSyncKotlin.PowerSyncException(
-                message: error.localizedDescription,
-                cause: PowerSyncKotlin.KotlinThrowable(message: error.localizedDescription)
-            )
-        }
-    }
-}
-
-enum PowerSyncError: Error {
-    case invalidTransaction
-}

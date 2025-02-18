@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0-Beta.7
+
+* Fixed an issue where throwing exceptions in the query `mapper` could cause a runtime crash.
+* Internally improved type casting.
+
 ## 1.0.0-Beta.6
 
 * BREAKING CHANGE: `watch` queries are now throwable and therefore will need to be accompanied by a `try` e.g.
