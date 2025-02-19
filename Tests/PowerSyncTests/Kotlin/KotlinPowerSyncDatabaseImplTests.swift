@@ -1,5 +1,5 @@
-import XCTest
 @testable import PowerSync
+import XCTest
 
 final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     private var database: KotlinPowerSyncDatabaseImpl!
@@ -45,9 +45,9 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
-no such table: usersfail
-""")
+            error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+            no such table: usersfail
+            """)
         }
     }
 
@@ -61,10 +61,10 @@ no such table: usersfail
             sql: "SELECT id, name, email FROM users WHERE id = ?",
             parameters: ["1"]
         ) { cursor in
-            (
-                try cursor.getString(name: "id"),
-                try cursor.getString(name: "name"),
-                try cursor.getString(name: "email")
+            try (
+                cursor.getString(name: "id"),
+                cursor.getString(name: "name"),
+                cursor.getString(name: "email")
             )
         }
 
@@ -79,18 +79,18 @@ no such table: usersfail
                 sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
                 parameters: ["1"]
             ) { cursor in
-                (
-                    try cursor.getString(name: "id"),
-                    try cursor.getString(name: "name"),
-                    try cursor.getString(name: "email")
+                try (
+                    cursor.getString(name: "id"),
+                    cursor.getString(name: "name"),
+                    cursor.getString(name: "email")
                 )
             }
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
-no such table: usersfail
-""")
+            error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
+            no such table: usersfail
+            """)
         }
     }
 
@@ -125,18 +125,36 @@ no such table: usersfail
                 sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
                 parameters: ["1"]
             ) { cursor in
-                (
-                    try cursor.getString(name: "id"),
-                    try cursor.getString(name: "name"),
-                    try cursor.getString(name: "email")
+                try (
+                    cursor.getString(name: "id"),
+                    cursor.getString(name: "name"),
+                    cursor.getString(name: "email")
                 )
             }
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
-no such table: usersfail
-""")
+            error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
+            no such table: usersfail
+            """)
+        }
+    }
+
+    func testMapperError() async throws {
+        _ = try await database.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "Test User", "test@example.com"]
+        )
+        do {
+            let _ = try await database.getOptional(
+                sql: "SELECT id, name, email FROM users WHERE id = ?",
+                parameters: ["1"]
+            ) { _ throws in
+                throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "cursor error"])
+            }
+            XCTFail("Expected an error to be thrown")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "cursor error")
         }
     }
 
@@ -150,9 +168,9 @@ no such table: usersfail
             sql: "SELECT id, name FROM users ORDER BY id",
             parameters: nil
         ) { cursor in
-            (
-                try cursor.getString(name: "id"),
-                try cursor.getString(name: "name")
+            try (
+                cursor.getString(name: "id"),
+                cursor.getString(name: "name")
             )
         }
 
@@ -169,18 +187,18 @@ no such table: usersfail
                 sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
                 parameters: ["1"]
             ) { cursor in
-                (
-                    try cursor.getString(name: "id"),
-                    try cursor.getString(name: "name"),
-                    try cursor.getString(name: "email")
+                try (
+                    cursor.getString(name: "id"),
+                    cursor.getString(name: "name"),
+                    cursor.getString(name: "email")
                 )
             }
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
-no such table: usersfail
-""")
+            error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
+            no such table: usersfail
+            """)
         }
     }
 
@@ -256,10 +274,34 @@ no such table: usersfail
 
             XCTFail("Expected an error to be thrown")
         } catch {
-        XCTAssertEqual(error.localizedDescription, """
-error while compiling: EXPLAIN SELECT name FROM usersfail ORDER BY id
-no such table: usersfail
-""")
+            XCTAssertEqual(error.localizedDescription, """
+            error while compiling: EXPLAIN SELECT name FROM usersfail ORDER BY id
+            no such table: usersfail
+            """)
+        }
+    }
+
+    func testWatchMapperError() async throws {
+        do {
+            _ = try await database.execute(
+                sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+                parameters: ["1", "User 1", "user1@example.com"]
+            )
+
+            let stream = try database.watch(
+                sql: "SELECT name FROM users ORDER BY id",
+                parameters: nil
+            ) { _ throws in throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "cursor error"]) }
+
+            // Actually consume the stream to trigger the error
+            for try await _ in stream {
+                XCTFail("Should not receive any values")
+            }
+
+            XCTFail("Expected an error to be thrown")
+        } catch {
+            print(error.localizedDescription)
+            XCTAssertEqual(error.localizedDescription, "cursor error")
         }
     }
 
@@ -276,7 +318,6 @@ no such table: usersfail
             )
         }
 
-
         let result = try await database.get(
             sql: "SELECT COUNT(*) FROM users",
             parameters: []
@@ -291,7 +332,7 @@ no such table: usersfail
         let loopCount = 100
 
         _ = try await database.writeTransaction { transaction in
-            for i in 1...loopCount {
+            for i in 1 ... loopCount {
                 _ = try transaction.execute(
                     sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                     parameters: [String(i), "Test User \(i)", "test\(i)@example.com"]
@@ -299,7 +340,7 @@ no such table: usersfail
 
                 _ = try transaction.execute(
                     sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
-                    parameters: [String(i*10000), "Test User \(i)-2", "test\(i)-2@example.com"]
+                    parameters: [String(i * 10000), "Test User \(i)-2", "test\(i)-2@example.com"]
                 )
             }
         }
@@ -324,9 +365,9 @@ no such table: usersfail
             }
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
-no such table: usersfail
-""")
+            error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+            no such table: usersfail
+            """)
         }
     }
 
@@ -345,9 +386,9 @@ no such table: usersfail
             }
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
-no such table: usersfail
-""")
+            error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+            no such table: usersfail
+            """)
         }
 
         let result = try await database.getOptional(
@@ -364,7 +405,6 @@ no such table: usersfail
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
             parameters: ["1", "Test User", "test@example.com"]
         )
-
 
         _ = try await database.readTransaction { transaction in
             let result = try transaction.get(
@@ -390,9 +430,9 @@ no such table: usersfail
             }
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-error while compiling: SELECT COUNT(*) FROM usersfail
-no such table: usersfail
-""")
+            error while compiling: SELECT COUNT(*) FROM usersfail
+            no such table: usersfail
+            """)
         }
     }
 
