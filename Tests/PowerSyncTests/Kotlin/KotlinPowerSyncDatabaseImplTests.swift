@@ -445,27 +445,27 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
 
         _ = try await database.writeTransaction { transaction in
-            _ = transaction.execute(
+            _ = try transaction.execute(
                 sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                 parameters: ["1", "Test User", "test@example.com"]
             )
 
-            _ = transaction.execute(
+            _ = try transaction.execute(
                 sql: "INSERT INTO tasks (id, user_id, description) VALUES (?, ?, ?)",
                 parameters: ["1", "1", "task 1"]
             )
 
-            _ = transaction.execute(
+            _ = try transaction.execute(
                 sql: "INSERT INTO tasks (id, user_id, description) VALUES (?, ?, ?)",
                 parameters: ["2", "1", "task 2"]
             )
 
-            _ = transaction.execute(
+            _ = try transaction.execute(
                 sql: "INSERT INTO comments (id, task_id, comment) VALUES (?, ?, ?)",
                 parameters: ["1", "1", "comment 1"]
             )
 
-            _ = transaction.execute(
+            _ = try transaction.execute(
                 sql: "INSERT INTO comments (id, task_id, comment) VALUES (?, ?, ?)",
                 parameters: ["2", "1", "comment 2"]
             )
