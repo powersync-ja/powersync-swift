@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-Beta.8
+
+* Update underlying package which has a fix to avoid `watchQuery` race conditions
+
 ## 1.0.0-Beta.7
 
 * Fixed an issue where throwing exceptions in the query `mapper` could cause a runtime crash.
