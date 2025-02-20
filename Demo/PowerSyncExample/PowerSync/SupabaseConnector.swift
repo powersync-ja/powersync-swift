@@ -81,36 +81,37 @@ class SupabaseConnector: PowerSyncBackendConnector {
     }
 
     override func uploadData(database: PowerSyncDatabaseProtocol) async throws {
+        guard let transaction = try await database.getCrudBatch() else { return }
 
-        guard let transaction = try await database.getNextCrudTransaction() else { return }
+            var lastEntry: CrudEntry?
+            do {
+                try await Task.detached {
+                    for entry in transaction.crud {
+                        lastEntry = entry
+                        let tableName = entry.table
 
-        var lastEntry: CrudEntry?
-        do {
-            for entry in transaction.crud {
-                lastEntry = entry
-                let tableName = entry.table
+                        let table = self.client.from(tableName)
 
-                let table = client.from(tableName)
+                        switch entry.op {
+                        case .put:
+                            var data: [String: AnyCodable] = entry.opData?.mapValues { AnyCodable($0) } ?? [:]
+                            data["id"] = AnyCodable(entry.id)
+                            try await table.upsert(data).execute();
+                        case .patch:
+                            guard let opData = entry.opData else { continue }
+                            let encodableData = opData.mapValues { AnyCodable($0) }
+                            try await table.update(encodableData).eq("id", value: entry.id).execute()
+                        case .delete:
+                            try await table.delete().eq( "id", value: entry.id).execute()
+                        }
+                    }
 
-                switch entry.op {
-                case .put:
-                    var data: [String: AnyCodable] = entry.opData?.mapValues { AnyCodable($0) } ?? [:]
-                    data["id"] = AnyCodable(entry.id)
-                    try await table.upsert(data).execute();
-                case .patch:
-                    guard let opData = entry.opData else { continue }
-                    let encodableData = opData.mapValues { AnyCodable($0) }
-                    try await table.update(encodableData).eq("id", value: entry.id).execute()
-                case .delete:
-                    try await table.delete().eq( "id", value: entry.id).execute()
-                }
-            }
+                    _ = try await transaction.complete.invoke(p1: nil)
+                }.value
 
-            _ = try await transaction.complete.invoke(p1: nil)
-
-        } catch {
-            if let errorCode = PostgresFatalCodes.extractErrorCode(from: error),
-                PostgresFatalCodes.isFatalError(errorCode) {
+            } catch {
+                if let errorCode = PostgresFatalCodes.extractErrorCode(from: error),
+                   PostgresFatalCodes.isFatalError(errorCode) {
                     /// Instead of blocking the queue with these errors,
                     /// discard the (rest of the) transaction.
                     ///
@@ -123,9 +124,9 @@ class SupabaseConnector: PowerSyncBackendConnector {
                     return
                 }
 
-            print("Data upload error - retrying last entry: \(lastEntry!), \(error)")
-            throw error
-        }
+                print("Data upload error - retrying last entry: \(lastEntry!), \(error)")
+                throw error
+            }
     }
 
     deinit {
