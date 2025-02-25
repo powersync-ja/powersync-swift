@@ -25,6 +25,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     func waitForFirstSync() async throws {
         try await kotlinDatabase.waitForFirstSync()
     }
+    
+    func waitForFirstSync(priority: Int32) async throws {
+        try await kotlinDatabase.waitForFirstSync(priority: priority)
+    }
 
     func connect(
         connector: PowerSyncBackendConnector,

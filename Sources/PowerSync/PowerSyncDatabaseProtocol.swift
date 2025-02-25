@@ -13,6 +13,9 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     
     /// Wait for the first sync to occur
     func waitForFirstSync() async throws
+   
+    /// Wait for the first (possibly partial) sync to occur that contains all buckets in the given priority.
+    func waitForFirstSync(priority: Int32) async throws
     
     /// Connect to the PowerSync service, and keep the databases in sync.
     ///
