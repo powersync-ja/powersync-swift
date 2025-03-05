@@ -56,20 +56,10 @@ class SystemManager {
     }
 
     func insertList(_ list: NewListContent) async throws {
-        let id = try await self.db.get(sql: "select uuid() as uuid", parameters: [], mapper: {cursor in try cursor.getString(name: "uuid")})
-        
         let result = try await self.db.execute(
-            sql: "INSERT INTO \(LISTS_TABLE) (id, created_at, name, owner_id) VALUES (?, datetime(), ?, ?)",
-            parameters: [id, list.name, connector.currentUserID]
+            sql: "INSERT INTO \(LISTS_TABLE) (id, created_at, name, owner_id) VALUES (uuid(), datetime(), ?, ?)",
+            parameters: [list.name, connector.currentUserID]
         )
-        
-        // insert 2000k todos
-        // try await self.db.writeTransaction(callback: { tx in
-        //     for (_) in 0..<10000 {
-        //         try tx.execute(sql: "INSERT INTO \(TODOS_TABLE) (id, list_id, description) VALUES (uuid(), ?, ?)", parameters: [id, "Todo \(Int.random(in: 0..<1000))"])
-        //     }
-            
-        // })
     }
 
     func deleteList(id: String) async throws {
@@ -97,8 +87,8 @@ class SystemManager {
                         listId: cursor.getString(name: "list_id"),
                         photoId: cursor.getStringOptional(name: "photo_id"),
                         description: cursor.getString(name: "description"),
-                        isComplete: cursor.getBooleanOptional(name: "completed") ?? false,
-                        createdAt: cursor.getStringOptional(name: "created_at"),
+                        isComplete: cursor.getBoolean(name: "completed"),
+                        createdAt: cursor.getString(name: "created_at"),
                         completedAt: cursor.getStringOptional(name: "completed_at"),
                         createdBy: cursor.getStringOptional(name: "created_by"),
                         completedBy: cursor.getStringOptional(name: "completed_by")

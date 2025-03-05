@@ -226,7 +226,6 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         let watchTask = Task {
             for try await names in stream {
-                print(names)
                 await resultsStore.append(names)
                 if await resultsStore.count() == 2 {
                     expectation.fulfill()
