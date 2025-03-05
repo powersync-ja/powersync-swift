@@ -2,6 +2,22 @@ import Foundation
 import Combine
 import PowerSyncKotlin
 
+public let DEFAULT_WATCH_THROTTLE_MS = Int64(30);
+
+public struct WatchOptions<RowType> {
+    public var sql: String
+    public var parameters: [Any]
+    public var throttleMs: Int64
+    public var mapper: (SqlCursor) throws -> RowType
+    
+    public init(sql: String, parameters: [Any]? = [], throttleMs: Int64? = DEFAULT_WATCH_THROTTLE_MS, mapper: @escaping (SqlCursor) throws -> RowType) {
+        self.sql = sql
+        self.parameters = parameters ?? [] // Default to empty array if nil
+        self.throttleMs = throttleMs ?? DEFAULT_WATCH_THROTTLE_MS // Default to the constant if nil
+        self.mapper = mapper;
+    }
+}
+
 public protocol Queries {
     /// Execute a write query (INSERT, UPDATE, DELETE)
     /// Using `RETURNING *` will result in an error.
@@ -68,6 +84,10 @@ public protocol Queries {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) throws -> AsyncThrowingStream<[RowType], Error>
+    
+    func watch<RowType>(
+        options: WatchOptions<RowType>
+    ) throws -> AsyncThrowingStream<[RowType], Error>
 
     /// Execute a write transaction with the given callback
     func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R
@@ -108,4 +128,27 @@ extension Queries {
     ) throws -> AsyncThrowingStream<[RowType], Error> {
         return try watch(sql: sql, parameters: [], mapper: mapper)
     }
+    
+
+    /// Execute a read-only (SELECT) query every time the source tables are modified
+    /// and return the results as an array in a Publisher.
+    func watch<RowType>(
+        sql: String,
+        parameters: [Any]?,
+        mapper: @escaping (SqlCursor) -> RowType
+    ) throws -> AsyncThrowingStream<[RowType], Error> {
+        return try watch(sql: sql, parameters: [], mapper: mapper)
+    }
+
+    /// Execute a read-only (SELECT) query every time the source tables are modified
+    /// and return the results as an array in a Publisher.
+    func watch<RowType>(
+        sql: String,
+        parameters: [Any]?,
+        mapper: @escaping (SqlCursor) throws -> RowType
+    ) throws -> AsyncThrowingStream<[RowType], Error> {
+        return try watch(sql: sql, parameters: [], mapper: mapper)
+    }
+    
+    
 }

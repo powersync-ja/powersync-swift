@@ -161,22 +161,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) throws -> AsyncThrowingStream<[RowType], Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    for await values in try self.kotlinDatabase.watch(
-                        sql: sql,
-                        parameters: parameters,
-                        mapper: mapper
-                    ) {
-                        try continuation.yield(safeCast(values, to: [RowType].self))
-                    }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-        }
+        try watch(options: WatchOptions(sql: sql, parameters: parameters, mapper: mapper))
     }
 
     func watch<RowType>(
@@ -184,41 +169,50 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) throws -> AsyncThrowingStream<[RowType], Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    var mapperError: Error?
-                    for try await values in try self.kotlinDatabase.watch(
-                        sql: sql,
-                        parameters: parameters,
-                        mapper: { cursor in do {
-                            return try mapper(cursor)
-                        } catch {
-                            mapperError = error
-                            // The value here does not matter. We will throw the exception later
-                            // This is not ideal, this is only a workaround until we expose fine grained access to Kotlin SDK internals.
-                            return nil as RowType?
-                        } }
-                    ) {
-                        if mapperError != nil {
-                            throw mapperError!
+       try watch(options: WatchOptions(sql: sql, parameters: parameters, mapper: mapper))
+    }
+        
+        func watch<RowType>(
+            options: WatchOptions<RowType>
+        ) throws -> AsyncThrowingStream<[RowType], Error> {
+            AsyncThrowingStream { continuation in
+                Task {
+                    do {
+                        var mapperError: Error?
+                        for try await values in try self.kotlinDatabase.watch(
+                            sql: options.sql,
+                            parameters: options.parameters,
+                            throttleMs: KotlinLong(value: options.throttleMs),
+                            mapper: { cursor in do {
+                                return try options.mapper(cursor)
+                            } catch {
+                                mapperError = error
+                                // The value here does not matter. We will throw the exception later
+                                // This is not ideal, this is only a workaround until we expose fine grained access to Kotlin SDK internals.
+                                return nil as RowType?
+                            } }
+                        ) {
+                            if mapperError != nil {
+                                throw mapperError!
+                            }
+                            try continuation.yield(safeCast(values, to: [RowType].self))
                         }
-                        try continuation.yield(safeCast(values, to: [RowType].self))
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
                     }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
                 }
             }
         }
-    }
-
-    public func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
-        return try safeCast(await kotlinDatabase.writeTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
-    }
-
-    public func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
-        return try safeCast(await kotlinDatabase.readTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
-    }
+        
+        
+        func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
+            return try safeCast(await kotlinDatabase.writeTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
+        }
+        
+        func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
+            return try safeCast(await kotlinDatabase.readTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
+        }
+    
 }
 
