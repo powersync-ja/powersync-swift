@@ -190,7 +190,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
                     // This attempts to EXPLAIN the query before passing it to Kotlin
                     // We could introduce an onChange API in Kotlin which we use to implement watches here.
                     // This would prevent most issues with exceptions.
-                    _ = try await self.kotlinDatabase.getAll(sql: "EXPLAIN \(options.sql)", parameters: options.parameters, mapper: { _ in "" })
+                    _ = try await self.kotlinDatabase.getAll(
+                        sql: "EXPLAIN \(options.sql)",
+                        parameters: options.parameters,
+                        mapper: { _ in "" }
+                    )
                     for try await values in try self.kotlinDatabase.watch(
                         sql: options.sql,
                         parameters: options.parameters,
