@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0-Beta.8
+
+* Improved watch query internals. Added the ability to throttle watched queries.
+
 ## 1.0.0-Beta.7
 
 * Fixed an issue where throwing exceptions in the query `mapper` could cause a runtime crash.
