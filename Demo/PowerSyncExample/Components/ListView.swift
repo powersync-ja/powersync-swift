@@ -9,8 +9,18 @@ struct ListView: View {
     @State private var error: Error?
     @State private var newList: NewListContent?
     @State private var editing: Bool = false
+    @State private var didSync: Bool = false
 
     var body: some View {
+        if !didSync {
+            Text("Busy with sync!").task {
+                do {
+                    try await system.db.waitForFirstSync(priority: 1)
+                    didSync = true;
+                } catch {}
+            }
+        }
+        
         List {
             if let error {
                 ErrorText(error)
