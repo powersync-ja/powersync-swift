@@ -25,7 +25,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     func waitForFirstSync() async throws {
         try await kotlinDatabase.waitForFirstSync()
     }
-    
+
     func waitForFirstSync(priority: Int32) async throws {
         try await kotlinDatabase.waitForFirstSync(priority: priority)
     }
@@ -173,58 +173,55 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) throws -> AsyncThrowingStream<[RowType], Error> {
-       try watch(options: WatchOptions(sql: sql, parameters: parameters, mapper: mapper))
+        try watch(options: WatchOptions(sql: sql, parameters: parameters, mapper: mapper))
     }
-        
-        func watch<RowType>(
-            options: WatchOptions<RowType>
-        ) throws -> AsyncThrowingStream<[RowType], Error> {
-            AsyncThrowingStream { continuation in
-                Task {
-                    do {
-                        var mapperError: Error?
-                        // HACK!
-                        // SKIEE doesn't support custom exceptions in Flows
-                        // Exceptions which occur in the Flow itself cause runtime crashes.
-                        // The most probable crash would be the internal EXPLAIN statement.
-                        // This attempts to EXPLAIN the query before passing it to Kotlin
-                        // We could introduce an onChange API in Kotlin which we use to implement watches here.
-                        // This would prevent most issues with exceptions.
-                        _ = try await self.kotlinDatabase.get(sql: "EXPLAIN \(options.sql)", parameters: options.parameters, mapper: {_ in ""})
-                        for try await values in try self.kotlinDatabase.watch(
-                            sql: options.sql,
-                            parameters: options.parameters,
-                            throttleMs: KotlinLong(value: options.throttleMs),
-                            mapper: { cursor in do {
-                                return try options.mapper(cursor)
-                            } catch {
-                                mapperError = error
-                                // The value here does not matter. We will throw the exception later
-                                // This is not ideal, this is only a workaround until we expose fine grained access to Kotlin SDK internals.
-                                return nil as RowType?
-                            } }
-                        ) {
-                            if mapperError != nil {
-                                throw mapperError!
-                            }
-                            try continuation.yield(safeCast(values, to: [RowType].self))
+
+    func watch<RowType>(
+        options: WatchOptions<RowType>
+    ) throws -> AsyncThrowingStream<[RowType], Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    var mapperError: Error?
+                    // HACK!
+                    // SKIEE doesn't support custom exceptions in Flows
+                    // Exceptions which occur in the Flow itself cause runtime crashes.
+                    // The most probable crash would be the internal EXPLAIN statement.
+                    // This attempts to EXPLAIN the query before passing it to Kotlin
+                    // We could introduce an onChange API in Kotlin which we use to implement watches here.
+                    // This would prevent most issues with exceptions.
+                    _ = try await self.kotlinDatabase.getAll(sql: "EXPLAIN \(options.sql)", parameters: options.parameters, mapper: { _ in "" })
+                    for try await values in try self.kotlinDatabase.watch(
+                        sql: options.sql,
+                        parameters: options.parameters,
+                        throttleMs: KotlinLong(value: options.throttleMs),
+                        mapper: { cursor in do {
+                            return try options.mapper(cursor)
+                        } catch {
+                            mapperError = error
+                            // The value here does not matter. We will throw the exception later
+                            // This is not ideal, this is only a workaround until we expose fine grained access to Kotlin SDK internals.
+                            return nil as RowType?
+                        } }
+                    ) {
+                        if mapperError != nil {
+                            throw mapperError!
                         }
-                        continuation.finish()
-                    } catch {
-                        continuation.finish(throwing: error)
+                        try continuation.yield(safeCast(values, to: [RowType].self))
                     }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
                 }
             }
         }
-        
-        
-        func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
-            return try safeCast(await kotlinDatabase.writeTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
-        }
-        
-        func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
-            return try safeCast(await kotlinDatabase.readTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
-        }
-    
-}
+    }
 
+    func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
+        return try safeCast(await kotlinDatabase.writeTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
+    }
+
+    func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
+        return try safeCast(await kotlinDatabase.readTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
+    }
+}

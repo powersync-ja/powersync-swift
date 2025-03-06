@@ -1,20 +1,20 @@
-import Foundation
 import Combine
+import Foundation
 import PowerSyncKotlin
 
-public let DEFAULT_WATCH_THROTTLE_MS = Int64(30);
+public let DEFAULT_WATCH_THROTTLE_MS = Int64(30)
 
 public struct WatchOptions<RowType> {
     public var sql: String
     public var parameters: [Any]
     public var throttleMs: Int64
     public var mapper: (SqlCursor) throws -> RowType
-    
+
     public init(sql: String, parameters: [Any]? = [], throttleMs: Int64? = DEFAULT_WATCH_THROTTLE_MS, mapper: @escaping (SqlCursor) throws -> RowType) {
         self.sql = sql
         self.parameters = parameters ?? [] // Default to empty array if nil
         self.throttleMs = throttleMs ?? DEFAULT_WATCH_THROTTLE_MS // Default to the constant if nil
-        self.mapper = mapper;
+        self.mapper = mapper
     }
 }
 
@@ -84,7 +84,7 @@ public protocol Queries {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) throws -> AsyncThrowingStream<[RowType], Error>
-    
+
     func watch<RowType>(
         options: WatchOptions<RowType>
     ) throws -> AsyncThrowingStream<[RowType], Error>
@@ -96,59 +96,36 @@ public protocol Queries {
     func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R
 }
 
-extension Queries {
-    public func execute(_ sql: String) async throws -> Int64 {
+public extension Queries {
+    func execute(_ sql: String) async throws -> Int64 {
         return try await execute(sql: sql, parameters: [])
     }
 
-    public func get<RowType>(
+    func get<RowType>(
         _ sql: String,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> RowType {
         return try await get(sql: sql, parameters: [], mapper: mapper)
     }
 
-    public func getAll<RowType>(
+    func getAll<RowType>(
         _ sql: String,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> [RowType] {
         return try await getAll(sql: sql, parameters: [], mapper: mapper)
     }
 
-    public func getOptional<RowType>(
+    func getOptional<RowType>(
         _ sql: String,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> RowType? {
         return try await getOptional(sql: sql, parameters: [], mapper: mapper)
     }
 
-    public func watch<RowType>(
+    func watch<RowType>(
         _ sql: String,
         mapper: @escaping (SqlCursor) -> RowType
     ) throws -> AsyncThrowingStream<[RowType], Error> {
         return try watch(sql: sql, parameters: [], mapper: mapper)
     }
-    
-
-    /// Execute a read-only (SELECT) query every time the source tables are modified
-    /// and return the results as an array in a Publisher.
-    func watch<RowType>(
-        sql: String,
-        parameters: [Any]?,
-        mapper: @escaping (SqlCursor) -> RowType
-    ) throws -> AsyncThrowingStream<[RowType], Error> {
-        return try watch(sql: sql, parameters: [], mapper: mapper)
-    }
-
-    /// Execute a read-only (SELECT) query every time the source tables are modified
-    /// and return the results as an array in a Publisher.
-    func watch<RowType>(
-        sql: String,
-        parameters: [Any]?,
-        mapper: @escaping (SqlCursor) throws -> RowType
-    ) throws -> AsyncThrowingStream<[RowType], Error> {
-        return try watch(sql: sql, parameters: [], mapper: mapper)
-    }
-    
-    
 }
