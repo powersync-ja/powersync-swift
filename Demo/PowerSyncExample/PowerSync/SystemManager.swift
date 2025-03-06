@@ -36,16 +36,17 @@ class SystemManager {
     func watchLists(_ callback: @escaping (_ lists: [ListContent]) -> Void ) async {
         do {
             for try await lists in try self.db.watch<ListContent>(
-                sql: "SELECT * FROM \(LISTS_TABLE)",
-                parameters: [],
-                mapper: { cursor in
-                    try ListContent(
-                        id: cursor.getString(name: "id"),
-                        name: cursor.getString(name: "name"),
-                        createdAt: cursor.getString(name: "created_at"),
-                        ownerId: cursor.getString(name: "owner_id")
-                    )
-                }
+                options: WatchOptions(
+                    sql: "SELECT * FROM \(LISTS_TABLE)",
+                    mapper: { cursor in
+                        try ListContent(
+                            id: cursor.getString(name: "id"),
+                            name: cursor.getString(name: "name"),
+                            createdAt: cursor.getString(name: "created_at"),
+                            ownerId: cursor.getString(name: "owner_id")
+                        )
+                    }
+                )
             ) {
                 callback(lists)
             }
@@ -55,7 +56,7 @@ class SystemManager {
     }
 
     func insertList(_ list: NewListContent) async throws {
-        _ = try await self.db.execute(
+        let result = try await self.db.execute(
             sql: "INSERT INTO \(LISTS_TABLE) (id, created_at, name, owner_id) VALUES (uuid(), datetime(), ?, ?)",
             parameters: [list.name, connector.currentUserID]
         )

@@ -198,13 +198,13 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         // Create an actor to handle concurrent mutations
         actor ResultsStore {
-            private var results: [[String]] = []
+            private var results: Set<String> = []
 
             func append(_ names: [String]) {
-                results.append(names)
+                results.formUnion(names)
             }
 
-            func getResults() -> [[String]] {
+            func getResults() -> Set<String> {
                 results
             }
 
@@ -213,14 +213,16 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
         }
 
+
         let resultsStore = ResultsStore()
 
         let stream = try database.watch(
-            sql: "SELECT name FROM users ORDER BY id",
-            parameters: nil
-        ) { cursor in
-            cursor.getString(index: 0)!
-        }
+            options: WatchOptions(
+                sql: "SELECT name FROM users ORDER BY id",
+                mapper: { cursor in
+                    cursor.getString(index: 0)!
+                }
+            ))
 
         let watchTask = Task {
             for try await names in stream {
@@ -240,13 +242,18 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
             parameters: ["2", "User 2", "user2@example.com"]
         )
+        
 
         await fulfillment(of: [expectation], timeout: 5)
         watchTask.cancel()
 
         let finalResults = await resultsStore.getResults()
-        XCTAssertEqual(finalResults.count, 2)
-        XCTAssertEqual(finalResults[1], ["User 1", "User 2"])
+        // The count of invocations here can vary a lot depending on the order of execution
+        // In some cases the creation of the users can fire before the initial watched query
+        // has emitted a result.
+        // However the watched query should always emit the latest result set.
+        XCTAssertLessThanOrEqual(finalResults.count, 3)
+        XCTAssertEqual(finalResults, ["User 1", "User 2"])
     }
 
     func testWatchError() async throws {

@@ -25,7 +25,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     func waitForFirstSync() async throws {
         try await kotlinDatabase.waitForFirstSync()
     }
-    
+
     func waitForFirstSync(priority: Int32) async throws {
         try await kotlinDatabase.waitForFirstSync(priority: priority)
     }
@@ -165,22 +165,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) throws -> AsyncThrowingStream<[RowType], Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    for await values in try self.kotlinDatabase.watch(
-                        sql: sql,
-                        parameters: parameters,
-                        mapper: mapper
-                    ) {
-                        try continuation.yield(safeCast(values, to: [RowType].self))
-                    }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-        }
+        try watch(options: WatchOptions(sql: sql, parameters: parameters, mapper: mapper))
     }
 
     func watch<RowType>(
@@ -188,15 +173,34 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) throws -> AsyncThrowingStream<[RowType], Error> {
+        try watch(options: WatchOptions(sql: sql, parameters: parameters, mapper: mapper))
+    }
+
+    func watch<RowType>(
+        options: WatchOptions<RowType>
+    ) throws -> AsyncThrowingStream<[RowType], Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
                     var mapperError: Error?
+                    // HACK!
+                    // SKIEE doesn't support custom exceptions in Flows
+                    // Exceptions which occur in the Flow itself cause runtime crashes.
+                    // The most probable crash would be the internal EXPLAIN statement.
+                    // This attempts to EXPLAIN the query before passing it to Kotlin
+                    // We could introduce an onChange API in Kotlin which we use to implement watches here.
+                    // This would prevent most issues with exceptions.
+                    _ = try await self.kotlinDatabase.getAll(
+                        sql: "EXPLAIN \(options.sql)",
+                        parameters: options.parameters,
+                        mapper: { _ in "" }
+                    )
                     for try await values in try self.kotlinDatabase.watch(
-                        sql: sql,
-                        parameters: parameters,
+                        sql: options.sql,
+                        parameters: options.parameters,
+                        throttleMs: KotlinLong(value: options.throttleMs),
                         mapper: { cursor in do {
-                            return try mapper(cursor)
+                            return try options.mapper(cursor)
                         } catch {
                             mapperError = error
                             // The value here does not matter. We will throw the exception later
@@ -217,12 +221,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         }
     }
 
-    public func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
+    func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
         return try safeCast(await kotlinDatabase.writeTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
     }
 
-    public func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
+    func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
         return try safeCast(await kotlinDatabase.readTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
     }
 }
-
