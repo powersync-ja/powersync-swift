@@ -1,5 +1,5 @@
 {
-  "originHash" : "25b8cd5d97789d7e497d6a5e0b04419a426018d83f0e80ab6817b213aa976748",
+  "originHash" : "33297127250b66812faa920958a24bae46bf9e9d1c38ea6b84ca413efaf16afd",
   "pins" : [
     {
       "identity" : "anycodable",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-kotlin.git",
       "state" : {
-        "revision" : "203db74889df8a20e3c6ac38aede6b0186d2e3b5",
-        "version" : "1.0.0-BETA23.0"
+        "revision" : "cb1a7d186144290b5ad706f5c2c9b67ff707356e",
+        "version" : "1.0.0-BETA27.0"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
       "state" : {
-        "revision" : "5de629f7ddc649a1e89c64fde6113fe113fe14de",
-        "version" : "0.3.9"
+        "revision" : "fb313c473b17457d79bf3847905f5a288901d493",
+        "version" : "0.3.11"
       }
     },
     {
