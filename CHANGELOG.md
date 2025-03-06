@@ -3,6 +3,7 @@
 ## 1.0.0-Beta.8
 
 * Improved watch query internals. Added the ability to throttle watched queries.
+* Added support for sync bucket priorities.
 
 ## 1.0.0-Beta.7
 
