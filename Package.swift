@@ -8,6 +8,7 @@ let package = Package(
     name: packageName,
     platforms: [
         .iOS(.v13),
+        .macOS(.v10_15)
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
@@ -27,7 +28,8 @@ let package = Package(
             dependencies: [
                 .product(name: "PowerSyncKotlin", package: "powersync-kotlin"),
                 .product(name: "PowerSyncSQLiteCore", package: "powersync-sqlite-core-swift")
-            ]),
+            ]
+        ),
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]
