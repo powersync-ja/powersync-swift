@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-Beta.9
+
+* Update PowerSync SQLite core extension to 0.3.12.
+* Added queuing protection and warnings when connecting multiple PowerSync clients to the same database file.
+* Improved concurrent SQLite connection support. A single write connection and multiple read connections are used for concurrent read queries.
+* Internally improved the linking of SQLite.
+* Enabled Full Text Search support.
+* Added the ability to update the schema for existing PowerSync clients.
+* Fixed bug where local only, insert only and view name overrides were not applied for schema tables.
+
 ## 1.0.0-Beta.8
 
 * Improved watch query internals. Added the ability to throttle watched queries.
