@@ -443,6 +443,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     }
 
     func testUpdatingSchema() async throws {
+        _ = try await database.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "Test User", "test@example.com"]
+        )
+
         let newSchema = Schema(tables: [
             Table(
                 name: "users",
@@ -453,11 +458,6 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 viewNameOverride: "people"
             ),
         ])
-
-        _ = try await database.execute(
-            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
-            parameters: ["1", "Test User", "test@example.com"]
-        )
 
         try await database.updateSchema(schema: newSchema)
 
