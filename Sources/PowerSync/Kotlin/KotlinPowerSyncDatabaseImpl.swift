@@ -26,6 +26,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         try await kotlinDatabase.waitForFirstSync()
     }
 
+    func updateSchema(schema: any SchemaProtocol) async throws {
+        try await kotlinDatabase.updateSchema(schema: KotlinAdapter.Schema.toKotlin(schema))
+    }
+
     func waitForFirstSync(priority: Int32) async throws {
         try await kotlinDatabase.waitForFirstSync(priority: priority)
     }

@@ -13,6 +13,13 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     
     /// Wait for the first sync to occur
     func waitForFirstSync() async throws
+    
+
+    /// Replace the schema with a new version. This is for advanced use cases - typically the schema
+    /// should just be specified once in the constructor.
+    ///
+    /// Cannot be used while connected - this should only be called before connect.
+    func updateSchema(schema: SchemaProtocol) async throws
    
     /// Wait for the first (possibly partial) sync to occur that contains all buckets in the given priority.
     func waitForFirstSync(priority: Int32) async throws

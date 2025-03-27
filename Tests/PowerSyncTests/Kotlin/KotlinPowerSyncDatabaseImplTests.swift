@@ -213,7 +213,6 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
         }
 
-
         let resultsStore = ResultsStore()
 
         let stream = try database.watch(
@@ -242,7 +241,6 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
             parameters: ["2", "User 2", "user2@example.com"]
         )
-        
 
         await fulfillment(of: [expectation], timeout: 5)
         watchTask.cancel()
@@ -432,5 +430,42 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             no such table: usersfail
             """)
         }
+    }
+
+    func testFTS() async throws {
+        let supported = try await database.get(
+            "SELECT sqlite_compileoption_used('ENABLE_FTS5');"
+        ) { cursor in
+            cursor.getLong(index: 0)
+        }
+
+        XCTAssertEqual(supported, 1)
+    }
+
+    func testUpdatingSchema() async throws {
+        _ = try await database.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "Test User", "test@example.com"]
+        )
+
+        let newSchema = Schema(tables: [
+            Table(
+                name: "users",
+                columns: [
+                    .text("name"),
+                    .text("email"),
+                ],
+                viewNameOverride: "people"
+            ),
+        ])
+
+        try await database.updateSchema(schema: newSchema)
+
+        let peopleCount = try await database.get(
+            sql: "SELECT COUNT(*) FROM people",
+            parameters: []
+        ) { cursor in cursor.getLong(index: 0) }
+
+        XCTAssertEqual(peopleCount, 1)
     }
 }
