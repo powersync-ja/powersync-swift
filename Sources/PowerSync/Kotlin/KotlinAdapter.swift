@@ -1,5 +1,6 @@
 import PowerSyncKotlin
 
+
 internal struct KotlinAdapter {
     struct Index {
         static func toKotlin(_ index: IndexProtocol) -> PowerSyncKotlin.Index {
