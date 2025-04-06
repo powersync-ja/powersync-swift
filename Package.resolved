@@ -1,6 +1,15 @@
 {
   "pins" : [
     {
+      "identity" : "powersync-kotlin",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/powersync-ja/powersync-kotlin.git",
+      "state" : {
+        "revision" : "443df078f4b9352de137000b993d564d4ab019b7",
+        "version" : "1.0.0-BETA28.0"
+      }
+    },
+    {
       "identity" : "powersync-sqlite-core-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
