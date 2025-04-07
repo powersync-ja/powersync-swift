@@ -16,13 +16,15 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         database = KotlinPowerSyncDatabaseImpl(
             schema: schema,
-            dbFilename: ":memory:"
+            dbFilename: ":memory:",
+            logger: DefaultLogger()
         )
         try await database.disconnectAndClear()
     }
 
     override func tearDown() async throws {
         try await database.disconnectAndClear()
+        try await database.close()
         database = nil
         try await super.tearDown()
     }
@@ -467,5 +469,46 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         ) { cursor in cursor.getLong(index: 0) }
 
         XCTAssertEqual(peopleCount, 1)
+    }
+    
+    func testCustomLogger() async throws {
+        let logger = TestLogger()
+        
+        let db2 = KotlinPowerSyncDatabaseImpl(
+            schema: schema,
+            dbFilename: ":memory:",
+            logger: logger
+        )
+        
+        try await db2.close()
+        
+        let warningIndex = logger.logs.firstIndex(
+            where: { value in
+                value.contains("warning: Multiple PowerSync instances for the same database have been detected")
+            }
+        )
+        
+        XCTAssert(warningIndex! >= 0)
+    }
+    
+    func testMinimumSeverity() async throws {
+        let logger = TestLogger(minSeverity: .error)
+        
+        let db2 = KotlinPowerSyncDatabaseImpl(
+            schema: schema,
+            dbFilename: ":memory:",
+            logger: logger
+        )
+        
+        try await db2.close()
+        
+        let warningIndex = logger.logs.firstIndex(
+            where: { value in
+                value.contains("warning: Multiple PowerSync instances for the same database have been detected")
+            }
+        )
+        
+        // The warning should not be present due to the min severity
+        XCTAssert(warningIndex == nil)
     }
 }
