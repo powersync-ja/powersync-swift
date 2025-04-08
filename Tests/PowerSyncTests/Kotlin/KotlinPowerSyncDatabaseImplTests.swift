@@ -27,7 +27,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         // Tests currently fail if this is called.
         // The watched query tests try and read from the DB while it's closing. 
         // This causes a PowerSyncException to be thrown in the Kotlin flow.
-        // Custom exceptions are not supported by SKIEE. This causes a crash.
+        // Custom exceptions in flows are not supported by SKIEE. This causes a crash.
         // FIXME: Reapply once watched query errors are handled better.
         // try await database.close()
         database = nil
