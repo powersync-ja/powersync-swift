@@ -4,23 +4,22 @@ import Foundation
 public enum PowerSyncError: Error {
     /// A general error with an associated message
     case generalError(String)
-    
+
     /// Indicates that a file was not found at the given path
     case fileNotFound(String)
-    
+
     /// An I/O error occurred
     case ioError(Error)
-    
+
     /// The given file or directory path was invalid
     case invalidPath(String)
-    
+
     /// An error related to attachment handling
     case attachmentError(String)
 }
 
 /// Protocol defining an adapter interface for local file storage
 public protocol LocalStorageAdapter {
-    
     /// Saves data to a file at the specified path.
     ///
     /// - Parameters:
@@ -32,7 +31,7 @@ public protocol LocalStorageAdapter {
         filePath: String,
         data: Data
     ) async throws -> Int64
-    
+
     /// Reads a file from the specified path.
     ///
     /// - Parameters:
@@ -44,32 +43,32 @@ public protocol LocalStorageAdapter {
         filePath: String,
         mediaType: String?
     ) async throws -> Data
-    
+
     /// Deletes a file at the specified path.
     ///
     /// - Parameter filePath: The full path to the file to delete.
     /// - Throws: `PowerSyncError` if deletion fails or file doesn't exist.
     func deleteFile(filePath: String) async throws
-    
+
     /// Checks if a file exists at the specified path.
     ///
     /// - Parameter filePath: The path to the file.
     /// - Returns: `true` if the file exists, `false` otherwise.
     /// - Throws: `PowerSyncError` if checking fails.
     func fileExists(filePath: String) async throws -> Bool
-    
+
     /// Creates a directory at the specified path.
     ///
     /// - Parameter path: The full path to the directory.
     /// - Throws: `PowerSyncError` if creation fails.
     func makeDir(path: String) async throws
-    
+
     /// Removes a directory at the specified path.
     ///
     /// - Parameter path: The full path to the directory.
     /// - Throws: `PowerSyncError` if removal fails.
     func rmDir(path: String) async throws
-    
+
     /// Copies a file from the source path to the target path.
     ///
     /// - Parameters:
@@ -84,7 +83,6 @@ public protocol LocalStorageAdapter {
 
 /// Extension providing a default implementation of `readFile` without a media type
 public extension LocalStorageAdapter {
-    
     /// Reads a file from the specified path without specifying a media type.
     ///
     /// - Parameter filePath: The full path to the file.

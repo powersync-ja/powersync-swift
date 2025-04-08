@@ -1,5 +1,6 @@
 import Foundation
-//TODO should not need this
+
+// TODO: should not need this
 import PowerSyncKotlin
 
 /**
@@ -10,14 +11,14 @@ public class AttachmentService {
     private let tableName: String
 //    private let logger: Logger
     private let maxArchivedCount: Int64
-    
+
     /**
      * Table used for storing attachments in the attachment queue.
      */
     private var table: String {
         return tableName
     }
-    
+
     public init(
         db: PowerSyncDatabaseProtocol,
         tableName: String,
@@ -29,24 +30,24 @@ public class AttachmentService {
 //        self.logger = logger
         self.maxArchivedCount = maxArchivedCount
     }
-    
+
     /**
      * Delete the attachment from the attachment queue.
      */
     public func deleteAttachment(id: String) async throws {
         _ = try await db.execute(sql: "DELETE FROM \(table) WHERE id = ?", parameters: [id])
     }
-    
+
     /**
      * Set the state of the attachment to ignore.
      */
     public func ignoreAttachment(id: String) async throws {
         _ = try await db.execute(
-            sql:  "UPDATE \(table) SET state = ? WHERE id = ?",
+            sql: "UPDATE \(table) SET state = ? WHERE id = ?",
             parameters: [AttachmentState.archived.rawValue, id]
         )
     }
-    
+
     /**
      * Get the attachment from the attachment queue using an ID.
      */
@@ -55,7 +56,7 @@ public class AttachmentService {
             try Attachment.fromCursor(cursor)
         })
     }
-    
+
     /**
      * Save the attachment to the attachment queue.
      */
@@ -64,7 +65,7 @@ public class AttachmentService {
             try self.upsertAttachment(attachment, context: ctx)
         }
     }
-    
+
     /**
      * Save the attachments to the attachment queue.
      */
@@ -72,14 +73,14 @@ public class AttachmentService {
         if attachments.isEmpty {
             return
         }
-        
+
         try await db.writeTransaction { tx in
             for attachment in attachments {
                 _ = try self.upsertAttachment(attachment, context: tx)
             }
         }
     }
-    
+
     /**
      * Get all the ID's of attachments in the attachment queue.
      */
@@ -87,11 +88,12 @@ public class AttachmentService {
         return try await db.getAll(
             sql: "SELECT id FROM \(table) WHERE id IS NOT NULL",
             parameters: [],
-            mapper: {cursor in
-            try cursor.getString(name: "id")
-        })
+            mapper: { cursor in
+                try cursor.getString(name: "id")
+            }
+        )
     }
-    
+
     public func getAttachments() async throws -> [Attachment] {
         return try await db.getAll(
             sql: """
@@ -105,11 +107,12 @@ public class AttachmentService {
                 timestamp ASC
             """,
             parameters: [],
-            mapper:  { cursor in
-            try Attachment.fromCursor(cursor)
-        })
+            mapper: { cursor in
+                try Attachment.fromCursor(cursor)
+            }
+        )
     }
-    
+
     /**
      * Gets all the active attachments which require an operation to be performed.
      */
@@ -136,16 +139,16 @@ public class AttachmentService {
             try Attachment.fromCursor(cursor)
         }
     }
-    
+
     /**
      * Watcher for changes to attachments table.
      * Once a change is detected it will initiate a sync of the attachments
      */
     public func watchActiveAttachments() throws -> AsyncThrowingStream<[String], Error> {
 //        logger.i("Watching attachments...")
-        
+
         return try db.watch(
-            sql:  """
+            sql: """
             SELECT 
                 id 
             FROM 
@@ -166,16 +169,16 @@ public class AttachmentService {
             try cursor.getString(name: "id")
         }
     }
-    
+
     /**
      * Helper function to clear the attachment queue
      * Currently only used for testing purposes.
      */
     public func clearQueue() async throws {
-        //logger.i("Clearing attachment queue...")
+        // logger.i("Clearing attachment queue...")
         _ = try await db.execute("DELETE FROM \(table)")
     }
-    
+
     /**
      * Delete attachments which have been archived
      * @returns true if all items have been deleted. Returns false if there might be more archived
@@ -204,20 +207,20 @@ public class AttachmentService {
         ) { cursor in
             try Attachment.fromCursor(cursor)
         }
-        
+
         try await callback(attachments)
-        
+
         let ids = try JSONEncoder().encode(attachments.map { $0.id })
         let idsString = String(data: ids, encoding: .utf8)!
-        
+
         _ = try await db.execute(
-            sql:  "DELETE FROM \(table) WHERE id IN (SELECT value FROM json_each(?));",
+            sql: "DELETE FROM \(table) WHERE id IN (SELECT value FROM json_each(?));",
             parameters: [idsString]
         )
-        
+
         return attachments.count < limit
     }
-    
+
     /**
      * Upserts an attachment record synchronously given a database connection context.
      */
@@ -236,7 +239,7 @@ public class AttachmentService {
             mediaType: attachment.mediaType,
             size: attachment.size,
         )
-        
+
         try context.execute(
             sql: """
             INSERT OR REPLACE INTO 
@@ -255,7 +258,7 @@ public class AttachmentService {
                 updatedRecord.hasSynced ?? 0,
             ]
         )
-        
+
         return attachment
     }
 }

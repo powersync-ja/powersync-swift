@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 /// A service that synchronizes attachments between local and remote storage.
 ///

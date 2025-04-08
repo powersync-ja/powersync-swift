@@ -7,7 +7,6 @@ import Foundation
 ///
 /// If an operation fails and should not be retried, the attachment record is archived.
 public protocol SyncErrorHandler {
-    
     /// Handles a download error for a specific attachment.
     ///
     /// - Parameters:
@@ -48,17 +47,17 @@ public protocol SyncErrorHandler {
 public class DefaultSyncErrorHandler: SyncErrorHandler {
     public init() {}
 
-    public func onDownloadError(attachment: Attachment, error: Error) async -> Bool {
+    public func onDownloadError(attachment _: Attachment, error _: Error) async -> Bool {
         // Default: do not retry failed downloads
         return false
     }
 
-    public func onUploadError(attachment: Attachment, error: Error) async -> Bool {
+    public func onUploadError(attachment _: Attachment, error _: Error) async -> Bool {
         // Default: do not retry failed uploads
         return false
     }
 
-    public func onDeleteError(attachment: Attachment, error: Error) async -> Bool {
+    public func onDeleteError(attachment _: Attachment, error _: Error) async -> Bool {
         // Default: do not retry failed deletions
         return false
     }
