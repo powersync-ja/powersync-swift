@@ -2,44 +2,59 @@ import OSLog
 
 /// A log writer which prints to the standard output
 ///
-/// This writer uses `os.Logger` on iOS 14+ and falls back to `print` for earlier versions.
+/// This writer uses `os.Logger` on iOS/macOS/tvOS/watchOS 14+ and falls back to `print` for earlier versions.
 public class PrintLogWriter: LogWriterProtocol {
     
-    /// Logs a message with a given severity and optional tag.
-       ///
-       /// - Parameters:
-       ///   - severity: The severity level of the message.
-       ///   - message: The content of the log message.
-       ///   - tag: An optional tag used to categorize the message. If empty, no brackets are shown.
-    public func log(severity: LogSeverity, message: String, tag: String?) {
-        let tagPrefix: String
-        if let tag, !tag.isEmpty {
-            tagPrefix = "[\(tag)] "
-        } else {
-            tagPrefix = ""
+    private let subsystem: String
+    private let category: String
+    private lazy var logger: Any? = {
+        if #available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *) {
+            return Logger(subsystem: subsystem, category: category)
         }
+        return nil
+    }()
+    
+    /// Creates a new PrintLogWriter
+    /// - Parameters:
+    ///   - subsystem: The subsystem identifier (typically reverse DNS notation of your app)
+    ///   - category: The category within your subsystem
+    public init(subsystem: String = Bundle.main.bundleIdentifier ?? "com.powersync.logger",
+                category: String = "default") {
+        self.subsystem = subsystem
+        self.category = category
+    }
+    
+    /// Logs a message with a given severity and optional tag.
+    /// - Parameters:
+    ///   - severity: The severity level of the message.
+    ///   - message: The content of the log message.
+    ///   - tag: An optional tag used to categorize the message. If empty, no brackets are shown.
+    public func log(severity: LogSeverity, message: String, tag: String?) {
+        let tagPrefix = tag.map { !$0.isEmpty ? "[\($0)] " : "" } ?? ""
+        let formattedMessage = "\(tagPrefix)\(message)"
         
-        let message = "\(tagPrefix) \(message)"
-        if #available(iOS 14.0, *) {
-            let l = Logger()
+        if #available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *) {
+            guard let logger = logger as? Logger else { return }
             
             switch severity {
-                case .info:
-                    l.info("\(message)")
-                case .error:
-                    l.error("\(message)")
-                case .debug:
-                    l.debug("\(message)")
-                case .warning:
-                    l.warning("\(message)")
-                case .fault:
-                    l.fault("\(message)")
+            case .info:
+                logger.info("\(formattedMessage, privacy: .public)")
+            case .error:
+                logger.error("\(formattedMessage, privacy: .public)")
+            case .debug:
+                logger.debug("\(formattedMessage, privacy: .public)")
+            case .warning:
+                logger.warning("\(formattedMessage, privacy: .public)")
+            case .fault:
+                logger.fault("\(formattedMessage, privacy: .public)")
             }
         } else {
-            print("\(severity.stringValue): \(message)")
+            print("\(severity.stringValue): \(formattedMessage)")
         }
     }
 }
+
+
 
 /// A default logger configuration that uses `PrintLogWritter` and filters messages by minimum severity.
 public class DefaultLogger: LoggerProtocol {
