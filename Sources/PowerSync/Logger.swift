@@ -53,7 +53,7 @@ public class DefaultLogger: LoggerProtocol {
     ///     - writers: Optional writers which logs should be written to. Defaults to a `PrintLogWriter`.
     public init(minSeverity: LogSeverity = .debug, writers: [any LogWriterProtocol]? = nil ) {
         self.writers = writers ?? [ PrintLogWriter() ]
-        self.minSeverirty = minSeverity
+        self.minSeverity = minSeverity
     }
     
     public func setWriters(_ writters: [any LogWriterProtocol]) {
@@ -61,7 +61,7 @@ public class DefaultLogger: LoggerProtocol {
     }
     
     public func setMinSeverity(_ severity: LogSeverity) {
-        self.minSeverirty = severity
+        self.minSeverity = severity
     }
     
     
@@ -86,7 +86,7 @@ public class DefaultLogger: LoggerProtocol {
     }
     
     private func writeLog(_ message: String, severity: LogSeverity, tag: String?) {
-        if (severity.rawValue < self.minSeverirty.rawValue) {
+        if (severity.rawValue < self.minSeverity.rawValue) {
             return
         }
         
