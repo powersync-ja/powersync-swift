@@ -9,7 +9,7 @@ private class KermitLogWriterAdapter: Kermit_coreLogWriter {
     
     /// Initializes a new adapter.
     ///
-    /// - Parameter adapter: A Swift log writer that will handle log output.
+    /// - Parameter logger: A Swift log writer that will handle log output.
     init(logger: any LoggerProtocol) {
         self.logger = logger
         super.init()
@@ -20,7 +20,7 @@ private class KermitLogWriterAdapter: Kermit_coreLogWriter {
     /// - Parameters:
     ///   - severity: The severity level of the log.
     ///   - message: The content of the log message.
-    ///   - tag: An optional string categorizing the log.
+    ///   - tag: A string categorizing the log.
     ///   - throwable: An optional Kotlin exception (ignored here).
     override func log(severity: Kermit_coreSeverity, message: String, tag: String, throwable: KotlinThrowable?) {
         switch severity {
@@ -40,7 +40,7 @@ private class KermitLogWriterAdapter: Kermit_coreLogWriter {
     }
 }
 
-/// A logger implementation that integrates with PowerSync's Kotlin backend using Kermit.
+/// A logger implementation that integrates with PowerSync's Kotlin core using Kermit.
 ///
 /// This class bridges Swift log writers with the Kotlin logging system and supports
 /// runtime configuration of severity levels and writer lists.
@@ -51,10 +51,10 @@ internal class DatabaseLogger: LoggerProtocol {
     
     /// Initializes a new logger with an optional list of writers.
     ///
-    /// - Parameter writers: An array of Swift log writers. Defaults to an empty array.
+    /// - Parameter logger: A logger which will be called for each internal log operation
     init(_ logger: any LoggerProtocol) {
         self.logger = logger
-        // Set to the lowest severity. The adapter downstream logger should filter by severity
+        // Set to the lowest severity. The provided logger should filter by severity
         kLogger.mutableConfig.setMinSeverity(Kermit_coreSeverity.verbose)
         kLogger.mutableConfig.setLogWriterList(
             [KermitLogWriterAdapter(logger: logger)]
@@ -80,27 +80,27 @@ internal class DatabaseLogger: LoggerProtocol {
     }
     
     /// Logs a debug-level message.
-    public func debug(_ message: String, tag: String) {
+    public func debug(_ message: String, tag: String?) {
         logger.debug(message, tag: tag)
     }
     
     /// Logs an info-level message.
-    public func info(_ message: String, tag: String) {
+    public func info(_ message: String, tag: String?) {
         logger.info(message, tag: tag)
     }
     
     /// Logs a warning-level message.
-    public func warning(_ message: String, tag: String) {
+    public func warning(_ message: String, tag: String?) {
         logger.warning(message, tag: tag)
     }
     
     /// Logs an error-level message.
-    public func error(_ message: String, tag: String) {
+    public func error(_ message: String, tag: String?) {
         logger.error(message, tag: tag)
     }
     
     /// Logs a fault (assert-level) message, typically used for critical issues.
-    public func fault(_ message: String, tag: String) {
+    public func fault(_ message: String, tag: String?) {
         logger.fault(message, tag: tag)
     }
 }

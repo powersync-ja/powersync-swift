@@ -11,8 +11,14 @@ public class PrintLogWriter: LogWriterProtocol {
        ///   - severity: The severity level of the message.
        ///   - message: The content of the log message.
        ///   - tag: An optional tag used to categorize the message. If empty, no brackets are shown.
-    public func log(severity: LogSeverity, message: String, tag: String) {
-        let tagPrefix = tag.isEmpty ? "" : "[\(tag)] "
+    public func log(severity: LogSeverity, message: String, tag: String?) {
+        let tagPrefix: String
+        if let tag, !tag.isEmpty {
+            tagPrefix = "[\(tag)] "
+        } else {
+            tagPrefix = ""
+        }
+        
         let message = "\(tagPrefix) \(message)"
         if #available(iOS 14.0, *) {
             let l = Logger()
@@ -30,21 +36,21 @@ public class PrintLogWriter: LogWriterProtocol {
                     l.fault("\(message)")
             }
         } else {
-            print("\(severity.rawValue): \(message)")
+            print("\(severity.stringValue): \(message)")
         }
     }
 }
 
-/// A default logger configuration that uses `SwiftLogWritter` and filters messages by minimum severity.
-///
-/// This logger integrates with your custom logging system and uses `os.Logger` under the hood.
+/// A default logger configuration that uses `PrintLogWritter` and filters messages by minimum severity.
 public class DefaultLogger: LoggerProtocol {
     public var minSeverirty: LogSeverity
     public var writers: [any LogWriterProtocol]
     
     /// Initializes the default logger with an optional minimum severity level.
     ///
-    /// - Parameter minSeverity: The minimum severity level to log. Defaults to `.debug`.
+    /// - Parameters
+    ///     - minSeverity: The minimum severity level to log. Defaults to `.debug`.
+    ///     - writers: Optional writers which logs should be written to. Defaults to a `PrintLogWriter`.
     public init(minSeverity: LogSeverity = .debug, writers: [any LogWriterProtocol]? = nil ) {
         self.writers = writers ?? [ PrintLogWriter() ]
         self.minSeverirty = minSeverity
@@ -59,27 +65,27 @@ public class DefaultLogger: LoggerProtocol {
     }
     
     
-    public func debug(_ message: String, tag: String) {
-        self.writeLog(message, tag: tag, severity: LogSeverity.debug)
+    public func debug(_ message: String, tag: String? = nil) {
+        self.writeLog(message, severity: LogSeverity.debug, tag: tag)
     }
     
-    public func error(_ message: String, tag: String) {
-        self.writeLog(message, tag: tag, severity: LogSeverity.error)
+    public func error(_ message: String, tag: String? = nil) {
+        self.writeLog(message, severity: LogSeverity.error, tag: tag)
     }
     
-    public func info(_ message: String, tag: String) {
-        self.writeLog(message, tag: tag, severity: LogSeverity.info)
+    public func info(_ message: String, tag: String? = nil) {
+        self.writeLog(message, severity: LogSeverity.info, tag: tag)
     }
     
-    public func warning(_ message: String, tag: String) {
-        self.writeLog(message, tag: tag, severity: LogSeverity.warning)
+    public func warning(_ message: String, tag: String? = nil) {
+        self.writeLog(message, severity: LogSeverity.warning, tag: tag)
     }
     
-    public func fault(_ message: String, tag: String) {
-        self.writeLog(message, tag: tag, severity: LogSeverity.fault)
+    public func fault(_ message: String, tag: String? = nil) {
+        self.writeLog(message, severity: LogSeverity.fault, tag: tag)
     }
     
-    private func writeLog(_ message: String, tag: String, severity: LogSeverity) {
+    private func writeLog(_ message: String, severity: LogSeverity, tag: String?) {
         if (severity.rawValue < self.minSeverirty.rawValue) {
             return
         }

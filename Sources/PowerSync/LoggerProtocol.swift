@@ -41,7 +41,7 @@ public protocol LogWriterProtocol {
     ///   - severity: The severity level of the log message.
     ///   - message: The content of the log message.
     ///   - tag: An optional tag to categorize or group the log message.
-    func log(severity: LogSeverity, message: String, tag: String)
+    func log(severity: LogSeverity, message: String, tag: String?)
 }
 
 /// A protocol defining the interface for a logger that supports severity filtering and multiple writers.
@@ -65,33 +65,33 @@ public protocol LoggerProtocol {
     /// - Parameters:
     ///   - message: The content of the log message.
     ///   - tag: An optional tag to categorize the message.
-    func info(_ message: String, tag: String)
+    func info(_ message: String, tag: String?)
     
     /// Logs an error message.
     ///
     /// - Parameters:
     ///   - message: The content of the log message.
     ///   - tag: An optional tag to categorize the message.
-    func error(_ message: String, tag: String)
+    func error(_ message: String, tag: String?)
     
     /// Logs a debug message.
     ///
     /// - Parameters:
     ///   - message: The content of the log message.
     ///   - tag: An optional tag to categorize the message.
-    func debug(_ message: String, tag: String)
+    func debug(_ message: String, tag: String?)
     
     /// Logs a warning message.
     ///
     /// - Parameters:
     ///   - message: The content of the log message.
     ///   - tag: An optional tag to categorize the message.
-    func warning(_ message: String, tag: String)
+    func warning(_ message: String, tag: String?)
     
     /// Logs a fault message, typically used for critical system-level failures.
     ///
     /// - Parameters:
     ///   - message: The content of the log message.
     ///   - tag: An optional tag to categorize the message.
-    func fault(_ message: String, tag: String)
+    func fault(_ message: String, tag: String?)
 }
