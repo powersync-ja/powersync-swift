@@ -5,108 +5,83 @@ import OSLog
 //TODO should not need this
 import PowerSyncKotlin
 
-/**
- * A watched attachment record item.
- * This is usually returned from watching all relevant attachment IDs.
- */
+/// A watched attachment record item.
+/// This is usually returned from watching all relevant attachment IDs.
 public struct WatchedAttachmentItem {
-    /**
-     * Id for the attachment record
-     */
+    /// Id for the attachment record
     public let id: String
     
-    /**
-     * File extension used to determine an internal filename for storage if no `filename` is provided
-     */
+    /// File extension used to determine an internal filename for storage if no `filename` is provided
     public let fileExtension: String?
     
-    /**
-     * Filename to store the attachment with
-     */
+    /// Filename to store the attachment with
     public let filename: String?
     
-    public init(id: String, fileExtension: String? = nil, filename: String? = nil) {
+    /// Metadata for the attachment (optional)
+    public let metaData: String?
+    
+    /// Initializes a new `WatchedAttachmentItem`
+    /// - Parameters:
+    ///   - id: Attachment record ID
+    ///   - fileExtension: Optional file extension
+    ///   - filename: Optional filename
+    ///   - metaData: Optional metadata
+    public init(
+        id: String,
+        fileExtension: String? = nil,
+        filename: String? = nil,
+        metaData: String? = nil
+    ) {
         self.id = id
         self.fileExtension = fileExtension
         self.filename = filename
+        self.metaData = metaData
         
         precondition(fileExtension != nil || filename != nil, "Either fileExtension or filename must be provided.")
     }
 }
 
 
-/**
- * Class used to implement the attachment queue
- * Requires a PowerSyncDatabase, an implementation of
- * RemoteStorageAdapter and an attachment directory name which will
- * determine which folder attachments are stored into.
- */
+/// Class used to implement the attachment queue
+/// Requires a PowerSyncDatabase, a RemoteStorageAdapter implementation, and a directory name for attachments.
 public actor AttachmentQueue {
+    /// Default name of the attachments table
     public static let DEFAULT_TABLE_NAME = "attachments"
-    public static let DEFAULT_ATTACHMENTS_DIRECTORY_NAME = "attachments"
     
-    /**
-     * PowerSync database client
-     */
+    /// PowerSync database client
     public let db: PowerSyncDatabaseProtocol
     
-    /**
-     * Adapter which interfaces with the remote storage backend
-     */
+    /// Remote storage adapter
     public let remoteStorage: RemoteStorageAdapter
     
-    /**
-     * Directory name where attachment files will be written to disk.
-     * This will be created if it does not exist
-     */
-    private let attachmentDirectory: String
+    /// Directory name for attachments
+    private let attachmentsDirectory: String
     
-    /**
-     * A publisher for the current state of local attachments
-     */
+    /// Stream of watched attachments
     private let watchedAttachments: AsyncThrowingStream<[WatchedAttachmentItem], Error>
     
-    /**
-     * Provides access to local filesystem storage methods
-     */
+    /// Local file system adapter
     public let localStorage: LocalStorageAdapter
     
-    /**
-     * SQLite table where attachment state will be recorded
-     */
+    /// Attachments table name in SQLite
     private let attachmentsQueueTableName: String
     
-    /**
-     * Attachment operation error handler. This specified if failed attachment operations
-     * should be retried.
-     */
+    /// Optional sync error handler
     private let errorHandler: SyncErrorHandler?
     
-    /**
-     * Periodic interval to trigger attachment sync operations
-     */
+    /// Interval between periodic syncs
     private let syncInterval: TimeInterval
     
-    /**
-     * Archived attachments can be used as a cache which can be restored if an attachment id
-     * reappears after being removed. This parameter defines how many archived records are retained.
-     * Records are deleted once the number of items exceeds this value.
-     */
+    /// Limit on number of archived attachments
     private let archivedCacheLimit: Int64
     
-    /**
-     * Throttles remote sync operations triggering
-     */
+    /// Duration for throttling sync operations
     private let syncThrottleDuration: TimeInterval
     
-    /**
-     * Creates a list of subdirectories in the attachmentDirectory
-     */
+    /// Subdirectories to be created in attachments directory
     private let subdirectories: [String]?
     
-    /**
-     * Should attachments be downloaded
-     */
+    /// Whether to allow downloading of attachments
     private let downloadAttachments: Bool
     
     /**
@@ -114,25 +89,16 @@ public actor AttachmentQueue {
      */
 //    public let logger: Logger
     
-    /**
-     * Service which provides access to attachment records.
-     * Use this to:
-     *  - Query all current attachment records
-     *  - Create new attachment records for upload/download
-     */
+    /// Attachment service for interacting with attachment records
     public let attachmentsService: AttachmentService
     
     private var syncStatusTask: Task<Void, Error>?
-    private let mutex = NSLock()
     private var cancellables = Set<AnyCancellable>()
     
+    /// Indicates whether the queue has been closed
     public private(set) var closed: Bool = false
     
-    /**
-     * Syncing service for this attachment queue.
-     * This processes attachment records and performs relevant upload, download and delete
-     * operations.
-     */
+    /// Syncing service instance
     private(set) lazy var syncingService: SyncingService = {
         return SyncingService(
             remoteStorage: self.remoteStorage,
@@ -147,10 +113,12 @@ public actor AttachmentQueue {
         )
     }()
     
+    /// Initializes the attachment queue
+    /// - Parameters match the stored properties
     public init(
         db: PowerSyncDatabaseProtocol,
         remoteStorage: RemoteStorageAdapter,
-        attachmentDirectory: String,
+        attachmentsDirectory: String,
         watchedAttachments: AsyncThrowingStream<[WatchedAttachmentItem], Error>,
         localStorage: LocalStorageAdapter = FileManagerStorageAdapter(),
         attachmentsQueueTableName: String = DEFAULT_TABLE_NAME,
@@ -164,7 +132,7 @@ public actor AttachmentQueue {
     ) {
         self.db = db
         self.remoteStorage = remoteStorage
-        self.attachmentDirectory = attachmentDirectory
+        self.attachmentsDirectory = attachmentsDirectory
         self.watchedAttachments = watchedAttachments
         self.localStorage = localStorage
         self.attachmentsQueueTableName = attachmentsQueueTableName
@@ -184,23 +152,18 @@ public actor AttachmentQueue {
         )
     }
     
-    /**
-     * Initialize the attachment queue by
-     * 1. Creating attachments directory
-     * 2. Adding watches for uploads, downloads, and deletes
-     * 3. Adding trigger to run uploads, downloads, and deletes when device is online after being offline
-     */
+    /// Starts the attachment sync process
     public func startSync() async throws {
         if closed {
             throw NSError(domain: "AttachmentError", code: 4, userInfo: [NSLocalizedDescriptionKey: "Attachment queue has been closed"])
         }
         
         // Ensure the directory where attachments are downloaded exists
-        try await localStorage.makeDir(path: attachmentDirectory)
+        try await localStorage.makeDir(path: attachmentsDirectory)
         
         if let subdirectories = subdirectories {
             for subdirectory in subdirectories {
-                let path = URL(fileURLWithPath: attachmentDirectory).appendingPathComponent(subdirectory).path
+                let path = URL(fileURLWithPath: attachmentsDirectory).appendingPathComponent(subdirectory).path
                 try await localStorage.makeDir(path: path)
             }
         }
@@ -239,6 +202,7 @@ public actor AttachmentQueue {
         }
     }
     
+    /// Closes the attachment queue and cancels all sync tasks
     public func close() async throws {
         if closed {
             return
@@ -249,12 +213,11 @@ public actor AttachmentQueue {
         closed = true
     }
     
-    /**
-     * Resolves the filename for new attachment items.
-     * A new attachment from watchedAttachments might not include a filename.
-     * Concatenates the attachment ID and extension by default.
-     * This method can be overridden for custom behavior.
-     */
+    /// Resolves the filename for a new attachment
+    /// - Parameters:
+    ///   - attachmentId: Attachment ID
+    ///   - fileExtension: File extension
+    /// - Returns: Resolved filename
     public func resolveNewAttachmentFilename(
         attachmentId: String,
         fileExtension: String?
@@ -262,20 +225,8 @@ public actor AttachmentQueue {
         return "\(attachmentId).\(fileExtension ?? "")"
     }
     
-    /**
-     * Processes attachment items returned from watchedAttachments.
-     * The default implementation asserts the items returned from watchedAttachments as the definitive
-     * state for local attachments.
-     *
-     * Records currently in the attachment queue which are not present in the items are deleted from
-     * the queue.
-     *
-     * Received items which are not currently in the attachment queue are assumed scheduled for
-     * download. This requires that locally created attachments should be created with saveFile
-     * before assigning the attachment ID to the relevant watched tables.
-     *
-     * This method can be overridden for custom behavior.
-     */
+    /// Processes watched attachment items and updates sync state
+    /// - Parameter items: List of watched attachment items
     public func processWatchedAttachments(items: [WatchedAttachmentItem]) async throws {
         // Need to get all the attachments which are tracked in the DB.
         // We might need to restore an archived attachment.
@@ -314,11 +265,9 @@ public actor AttachmentQueue {
                         existingQueueItem!.with(state: AttachmentState.synced.rawValue)
                     )
                 } else {
-                    /**
-                     * The localURI should be set if the record was meant to be downloaded
-                     * and has been synced. If it's missing and hasSynced is false then
-                     * it must be an upload operation
-                     */
+                     // The localURI should be set if the record was meant to be downloaded
+                     // and has been synced. If it's missing and hasSynced is false then
+                     // it must be an upload operation
                     let newState = existingQueueItem!.localUri == nil ?
                         AttachmentState.queuedDownload.rawValue :
                         AttachmentState.queuedUpload.rawValue
@@ -347,23 +296,18 @@ public actor AttachmentQueue {
         }
     }
     
-    /**
-     * A function which creates a new attachment locally. This new attachment is queued for upload
-     * after creation.
-     *
-     * The filename is resolved using resolveNewAttachmentFilename.
-     *
-     * A updateHook is provided which should be used when assigning relationships to the newly
-     * created attachment. This hook is executed in the same writeTransaction which creates the
-     * attachment record.
-     *
-     * This method can be overridden for custom behavior.
-     */
+    /// Saves a new file and schedules it for upload
+     /// - Parameters:
+     ///   - data: File data
+     ///   - mediaType: MIME type
+     ///   - fileExtension: File extension
+     ///   - updateHook: Hook to assign attachment relationships in the same transaction
+     /// - Returns: The created attachment
     public func saveFile(
         data: Data,
         mediaType: String,
         fileExtension: String?,
-        updateHook: ((PowerSyncTransaction, Attachment) throws -> Void)? = nil
+        updateHook: @escaping (PowerSyncTransaction, Attachment) throws -> Void
     ) async throws -> Attachment {
         let id = try await db.get(sql: "SELECT uuid() as id", parameters: [], mapper: { cursor in
             try cursor.getString(name: "id") })
@@ -387,29 +331,26 @@ public actor AttachmentQueue {
             )
             
             // Allow consumers to set relationships to this attachment id
-            try updateHook?(tx, attachment)
+            try updateHook(tx, attachment)
             
             return try self.attachmentsService.upsertAttachment(attachment, context: tx)
         }
     }
     
-    /**
-     * A function which creates an attachment delete operation locally. This operation is queued
-     * for delete.
-     * The default implementation assumes the attachment record already exists locally. An exception
-     * is thrown if the record does not exist locally.
-     * This method can be overridden for custom behavior.
-     */
+    /// Queues a file for deletion
+    /// - Parameters:
+    ///   - attachmentId: ID of the attachment to delete
+    ///   - updateHook: Hook to perform additional DB updates in the same transaction
     public func deleteFile(
         attachmentId: String,
-        updateHook: ((ConnectionContext, Attachment) throws -> Void)? = nil
+        updateHook: @escaping (ConnectionContext, Attachment) throws -> Void
     ) async throws -> Attachment {
         guard let attachment = try await attachmentsService.getAttachment(id: attachmentId) else {
             throw NSError(domain: "AttachmentError", code: 5, userInfo: [NSLocalizedDescriptionKey: "Attachment record with id \(attachmentId) was not found."])
         }
         
         return try await db.writeTransaction { tx in
-            try updateHook?(tx, attachment)
+            try updateHook(tx, attachment)
             
             let updatedAttachment = Attachment(
                 id: attachment.id,
@@ -425,17 +366,14 @@ public actor AttachmentQueue {
         }
     }
     
-    /**
-     * Return user's storage directory with the attachmentPath used to load the file.
-     * Example: filePath: "attachment-1.jpg" returns "/path/to/Documents/attachments/attachment-1.jpg"
-     */
+    /// Returns the local URI where a file is stored based on filename
+    /// - Parameter filename: The name of the file
+    /// - Returns: The file path
     public func getLocalUri(_ filename: String) -> String {
-        return URL(fileURLWithPath: attachmentDirectory).appendingPathComponent(filename).path
+        return URL(fileURLWithPath: attachmentsDirectory).appendingPathComponent(filename).path
     }
     
-    /**
-     * Removes all archived items
-     */
+    /// Removes all archived items
     public func expireCache() async throws {
         var done = false
         repeat {
@@ -443,12 +381,10 @@ public actor AttachmentQueue {
         } while !done
     }
     
-    /**
-     * Clears the attachment queue and deletes all attachment files
-     */
+    /// Clears the attachment queue and deletes all attachment files
     public func clearQueue() async throws {
         try await attachmentsService.clearQueue()
         // Remove the attachments directory
-        try await localStorage.rmDir(path: attachmentDirectory)
+        try await localStorage.rmDir(path: attachmentsDirectory)
     }
 }

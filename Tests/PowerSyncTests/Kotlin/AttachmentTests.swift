@@ -56,7 +56,7 @@ final class AttachmentTests: XCTestCase {
         
                 return MockRemoteStorage()
             }(),
-            attachmentDirectory: NSTemporaryDirectory(),
+            attachmentsDirectory: NSTemporaryDirectory(),
             watchedAttachments: try database.watch(options: WatchOptions(
                 sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
                 mapper: { cursor in WatchedAttachmentItem(
@@ -76,13 +76,13 @@ final class AttachmentTests: XCTestCase {
             parameters: []
         )
         
-        var attachmentsWatch = try database.watch(
+        let attachmentsWatch = try database.watch(
             options: WatchOptions(
                 sql: "SELECT * FROM attachments",
                 mapper: {cursor in try Attachment.fromCursor(cursor)}
             )).makeAsyncIterator()
         
-       var attachmentRecord = try await waitForMatch(
+       let attachmentRecord = try await waitForMatch(
             iterator: attachmentsWatch,
             where: {results in results.first?.state == AttachmentState.synced.rawValue},
             timeout: 5
@@ -129,7 +129,7 @@ final class AttachmentTests: XCTestCase {
         let queue = AttachmentQueue(
             db: database,
             remoteStorage: mockedRemote,
-            attachmentDirectory: NSTemporaryDirectory(),
+            attachmentsDirectory: NSTemporaryDirectory(),
             watchedAttachments: try database.watch(options: WatchOptions(
                 sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
                 mapper: { cursor in WatchedAttachmentItem(

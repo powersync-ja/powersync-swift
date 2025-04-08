@@ -6,6 +6,7 @@ func createAttachmentsTable(name: String) -> Table {
         .integer("has_synced"),
         .text("local_uri"),
         .text("media_type"),
-        .integer("size")
+        .integer("size"),
+        .text("meta_data")
     ])
 }
