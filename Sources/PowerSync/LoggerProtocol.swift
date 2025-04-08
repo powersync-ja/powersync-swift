@@ -57,9 +57,8 @@ public protocol LoggerProtocol {
     
     /// Sets the list of log writers that will handle log output.
     ///
-    /// - Parameter writters: An array of `LogWritterProtocol` conformers.
-    func setWriters(_ writters: [LogWriterProtocol])
-    
+    /// - Parameter writers: An array of `LogWriterProtocol` conformers.
+    func setWriters(_ writers: [LogWriterProtocol])
     /// Logs an informational message.
     ///
     /// - Parameters:
