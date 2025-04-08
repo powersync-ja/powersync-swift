@@ -74,7 +74,7 @@ internal class DatabaseLogger: LoggerProtocol {
     ///
     /// This updates both the internal writer list and the Kermit logger's configuration.
     ///
-    /// - Parameter writers: An array of Swift `LogWritterProtocol` implementations.
+    /// - Parameter writers: An array of Swift `LogWriterProtocol` implementations.
     public func setWriters(_ writers: [any LogWriterProtocol]) {
         logger.setWriters(writers)
     }
