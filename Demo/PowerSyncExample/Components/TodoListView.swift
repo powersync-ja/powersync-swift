@@ -1,5 +1,5 @@
-import SwiftUI
 import IdentifiedCollections
+import SwiftUI
 import SwiftUINavigation
 
 struct TodoListView: View {
@@ -18,7 +18,7 @@ struct TodoListView: View {
             }
 
             IfLet($newTodo) { $newTodo in
-                AddTodoListView(newTodo: $newTodo, listId: listId) { result in
+                AddTodoListView(newTodo: $newTodo, listId: listId) { _ in
                     withAnimation {
                         self.newTodo = nil
                     }
@@ -26,11 +26,32 @@ struct TodoListView: View {
             }
 
             ForEach(todos) { todo in
-                TodoListRow(todo: todo) {
-                    Task {
-                        try await toggleCompletion(of: todo)
-                    }
-                }
+                TodoListRow(
+                    todo: todo,
+                    completeTapped: {
+                        Task {
+                            await toggleCompletion(of: todo)
+                        }
+                    },
+                    deletePhotoTapped: {
+                        guard let attachments = system.attachments,
+                              let attachmentID = todo.photoId
+                        else {
+                            return
+                        }
+                        Task {
+                            do {
+                                _ = try await attachments.deleteFile(attachmentId: attachmentID) { tx, _ in
+                                    _ = try tx.execute(sql: "UPDATE \(TODOS_TABLE) SET photo_id = NULL WHERE id = ?", parameters: [todo.id])
+                                }
+                            } catch {
+                                self.error = error
+                            }
+                        }
+
+                    },
+                    capturePhotoTapped: {}
+                )
             }
             .onDelete { indexSet in
                 Task {
@@ -42,7 +63,7 @@ struct TodoListView: View {
         .navigationTitle("Todos")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                if (newTodo == nil) {
+                if newTodo == nil {
                     Button {
                         withAnimation {
                             newTodo = .init(
