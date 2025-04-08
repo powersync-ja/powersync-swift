@@ -17,7 +17,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         database = KotlinPowerSyncDatabaseImpl(
             schema: schema,
             dbFilename: ":memory:",
-            logger: DefaultLogger()
+            logger: DatabaseLogger(DefaultLogger())
         )
         try await database.disconnectAndClear()
     }
@@ -472,17 +472,18 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     }
     
     func testCustomLogger() async throws {
-        let logger = TestLogger()
+        let testWriter = TestLogWriterAdapter()
+        let logger = DefaultLogger(minSeverity: LogSeverity.debug, writers: [testWriter])
         
         let db2 = KotlinPowerSyncDatabaseImpl(
             schema: schema,
             dbFilename: ":memory:",
-            logger: logger
+            logger: DatabaseLogger(logger)
         )
         
         try await db2.close()
         
-        let warningIndex = logger.logs.firstIndex(
+        let warningIndex = testWriter.logs.firstIndex(
             where: { value in
                 value.contains("warning: Multiple PowerSync instances for the same database have been detected")
             }
@@ -492,17 +493,18 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     }
     
     func testMinimumSeverity() async throws {
-        let logger = TestLogger(minSeverity: .error)
+        let testWriter = TestLogWriterAdapter()
+        let logger = DefaultLogger(minSeverity: LogSeverity.error, writers: [testWriter])
         
         let db2 = KotlinPowerSyncDatabaseImpl(
             schema: schema,
             dbFilename: ":memory:",
-            logger: logger
+            logger: DatabaseLogger(logger)
         )
         
         try await db2.close()
         
-        let warningIndex = logger.logs.firstIndex(
+        let warningIndex = testWriter.logs.firstIndex(
             where: { value in
                 value.contains("warning: Multiple PowerSync instances for the same database have been detected")
             }

@@ -12,12 +12,12 @@ public let DEFAULT_DB_FILENAME = "powersync.db"
 public func PowerSyncDatabase(
     schema: Schema,
     dbFilename: String = DEFAULT_DB_FILENAME,
-    logger: DatabaseLogger = DefaultLogger()
+    logger: (any LoggerProtocol)? = nil
 ) -> PowerSyncDatabaseProtocol {
     
     return KotlinPowerSyncDatabaseImpl(
         schema: schema,
         dbFilename: dbFilename,
-        logger: logger
+        logger: logger != nil ? DatabaseLogger(logger!) : nil
     )
 }

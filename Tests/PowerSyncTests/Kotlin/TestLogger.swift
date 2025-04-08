@@ -9,15 +9,3 @@ class TestLogWriterAdapter: LogWriterProtocol {
     }
 }
 
-class TestLogger: DefaultLogger {
-    let writer = TestLogWriterAdapter()
-    
-    public var logs: [String] {
-            return writer.logs
-    }
-    
-    override init(minSeverity: LogSeverity = .debug) {
-        super.init(minSeverity: minSeverity)
-        setWriters([writer])
-    }
-}

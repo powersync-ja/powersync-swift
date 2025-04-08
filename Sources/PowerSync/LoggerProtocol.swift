@@ -1,19 +1,34 @@
-/// Represents the severity level of a log message.
-public enum LogSeverity: String, CaseIterable {
-    /// Informational messages that highlight the progress of the application.
-    case info = "INFO"
-    
-    /// Error events that might still allow the application to continue running.
-    case error = "ERROR"
-    
+public enum LogSeverity: Int, CaseIterable {
     /// Detailed information typically used for debugging.
-    case debug = "DEBUG"
-    
+    case debug = 0
+
+    /// Informational messages that highlight the progress of the application.
+    case info = 1
+
     /// Potentially harmful situations that are not necessarily errors.
-    case warning = "WARNING"
-    
+    case warning = 2
+
+    /// Error events that might still allow the application to continue running.
+    case error = 3
+
     /// Serious errors indicating critical failures, often unrecoverable.
-    case fault = "FAULT"
+    case fault = 4
+
+    /// Map severity to its string representation
+    public var stringValue: String {
+        switch self {
+        case .debug: return "DEBUG"
+        case .info: return "INFO"
+        case .warning: return "WARNING"
+        case .error: return "ERROR"
+        case .fault: return "FAULT"
+        }
+    }
+
+    /// Convert Int to String representation
+    public static func string(from intValue: Int) -> String? {
+        return LogSeverity(rawValue: intValue)?.stringValue
+    }
 }
 
 /// A protocol for writing log messages to a specific backend or output.
