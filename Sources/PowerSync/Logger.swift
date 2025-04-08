@@ -43,7 +43,7 @@ public class PrintLogWriter: LogWriterProtocol {
 
 /// A default logger configuration that uses `PrintLogWritter` and filters messages by minimum severity.
 public class DefaultLogger: LoggerProtocol {
-    public var minSeverirty: LogSeverity
+    public var minSeverity: LogSeverity
     public var writers: [any LogWriterProtocol]
     
     /// Initializes the default logger with an optional minimum severity level.
