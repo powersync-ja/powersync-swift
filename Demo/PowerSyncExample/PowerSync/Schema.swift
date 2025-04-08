@@ -10,7 +10,7 @@ let lists = Table(
         // ID column is automatically included
         .text("name"),
         .text("created_at"),
-        .text("owner_id")
+        .text("owner_id"),
     ]
 )
 
@@ -26,14 +26,14 @@ let todos = Table(
         Column.text("created_at"),
         Column.text("completed_at"),
         Column.text("created_by"),
-        Column.text("completed_by")
+        Column.text("completed_by"),
     ],
     indexes: [
         Index(
             name: "list_id",
             columns: [IndexedColumn.ascending("list_id")]
-        )
+        ),
     ]
 )
 
-let AppSchema = Schema(lists, todos)
+let AppSchema = Schema(lists, todos, createAttachmentsTable(name: "attachments"))

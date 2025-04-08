@@ -15,32 +15,32 @@ public enum AttachmentState: Int {
 /// Struct representing an attachment
 public struct Attachment {
     /// Unique identifier for the attachment
-    let id: String
+    public let id: String
 
     /// Timestamp for the last record update
-    let timestamp: Int
+    public let timestamp: Int
 
     /// Attachment filename, e.g. `[id].jpg`
-    let filename: String
+    public let filename: String
 
     /// Current attachment state, represented by the raw value of `AttachmentState`
-    let state: Int
+    public let state: Int
 
     /// Local URI pointing to the attachment file
-    let localUri: String?
+    public let localUri: String?
 
     /// Attachment media type (usually a MIME type)
-    let mediaType: String?
+    public let mediaType: String?
 
     /// Attachment byte size
-    let size: Int64?
+    public let size: Int64?
 
     /// Specifies if the attachment has been synced locally before.
     /// This is particularly useful for restoring archived attachments in edge cases.
-    let hasSynced: Int?
+    public let hasSynced: Int?
 
     /// Extra attachment metadata
-    let metaData: String?
+    public let metaData: String?
 
     /// Initializes a new `Attachment` instance
     public init(
@@ -78,9 +78,9 @@ public struct Attachment {
     ///   - metaData: Optional new metadata.
     /// - Returns: A new `Attachment` with updated values.
     func with(
-        filename: String? = nil,
+        filename _: String? = nil,
         state: Int? = nil,
-        timestamp: Int = 0,
+        timestamp _: Int = 0,
         hasSynced: Int? = 0,
         localUri: String? = nil,
         mediaType: String? = nil,
@@ -88,8 +88,8 @@ public struct Attachment {
         metaData: String? = nil
     ) -> Attachment {
         return Attachment(
-            id: self.id,
-            filename: self.filename,
+            id: id,
+            filename: filename,
             state: state ?? self.state,
             hasSynced: hasSynced ?? self.hasSynced,
             localUri: localUri ?? self.localUri,
@@ -105,16 +105,16 @@ public struct Attachment {
     /// - Throws: If required fields are missing or of incorrect type.
     /// - Returns: A fully constructed `Attachment` instance.
     public static func fromCursor(_ cursor: SqlCursor) throws -> Attachment {
-        return Attachment(
-            id: try cursor.getString(name: "id"),
-            filename: try cursor.getString(name: "filename"),
-            state: try cursor.getLong(name: "state"),
-            timestamp: try cursor.getLong(name: "timestamp"),
-            hasSynced: try cursor.getLongOptional(name: "has_synced"),
-            localUri: try cursor.getStringOptional(name: "local_uri"),
-            mediaType: try cursor.getStringOptional(name: "media_type"),
-            size: try cursor.getLongOptional(name: "size")?.int64Value,
-            metaData: try cursor.getStringOptional(name: "meta_data")
+        return try Attachment(
+            id: cursor.getString(name: "id"),
+            filename: cursor.getString(name: "filename"),
+            state: cursor.getLong(name: "state"),
+            timestamp: cursor.getLong(name: "timestamp"),
+            hasSynced: cursor.getLongOptional(name: "has_synced"),
+            localUri: cursor.getStringOptional(name: "local_uri"),
+            mediaType: cursor.getStringOptional(name: "media_type"),
+            size: cursor.getLongOptional(name: "size")?.int64Value,
+            metaData: cursor.getStringOptional(name: "meta_data")
         )
     }
 }

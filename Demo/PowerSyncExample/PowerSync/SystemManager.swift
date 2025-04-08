@@ -1,26 +1,70 @@
 import Foundation
 import PowerSync
 
+func getAttachmentsDirectoryPath() throws -> String {
+    guard let documentsURL = FileManager.default.urls(
+        for: .documentDirectory,
+        in: .userDomainMask
+    ).first else {
+        throw PowerSyncError.attachmentError("Could not determine attachments directory path")
+    }
+    let r = documentsURL.appendingPathComponent("attachments").path
+
+    return r
+}
+
 @Observable
 class SystemManager {
     let connector = SupabaseConnector()
     let schema = AppSchema
-    var db: PowerSyncDatabaseProtocol!
+    let db: PowerSyncDatabaseProtocol
+    let attachments: AttachmentQueue?
 
-    // openDb must be called before connect
-    func openDb() {
-        db = PowerSyncDatabase(schema: schema, dbFilename: "powersync-swift.sqlite")
+    init() {
+        db = PowerSyncDatabase(
+            schema: schema,
+            dbFilename: "powersync-swift.sqlite"
+        )
+        // Try and configure attachments
+        do {
+            let attachmentsDir = try getAttachmentsDirectoryPath()
+            let watchedAttachments = try db.watch(
+                options: WatchOptions(
+                    sql: "SELECT photo_id FROM \(TODOS_TABLE) WHERE photo_id IS NOT NULL",
+                    parameters: [],
+                    mapper: { cursor in
+                        try WatchedAttachmentItem(
+                            id: cursor.getString(name: "photo_id"),
+                            fileExtension: "jpg"
+                        )
+                    }
+                )
+            )
+
+            attachments = AttachmentQueue(
+                db: db,
+                remoteStorage: SupabaseRemoteStorage(storage: connector.getStorageBucket()),
+                attachmentsDirectory: attachmentsDir,
+                watchedAttachments: watchedAttachments
+            )
+        } catch {
+            print("Failed to initialize attachments queue: \(error)")
+            attachments = nil
+        }
     }
 
     func connect() async {
         do {
+            // Only for testing purposes
+            try await attachments?.clearQueue()
             try await db.connect(connector: connector)
+            try await attachments?.startSync()
         } catch {
             print("Unexpected error: \(error.localizedDescription)") // Catches any other error
         }
     }
 
-    func version() async -> String  {
+    func version() async -> String {
         do {
             return try await db.getPowerSyncVersion()
         } catch {
@@ -28,14 +72,16 @@ class SystemManager {
         }
     }
 
-    func signOut() async throws -> Void {
+    func signOut() async throws {
         try await db.disconnectAndClear()
         try await connector.client.auth.signOut()
+        try await attachments?.clearQueue()
+        try await attachments?.close()
     }
 
-    func watchLists(_ callback: @escaping (_ lists: [ListContent]) -> Void ) async {
+    func watchLists(_ callback: @escaping (_ lists: [ListContent]) -> Void) async {
         do {
-            for try await lists in try self.db.watch<ListContent>(
+            for try await lists in try db.watch<ListContent>(
                 options: WatchOptions(
                     sql: "SELECT * FROM \(LISTS_TABLE)",
                     mapper: { cursor in
@@ -56,7 +102,7 @@ class SystemManager {
     }
 
     func insertList(_ list: NewListContent) async throws {
-        let result = try await self.db.execute(
+        let result = try await db.execute(
             sql: "INSERT INTO \(LISTS_TABLE) (id, created_at, name, owner_id) VALUES (uuid(), datetime(), ?, ?)",
             parameters: [list.name, connector.currentUserID]
         )
@@ -72,14 +118,22 @@ class SystemManager {
                 sql: "DELETE FROM \(TODOS_TABLE) WHERE list_id = ?",
                 parameters: [id]
             )
-            return
         })
     }
 
-    func watchTodos(_ listId: String, _ callback: @escaping (_ todos: [Todo]) -> Void ) async {
+    func watchTodos(_ listId: String, _ callback: @escaping (_ todos: [Todo]) -> Void) async {
         do {
-            for try await todos in try self.db.watch(
-                sql: "SELECT * FROM \(TODOS_TABLE) WHERE list_id = ?",
+            for try await todos in try db.watch(
+                sql: """
+                  SELECT 
+                      t.*, a.local_uri
+                  FROM
+                      \(TODOS_TABLE) t
+                      LEFT JOIN attachments a ON t.photo_id = a.id
+                  WHERE 
+                      t.list_id = ?
+                  ORDER BY t.id;
+                """,
                 parameters: [listId],
                 mapper: { cursor in
                     try Todo(
@@ -91,7 +145,8 @@ class SystemManager {
                         createdAt: cursor.getString(name: "created_at"),
                         completedAt: cursor.getStringOptional(name: "completed_at"),
                         createdBy: cursor.getStringOptional(name: "created_by"),
-                        completedBy: cursor.getStringOptional(name: "completed_by")
+                        completedBy: cursor.getStringOptional(name: "completed_by"),
+                        photoUri: cursor.getStringOptional(name: "local_uri")
                     )
                 }
             ) {
@@ -103,7 +158,7 @@ class SystemManager {
     }
 
     func insertTodo(_ todo: NewTodo, _ listId: String) async throws {
-        _ = try await self.db.execute(
+        _ = try await db.execute(
             sql: "INSERT INTO \(TODOS_TABLE) (id, created_at, created_by, description, list_id, completed) VALUES (uuid(), datetime(), ?, ?, ?, ?)",
             parameters: [connector.currentUserID, todo.description, listId, todo.isComplete]
         )
@@ -111,13 +166,13 @@ class SystemManager {
 
     func updateTodo(_ todo: Todo) async throws {
         // Do this to avoid needing to handle date time from Swift to Kotlin
-        if(todo.isComplete) {
-            _ = try await self.db.execute(
+        if todo.isComplete {
+            _ = try await db.execute(
                 sql: "UPDATE \(TODOS_TABLE) SET description = ?, completed = ?, completed_at = datetime(), completed_by = ? WHERE id = ?",
                 parameters: [todo.description, todo.isComplete, connector.currentUserID, todo.id]
             )
         } else {
-            _ = try await self.db.execute(
+            _ = try await db.execute(
                 sql: "UPDATE \(TODOS_TABLE) SET description = ?, completed = ?, completed_at = NULL, completed_by = NULL WHERE id = ?",
                 parameters: [todo.description, todo.isComplete, todo.id]
             )
