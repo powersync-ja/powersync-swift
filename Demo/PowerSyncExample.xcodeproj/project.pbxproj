@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4276C4302DA67C2D0029D27D /* FtsSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4276C42F2DA67C2D0029D27D /* FtsSetup.swift */; };
+		4276C4322DA6800A0029D27D /* SearchResultItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4276C4312DA6800A0029D27D /* SearchResultItem.swift */; };
+		4276C4342DA6805F0029D27D /* SearchResultRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4276C4332DA6805F0029D27D /* SearchResultRow.swift */; };
+		4276C4362DA680D90029D27D /* SearchScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4276C4352DA680D90029D27D /* SearchScreen.swift */; };
 		6A4AD3852B9EE763005CBFD4 /* SupabaseConnector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AD3842B9EE763005CBFD4 /* SupabaseConnector.swift */; };
 		6A4AD3892B9EEB21005CBFD4 /* _Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AD3882B9EEB21005CBFD4 /* _Secrets.swift */; };
 		6A4AD3902B9EF775005CBFD4 /* ErrorText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AD38F2B9EF775005CBFD4 /* ErrorText.swift */; };
@@ -57,6 +61,10 @@
 
 /* Begin PBXFileReference section */
 		18CC627A2CC7A8B5009F7CDE /* powersync-kotlin */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "powersync-kotlin"; path = "../powersync-kotlin"; sourceTree = SOURCE_ROOT; };
+		4276C42F2DA67C2D0029D27D /* FtsSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FtsSetup.swift; sourceTree = "<group>"; };
+		4276C4312DA6800A0029D27D /* SearchResultItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultItem.swift; sourceTree = "<group>"; };
+		4276C4332DA6805F0029D27D /* SearchResultRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultRow.swift; sourceTree = "<group>"; };
+		4276C4352DA680D90029D27D /* SearchScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchScreen.swift; sourceTree = "<group>"; };
 		6A4AD3842B9EE763005CBFD4 /* SupabaseConnector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConnector.swift; sourceTree = "<group>"; };
 		6A4AD3882B9EEB21005CBFD4 /* _Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = _Secrets.swift; sourceTree = "<group>"; };
 		6A4AD38F2B9EF775005CBFD4 /* ErrorText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorText.swift; sourceTree = "<group>"; };
@@ -197,6 +205,7 @@
 				B65C4D6C2C60D38B00176007 /* HomeScreen.swift */,
 				B65C4D702C60D7D800176007 /* SignUpScreen.swift */,
 				B65C4D722C60D7EB00176007 /* TodosScreen.swift */,
+				4276C4352DA680D90029D27D /* SearchScreen.swift */,
 			);
 			path = Screens;
 			sourceTree = "<group>";
@@ -211,6 +220,7 @@
 				B666585E2C62115300159A81 /* ListRow.swift */,
 				B66658602C62179E00159A81 /* ListView.swift */,
 				6ABD787F2B9F2F1300558A41 /* AddListView.swift */,
+				4276C4332DA6805F0029D27D /* SearchResultRow.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -223,6 +233,8 @@
 				6ABD78772B9F2D2800558A41 /* Schema.swift */,
 				B66658642C62314B00159A81 /* Lists.swift */,
 				B66658662C62315400159A81 /* Todos.swift */,
+				4276C42F2DA67C2D0029D27D /* FtsSetup.swift */,
+				4276C4312DA6800A0029D27D /* SearchResultItem.swift */,
 			);
 			path = PowerSync;
 			sourceTree = "<group>";
@@ -552,12 +564,16 @@
 				B65C4D712C60D7D800176007 /* SignUpScreen.swift in Sources */,
 				B6B3698A2C64F4B30033C307 /* Navigation.swift in Sources */,
 				6ABD786B2B9F2C1500558A41 /* TodoListView.swift in Sources */,
+				4276C4302DA67C2D0029D27D /* FtsSetup.swift in Sources */,
+				4276C4322DA6800A0029D27D /* SearchResultItem.swift in Sources */,
 				6A4AD3852B9EE763005CBFD4 /* SupabaseConnector.swift in Sources */,
 				B65C4D732C60D7EB00176007 /* TodosScreen.swift in Sources */,
 				6ABD787A2B9F2D8300558A41 /* TodoListRow.swift in Sources */,
 				B66658652C62314B00159A81 /* Lists.swift in Sources */,
 				6A4AD3902B9EF775005CBFD4 /* ErrorText.swift in Sources */,
+				4276C4362DA680D90029D27D /* SearchScreen.swift in Sources */,
 				B66658672C62315400159A81 /* Todos.swift in Sources */,
+				4276C4342DA6805F0029D27D /* SearchResultRow.swift in Sources */,
 				6ABD78672B9F2B4800558A41 /* RootView.swift in Sources */,
 				B66658612C62179E00159A81 /* ListView.swift in Sources */,
 				6ABD78782B9F2D2800558A41 /* Schema.swift in Sources */,
@@ -705,7 +721,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"PowerSyncExample/Preview Content\"";
-				DEVELOPMENT_TEAM = 6WA62GTJNA;
+				DEVELOPMENT_TEAM = Y9N25KJUCF;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -742,7 +758,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"PowerSyncExample/Preview Content\"";
-				DEVELOPMENT_TEAM = 6WA62GTJNA;
+				DEVELOPMENT_TEAM = Y9N25KJUCF;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;

@@ -40,3 +40,6 @@ rm -rf ~/Library/org.swift.swiftpm
 ## Run project
 
 Build the project, launch the app and sign in or register a new user.
+
+based on following guide link where would i configure the full test search(fts)
+@https://docs.powersync.com/usage/use-case-examples/full-text-search#full-text-search 

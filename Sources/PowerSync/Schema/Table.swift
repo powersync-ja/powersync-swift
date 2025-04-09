@@ -45,7 +45,7 @@ public struct Table: TableProtocol {
         viewNameOverride ?? name
     }
 
-    internal var internalName: String {
+    public var internalName: String {
         localOnly ? "ps_data_local__\(name)" : "ps_data__\(name)"
     }
 
