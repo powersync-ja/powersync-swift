@@ -10,6 +10,10 @@ struct TodoListView: View {
     @State private var error: Error?
     @State private var newTodo: NewTodo?
     @State private var editing: Bool = false
+    
+    @State private var selectedImage: UIImage?
+    @State private var imageData: Data?
+    @State private var showCamera = false
 
     var body: some View {
         List {
@@ -50,7 +54,9 @@ struct TodoListView: View {
                         }
 
                     },
-                    capturePhotoTapped: {}
+                    capturePhotoTapped: {
+                        showCamera = true
+                    }
                 )
             }
             .onDelete { indexSet in
@@ -58,6 +64,9 @@ struct TodoListView: View {
                     await delete(at: indexSet)
                 }
             }
+        }
+        .sheet(isPresented: $showCamera) {
+            CameraView(imageData: $imageData)
         }
         .animation(.default, value: todos)
         .navigationTitle("Todos")
@@ -122,5 +131,47 @@ struct TodoListView: View {
         TodoListView(
             listId: UUID().uuidString.lowercased()
         ).environment(SystemManager())
+    }
+}
+
+
+struct CameraView: UIViewControllerRepresentable {
+    @Binding var imageData: Data?
+    @Environment(\.presentationMode) var presentationMode
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .camera
+        return picker
+    }
+
+    func updateUIViewController(_: UIImagePickerController, context _: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: CameraView
+
+        init(_ parent: CameraView) {
+            self.parent = parent
+        }
+
+        func imagePickerController(_: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                // Convert UIImage to Data
+                if let jpegData = image.jpegData(compressionQuality: 0.8) {
+                    parent.imageData = jpegData
+                }
+            }
+
+            parent.presentationMode.wrappedValue.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_: UIImagePickerController) {
+            parent.presentationMode.wrappedValue.dismiss()
+        }
     }
 }
