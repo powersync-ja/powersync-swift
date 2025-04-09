@@ -8,7 +8,6 @@
 import Foundation
 import PowerSync
 
-/// Defines the type of JSON extract operation needed for generating SQL.
 enum ExtractType {
     case columnOnly
     case columnInOperation
@@ -126,12 +125,24 @@ func getFtsSetupSqlStatements(
 ///   - schema: The `Schema` instance matching the database.
 /// - Throws: An error if the database transaction fails.
 func configureFts(db: PowerSyncDatabaseProtocol, schema: Schema) async throws {
+    let ftsCheckTable = "fts_\(LISTS_TABLE)"
+    let checkSql = "SELECT name FROM sqlite_master WHERE type='table' AND name = ?"
+
+    do {
+        let existingTable: String? = try await db.getOptional(sql: checkSql, parameters: [ftsCheckTable]) { cursor in
+             cursor.getString(name: "name")
+        }
+
+        if existingTable != nil {
+            print("[FTS] FTS table '\(ftsCheckTable)' already exists. Skipping setup.")
+            return
+        }
+    } catch {
+        print("[FTS] Failed to check for existing FTS tables: \(error.localizedDescription). Proceeding with setup attempt.")
+    }
     print("[FTS] Starting FTS configuration...")
     var allSqlStatements: [String] = []
 
-    // --- Define FTS configurations for each table ---
-
-    // Configure FTS for the 'lists' table
     if let listStatements = getFtsSetupSqlStatements(
         tableName: LISTS_TABLE,
         columns: ["name"],
@@ -142,11 +153,9 @@ func configureFts(db: PowerSyncDatabaseProtocol, schema: Schema) async throws {
         allSqlStatements.append(contentsOf: listStatements)
     }
 
-    // Configure FTS for the 'todos' table
     if let todoStatements = getFtsSetupSqlStatements(
         tableName: TODOS_TABLE,
         columns: ["description"],
-        // columns: ["description", "list_id"], // If you need to search by list_id via FTS
         schema: schema
     ) {
         print("[FTS] Generated \(todoStatements.count) SQL statements for '\(TODOS_TABLE)' table.")
@@ -158,7 +167,6 @@ func configureFts(db: PowerSyncDatabaseProtocol, schema: Schema) async throws {
     if !allSqlStatements.isEmpty {
         do {
             print("[FTS] Executing \(allSqlStatements.count) SQL statements in a transaction...")
-            // Execute all setup statements within a single database transaction
             _ = try await db.writeTransaction { transaction in
                 for sql in allSqlStatements {
                     print("[FTS] Executing SQL:\n\(sql)")

@@ -3,7 +3,6 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(SystemManager.self) var system
-
     @State private var authModel = AuthModel()
     @State private var navigationModel = NavigationModel()
 
