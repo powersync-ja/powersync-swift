@@ -130,7 +130,7 @@ func configureFts(db: PowerSyncDatabaseProtocol, schema: Schema) async throws {
 
     do {
         let existingTable: String? = try await db.getOptional(sql: checkSql, parameters: [ftsCheckTable]) { cursor in
-             cursor.getString(name: "name")
+             try cursor.getString(name: "name")
         }
 
         if existingTable != nil {
