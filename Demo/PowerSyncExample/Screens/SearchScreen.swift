@@ -16,40 +16,38 @@ struct SearchScreen: View {
     @State private var searchTask: Task<Void, Never>? = nil
     
     var body: some View {
-        NavigationView {
-            List {
-                if isLoading {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                } else if let error = searchError {
-                    Text("Error: \(error)")
-                } else if searchText.isEmpty {
-                    ContentUnavailableView("Search Lists & Todos", systemImage: "magnifyingglass")
-                } else if searchResults.isEmpty && !searchText.isEmpty {
-                    ContentUnavailableView.search(text: searchText)
-                } else {
-                    ForEach(searchResults) { item in
-                        SearchResultRow(item: item)
-                    }
+        List {
+            if isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+            } else if let error = searchError {
+                Text("Error: \(error)")
+            } else if searchText.isEmpty {
+                ContentUnavailableView("Search Lists & Todos", systemImage: "magnifyingglass")
+            } else if searchResults.isEmpty && !searchText.isEmpty {
+                ContentUnavailableView.search(text: searchText)
+            } else {
+                ForEach(searchResults) { item in
+                    SearchResultRow(item: item)
                 }
             }
-            .navigationTitle("Search")
-            .searchable(text: $searchText,
-                        placement: .toolbar,
-                        prompt: "Search Lists & Todos")
-            .onChange(of: searchText) { _, newValue in
-                triggerSearch(term: newValue)
+        }
+        .navigationTitle("Search")
+        .searchable(text: $searchText,
+                    placement: .toolbar,
+                    prompt: "Search Lists & Todos")
+        .onChange(of: searchText) { _, newValue in
+            triggerSearch(term: newValue)
+        }
+        .onChange(of: searchText) { _, newValue in
+            if newValue.isEmpty && !isLoading {
+                searchResults = []
+                searchError = nil
             }
-            .onChange(of: searchText) { _, newValue in
-                if newValue.isEmpty && !isLoading {
-                    searchResults = []
-                    searchError = nil
-                }
-            }
-        }.navigationViewStyle(.stack)
+        }
     }
     
     private func triggerSearch(term: String) {
