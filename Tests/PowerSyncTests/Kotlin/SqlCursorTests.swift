@@ -33,7 +33,8 @@ final class SqlCursorTests: XCTestCase {
         
         database = KotlinPowerSyncDatabaseImpl(
             schema: schema,
-            dbFilename: ":memory:"
+            dbFilename: ":memory:",
+            logger:  DatabaseLogger(DefaultLogger())
         )
         try await database.disconnectAndClear()
     }
