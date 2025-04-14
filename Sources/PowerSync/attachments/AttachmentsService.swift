@@ -238,7 +238,7 @@ public class AttachmentService {
             hasSynced: attachment.hasSynced,
             localUri: attachment.localUri,
             mediaType: attachment.mediaType,
-            size: attachment.size,
+            size: attachment.size
         )
 
         try context.execute(
@@ -256,7 +256,7 @@ public class AttachmentService {
                 updatedRecord.mediaType ?? NSNull(),
                 updatedRecord.size ?? NSNull(),
                 updatedRecord.state,
-                updatedRecord.hasSynced ?? 0,
+                updatedRecord.hasSynced ?? 0
             ]
         )
 

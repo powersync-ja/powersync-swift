@@ -1,6 +1,8 @@
+/// Creates a PowerSync Schema table for attachment state
 public func createAttachmentsTable(name: String) -> Table {
     return Table(
-        name: name, columns: [
+        name: name,
+        columns: [
             .integer("timestamp"),
             .integer("state"),
             .text("filename"),
@@ -9,6 +11,7 @@ public func createAttachmentsTable(name: String) -> Table {
             .text("media_type"),
             .integer("size"),
             .text("meta_data"),
-        ], localOnly: true
+        ],
+        localOnly: true
     )
 }

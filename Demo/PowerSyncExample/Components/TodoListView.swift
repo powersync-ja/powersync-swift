@@ -11,10 +11,10 @@ struct TodoListView: View {
     @State private var newTodo: NewTodo?
     @State private var editing: Bool = false
 
-    @State private var selectedImage: UIImage?
     // Called when a photo has been captured. Individual widgets should register the listener
-    @State private var onPhotoCapture: ((_: Data) async throws -> Void)?
-    @State private var showCamera = false
+    @State private var onMediaSelect: ((_: Data) async throws -> Void)?
+    @State private var pickMediaType: UIImagePickerController.SourceType = .camera
+    @State private var showMediaPicker = false
 
     var body: some View {
         List {
@@ -56,25 +56,14 @@ struct TodoListView: View {
 
                     },
                     capturePhotoTapped: {
-                        showCamera = true
-                        // Register a callback for successful image capture
-                        onPhotoCapture = { (_ fileData: Data) in
-                            guard let attachments = system.attachments
-                            else {
-                                return
-                            }
-
-                            try await attachments.saveFile(
-                                data: fileData,
-                                mediaType: "image/jpeg",
-                                fileExtension: "jpg"
-                            ) { tx, record in
-                                _ = try tx.execute(
-                                    sql: "UPDATE \(TODOS_TABLE) SET photo_id = ? WHERE id = ?",
-                                    parameters: [record.id, todo.id]
-                                )
-                            }
-                        }
+                        registerMediaCallback(todo: todo)
+                        pickMediaType = .camera
+                        showMediaPicker = true
+                    },
+                    selectPhotoTapped: {
+                        registerMediaCallback(todo: todo)
+                        pickMediaType = .photoLibrary
+                        showMediaPicker = true
                     }
                 )
             }
@@ -84,8 +73,11 @@ struct TodoListView: View {
                 }
             }
         }
-        .sheet(isPresented: $showCamera) {
-            CameraView(onPhotoCapture: $onPhotoCapture)
+        .sheet(isPresented: $showMediaPicker) {
+            CameraView(
+                onMediaSelect: $onMediaSelect,
+                mediaType: $pickMediaType
+            )
         }
         .animation(.default, value: todos)
         .navigationTitle("Todos")
@@ -143,6 +135,32 @@ struct TodoListView: View {
             self.error = error
         }
     }
+    
+    ///  Registers a callback which saves a photo for the specified Todo item if media is sucessfully loaded.
+    func registerMediaCallback(todo: Todo) {
+        // Register a callback for successful image capture
+        onMediaSelect = { (_ fileData: Data) in
+            guard let attachments = system.attachments
+            else {
+                return
+            }
+
+            do {
+                try await attachments.saveFile(
+                    data: fileData,
+                    mediaType: "image/jpeg",
+                    fileExtension: "jpg"
+                ) { tx, record in
+                    _ = try tx.execute(
+                        sql: "UPDATE \(TODOS_TABLE) SET photo_id = ? WHERE id = ?",
+                        parameters: [record.id, todo.id]
+                    )
+                }
+            } catch {
+                self.error = error
+            }
+        }
+    }
 }
 
 #Preview {
@@ -154,13 +172,15 @@ struct TodoListView: View {
 }
 
 struct CameraView: UIViewControllerRepresentable {
-    @Binding var onPhotoCapture: ((_: Data) async throws -> Void)?
+    @Binding var onMediaSelect: ((_: Data) async throws -> Void)?
+    @Binding var mediaType: UIImagePickerController.SourceType
+    
     @Environment(\.presentationMode) var presentationMode
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.delegate = context.coordinator
-        picker.sourceType = .camera
+        picker.sourceType = mediaType
         return picker
     }
 
@@ -181,11 +201,12 @@ struct CameraView: UIViewControllerRepresentable {
             if let image = info[.originalImage] as? UIImage {
                 // Convert UIImage to Data
                 if let jpegData = image.jpegData(compressionQuality: 0.8) {
-                    if let photoCapture = parent.onPhotoCapture {
+                    if let photoCapture = parent.onMediaSelect {
                         Task {
                             do {
                                 try await photoCapture(jpegData)
                             } catch {
+                                // The photoCapture method should handle errors
                                 print("Error saving photo: \(error)")
                             }
                         }

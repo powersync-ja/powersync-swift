@@ -5,6 +5,7 @@ struct TodoListRow: View {
     let completeTapped: () -> Void
     let deletePhotoTapped: () -> Void
     let capturePhotoTapped: () -> Void
+    let selectPhotoTapped: () -> Void
 
     @State private var image: UIImage? = nil
 
@@ -32,12 +33,20 @@ struct TodoListRow: View {
             Spacer()
             VStack {
                 if todo.photoId == nil {
-                    Button {
-                        capturePhotoTapped()
-                    } label: {
-                        Image(systemName: "camera.fill")
+                    HStack {
+                        Button {
+                            capturePhotoTapped()
+                        } label: {
+                            Image(systemName: "camera.fill")
+                        }
+                        .buttonStyle(.plain)
+                        Button {
+                            selectPhotoTapped()
+                        } label: {
+                            Image(systemName: "photo.on.rectangle")
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 } else {
                     Button {
                         deletePhotoTapped()
@@ -85,6 +94,7 @@ struct TodoListRow: View {
 
         ),
         completeTapped: {},
-        deletePhotoTapped: {}
+        deletePhotoTapped: {},
+        capturePhotoTapped: {}
     ) {}
 }
