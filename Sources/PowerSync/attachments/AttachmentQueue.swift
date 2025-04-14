@@ -110,7 +110,7 @@ public actor AttachmentQueue {
             return await self.getLocalUri(filename)
         },
         errorHandler: self.errorHandler,
-        syncThrottle: self.syncThrottleDuration,
+        syncThrottle: self.syncThrottleDuration
     )
 
     /// Initializes the attachment queue

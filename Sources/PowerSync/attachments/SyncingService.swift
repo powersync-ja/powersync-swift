@@ -37,7 +37,7 @@ actor SyncingService {
         logger: any LoggerProtocol,
         getLocalUri: @escaping (String) async -> String,
         errorHandler: SyncErrorHandler? = nil,
-        syncThrottle: TimeInterval = 5.0,
+        syncThrottle: TimeInterval = 5.0
     ) {
         self.remoteStorage = remoteStorage
         self.localStorage = localStorage
