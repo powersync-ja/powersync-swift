@@ -46,6 +46,8 @@ public struct WatchedAttachmentItem {
 public actor AttachmentQueue {
     /// Default name of the attachments table
     public static let DEFAULT_TABLE_NAME = "attachments"
+    
+    let logTag = "AttachmentQueue"
 
     /// PowerSync database client
     public let db: PowerSyncDatabaseProtocol
@@ -86,7 +88,7 @@ public actor AttachmentQueue {
     /**
      * Logging interface used for all log operations
      */
-//    public let logger: Logger
+    public let logger: any LoggerProtocol
 
     /// Attachment service for interacting with attachment records
     public let attachmentsService: AttachmentService
@@ -102,12 +104,13 @@ public actor AttachmentQueue {
         remoteStorage: self.remoteStorage,
         localStorage: self.localStorage,
         attachmentsService: self.attachmentsService,
+        logger: self.logger,
         getLocalUri: { [weak self] filename in
             guard let self = self else { return filename }
             return await self.getLocalUri(filename)
         },
         errorHandler: self.errorHandler,
-        syncThrottle: self.syncThrottleDuration
+        syncThrottle: self.syncThrottleDuration,
     )
 
     /// Initializes the attachment queue
@@ -125,7 +128,7 @@ public actor AttachmentQueue {
         syncThrottleDuration: TimeInterval = 1.0,
         subdirectories: [String]? = nil,
         downloadAttachments: Bool = true,
-//        logger: Logger = Logger(subsystem: "com.powersync.attachments", category: "AttachmentQueue")
+        logger: (any LoggerProtocol)? = nil
     ) {
         self.db = db
         self.remoteStorage = remoteStorage
@@ -139,12 +142,12 @@ public actor AttachmentQueue {
         self.syncThrottleDuration = syncThrottleDuration
         self.subdirectories = subdirectories
         self.downloadAttachments = downloadAttachments
-//        self.logger = logger
+        self.logger = logger ?? db.logger
 
         attachmentsService = AttachmentService(
             db: db,
             tableName: attachmentsQueueTableName,
-//            logger: logger,
+            logger: self.logger,
             maxArchivedCount: archivedCacheLimit
         )
     }
@@ -193,7 +196,7 @@ public actor AttachmentQueue {
                 try await watchTask.value
             } catch {
                 if !(error is CancellationError) {
-//                    logger.error("Error in sync job: \(error.localizedDescription)")
+                    logger.error("Error in sync job: \(error.localizedDescription)", tag: logTag)
                 }
             }
         }

@@ -17,6 +17,9 @@ actor SyncingService {
     private let syncTriggerSubject = PassthroughSubject<Void, Never>()
     private var periodicSyncTimer: Timer?
     private var syncTask: Task<Void, Never>?
+    let logger: any LoggerProtocol
+    
+    let logTag = "AttachmentSync"
 
     /// Initializes a new instance of `SyncingService`.
     ///
@@ -31,9 +34,10 @@ actor SyncingService {
         remoteStorage: RemoteStorageAdapter,
         localStorage: LocalStorageAdapter,
         attachmentsService: AttachmentService,
+        logger: any LoggerProtocol,
         getLocalUri: @escaping (String) async -> String,
         errorHandler: SyncErrorHandler? = nil,
-        syncThrottle: TimeInterval = 5.0
+        syncThrottle: TimeInterval = 5.0,
     ) {
         self.remoteStorage = remoteStorage
         self.localStorage = localStorage
@@ -41,6 +45,7 @@ actor SyncingService {
         self.getLocalUri = getLocalUri
         self.errorHandler = errorHandler
         self.syncThrottle = syncThrottle
+        self.logger = logger
 
         Task { await self.setupSyncFlow() }
     }
@@ -74,7 +79,7 @@ actor SyncingService {
                     _ = try await deleteArchivedAttachments()
                 } catch {
                     if error is CancellationError { break }
-                    // logger.error("Sync failure: \(error)")
+                     logger.error("Sync error: \(error)", tag: logTag)
                 }
             }
 
@@ -167,6 +172,7 @@ actor SyncingService {
     /// - Parameter attachment: The attachment to upload.
     /// - Returns: The updated attachment with new sync state.
     private func uploadAttachment(attachment: Attachment) async throws -> Attachment {
+        logger.info("Uploading attachment \(attachment.filename)", tag: logTag)
         do {
             guard let localUri = attachment.localUri else {
                 throw PowerSyncError.attachmentError("No localUri for attachment \(attachment.id)")
@@ -192,6 +198,7 @@ actor SyncingService {
     /// - Parameter attachment: The attachment to download.
     /// - Returns: The updated attachment with new sync state.
     private func downloadAttachment(attachment: Attachment) async throws -> Attachment {
+        logger.info("Downloading attachment \(attachment.filename)", tag: logTag)
         do {
             let attachmentPath = await getLocalUri(attachment.filename)
             let fileData = try await remoteStorage.downloadFile(attachment: attachment)
@@ -218,6 +225,7 @@ actor SyncingService {
     /// - Parameter attachment: The attachment to delete.
     /// - Returns: The updated attachment with archived state.
     private func deleteAttachment(attachment: Attachment) async throws -> Attachment {
+        logger.info("Deleting attachment \(attachment.filename)", tag: logTag)
         do {
             try await remoteStorage.deleteFile(attachment: attachment)
 

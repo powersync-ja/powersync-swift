@@ -1,12 +1,16 @@
 import OSLog
 
-class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector {
+internal class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector {
     let swiftBackendConnector: PowerSyncBackendConnector
-
+    let db: any PowerSyncDatabaseProtocol
+    let logTag = "PowerSyncBackendConnector"
+    
     init(
-        swiftBackendConnector: PowerSyncBackendConnector
+        swiftBackendConnector: PowerSyncBackendConnector,
+        db: any PowerSyncDatabaseProtocol
     ) {
         self.swiftBackendConnector = swiftBackendConnector
+        self.db = db
     }
 
     override func __fetchCredentials() async throws -> KotlinPowerSyncCredentials? {
@@ -14,25 +18,17 @@ class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector {
             let result = try await swiftBackendConnector.fetchCredentials()
             return result?.kotlinCredentials
         } catch {
-            if #available(iOS 14.0, *) {
-                Logger().error("🔴 Failed to fetch credentials: \(error.localizedDescription)")
-            } else {
-                print("🔴 Failed to fetch credentials: \(error.localizedDescription)")
-            }
+            db.logger.error("Error while fetching credentials", tag: logTag)
             return nil
         }
     }
 
     override func __uploadData(database: KotlinPowerSyncDatabase) async throws {
-        let swiftDatabase = KotlinPowerSyncDatabaseImpl(kotlinDatabase: database)
         do {
-            return  try await swiftBackendConnector.uploadData(database: swiftDatabase)
+            // Pass the Swift DB protocal to the connector
+            return  try await swiftBackendConnector.uploadData(database: db)
         } catch {
-            if #available(iOS 14.0, *) {
-                Logger().error("🔴 Failed to upload data: \(error)")
-            } else {
-                print("🔴 Failed to upload data: \(error)")
-            }
+            db.logger.error("Error while uploading data: \(error)", tag: logTag)
         }
     }
 }

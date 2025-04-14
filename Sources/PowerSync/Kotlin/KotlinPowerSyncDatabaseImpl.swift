@@ -1,27 +1,27 @@
 import Foundation
 import PowerSyncKotlin
 
-final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
+internal final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
+    let logger: any LoggerProtocol
+    
     private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
 
     var currentStatus: SyncStatus { kotlinDatabase.currentStatus }
+    
 
     init(
         schema: Schema,
         dbFilename: String,
-        logger: DatabaseLogger? = nil
+        logger: DatabaseLogger
     ) {
         let factory = PowerSyncKotlin.DatabaseDriverFactory()
         kotlinDatabase = PowerSyncDatabase(
             factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),
             dbFilename: dbFilename,
-            logger: logger?.kLogger
+            logger: logger.kLogger
         )
-    }
-
-    init(kotlinDatabase: KotlinPowerSyncDatabase) {
-        self.kotlinDatabase = kotlinDatabase
+        self.logger = logger
     }
 
     func waitForFirstSync() async throws {
@@ -42,7 +42,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         retryDelayMs: Int64 = 5000,
         params: [String: JsonParam?] = [:]
     ) async throws {
-        let connectorAdapter = PowerSyncBackendConnectorAdapter(swiftBackendConnector: connector)
+        let connectorAdapter = PowerSyncBackendConnectorAdapter(
+            swiftBackendConnector: connector,
+            db: self
+        )
 
         try await kotlinDatabase.connect(
             connector: connectorAdapter,

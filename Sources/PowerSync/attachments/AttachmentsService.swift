@@ -9,7 +9,8 @@ import PowerSyncKotlin
 public class AttachmentService {
     private let db: any PowerSyncDatabaseProtocol
     private let tableName: String
-//    private let logger: Logger
+    private let logger: any LoggerProtocol
+    private let logTag = "AttachmentService"
     private let maxArchivedCount: Int64
 
     /**
@@ -22,12 +23,12 @@ public class AttachmentService {
     public init(
         db: PowerSyncDatabaseProtocol,
         tableName: String,
-//        logger: Logger,
+        logger: any LoggerProtocol,
         maxArchivedCount: Int64
     ) {
         self.db = db
         self.tableName = tableName
-//        self.logger = logger
+        self.logger = logger
         self.maxArchivedCount = maxArchivedCount
     }
 
@@ -145,7 +146,7 @@ public class AttachmentService {
      * Once a change is detected it will initiate a sync of the attachments
      */
     public func watchActiveAttachments() throws -> AsyncThrowingStream<[String], Error> {
-//        logger.i("Watching attachments...")
+        logger.info("Watching attachments...", tag: logTag)
 
         return try db.watch(
             sql: """
