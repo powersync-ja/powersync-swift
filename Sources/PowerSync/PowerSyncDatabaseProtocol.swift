@@ -100,6 +100,12 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     ///
     /// - Parameter clearLocal: Set to false to preserve data in local-only tables.
     func disconnectAndClear(clearLocal: Bool) async throws
+    
+    /// Close the database, releasing resources.
+    /// Also disconnects any active connection.
+    ///
+    /// Once close is called, this database cannot be used again - a new one must be constructed.
+    func close() async throws
 }
 
 public extension PowerSyncDatabaseProtocol {
