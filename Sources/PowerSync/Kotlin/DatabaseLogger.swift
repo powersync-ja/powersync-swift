@@ -61,24 +61,6 @@ internal class DatabaseLogger: LoggerProtocol {
         )
     }
     
-    /// Sets the minimum severity level that will be logged.
-    ///
-    /// Messages below this level will be ignored.
-    ///
-    /// - Parameter severity: The minimum `LogSeverity` to allow through.
-    public func setMinSeverity(_ severity: LogSeverity) {
-        logger.setMinSeverity(severity)
-    }
-    
-    /// Sets the list of log writers that will receive log messages.
-    ///
-    /// This updates both the internal writer list and the Kermit logger's configuration.
-    ///
-    /// - Parameter writers: An array of Swift `LogWriterProtocol` implementations.
-    public func setWriters(_ writers: [any LogWriterProtocol]) {
-        logger.setWriters(writers)
-    }
-    
     /// Logs a debug-level message.
     public func debug(_ message: String, tag: String?) {
         logger.debug(message, tag: tag)

@@ -48,17 +48,6 @@ public protocol LogWriterProtocol {
 ///
 /// Conformers provide logging APIs and manage attached log writers.
 public protocol LoggerProtocol {
-    /// Sets the minimum severity level to be logged.
-    ///
-    /// Log messages below this severity will be ignored.
-    ///
-    /// - Parameter severity: The minimum severity level to log.
-    func setMinSeverity(_ severity: LogSeverity)
-    
-    /// Sets the list of log writers that will handle log output.
-    ///
-    /// - Parameter writers: An array of `LogWriterProtocol` conformers.
-    func setWriters(_ writers: [LogWriterProtocol])
     /// Logs an informational message.
     ///
     /// - Parameters:
