@@ -83,3 +83,7 @@ The PowerSync Swift SDK currently makes use of the [PowerSync Kotlin Multiplatfo
 ## Migration from Alpha to Beta
 
 See these [developer notes](https://docs.powersync.com/client-sdk-references/swift#migrating-from-the-alpha-to-the-beta-sdk) if you are migrating from the alpha to the beta version of the Swift SDK.
+
+## Attachments
+
+See the attachments [README](./Sources/PowerSync/attachments/README.md) for more information.

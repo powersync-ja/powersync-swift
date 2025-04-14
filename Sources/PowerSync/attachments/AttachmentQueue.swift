@@ -46,7 +46,7 @@ public struct WatchedAttachmentItem {
 public actor AttachmentQueue {
     /// Default name of the attachments table
     public static let DEFAULT_TABLE_NAME = "attachments"
-    
+
     let logTag = "AttachmentQueue"
 
     /// PowerSync database client
@@ -304,6 +304,7 @@ public actor AttachmentQueue {
     ///   - fileExtension: File extension
     ///   - updateHook: Hook to assign attachment relationships in the same transaction
     /// - Returns: The created attachment
+    @discardableResult
     public func saveFile(
         data: Data,
         mediaType: String,
@@ -343,6 +344,7 @@ public actor AttachmentQueue {
     /// - Parameters:
     ///   - attachmentId: ID of the attachment to delete
     ///   - updateHook: Hook to perform additional DB updates in the same transaction
+    @discardableResult
     public func deleteFile(
         attachmentId: String,
         updateHook: @escaping (ConnectionContext, Attachment) throws -> Void
@@ -361,7 +363,7 @@ public actor AttachmentQueue {
                 hasSynced: attachment.hasSynced,
                 localUri: attachment.localUri,
                 mediaType: attachment.mediaType,
-                size: attachment.size,
+                size: attachment.size
             )
 
             return try self.attachmentsService.upsertAttachment(updatedAttachment, context: tx)

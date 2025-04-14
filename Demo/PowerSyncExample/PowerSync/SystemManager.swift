@@ -8,9 +8,7 @@ func getAttachmentsDirectoryPath() throws -> String {
     ).first else {
         throw PowerSyncError.attachmentError("Could not determine attachments directory path")
     }
-    let r = documentsURL.appendingPathComponent("attachments").path
-
-    return r
+    return documentsURL.appendingPathComponent("attachments").path
 }
 
 @Observable

@@ -10,9 +10,10 @@ struct TodoListView: View {
     @State private var error: Error?
     @State private var newTodo: NewTodo?
     @State private var editing: Bool = false
-    
+
     @State private var selectedImage: UIImage?
-    @State private var imageData: Data?
+    // Called when a photo has been captured. Individual widgets should register the listener
+    @State private var onPhotoCapture: ((_: Data) async throws -> Void)?
     @State private var showCamera = false
 
     var body: some View {
@@ -45,7 +46,7 @@ struct TodoListView: View {
                         }
                         Task {
                             do {
-                                _ = try await attachments.deleteFile(attachmentId: attachmentID) { tx, _ in
+                                try await attachments.deleteFile(attachmentId: attachmentID) { tx, _ in
                                     _ = try tx.execute(sql: "UPDATE \(TODOS_TABLE) SET photo_id = NULL WHERE id = ?", parameters: [todo.id])
                                 }
                             } catch {
@@ -56,6 +57,24 @@ struct TodoListView: View {
                     },
                     capturePhotoTapped: {
                         showCamera = true
+                        // Register a callback for successful image capture
+                        onPhotoCapture = { (_ fileData: Data) in
+                            guard let attachments = system.attachments
+                            else {
+                                return
+                            }
+
+                            try await attachments.saveFile(
+                                data: fileData,
+                                mediaType: "image/jpeg",
+                                fileExtension: "jpg"
+                            ) { tx, record in
+                                _ = try tx.execute(
+                                    sql: "UPDATE \(TODOS_TABLE) SET photo_id = ? WHERE id = ?",
+                                    parameters: [record.id, todo.id]
+                                )
+                            }
+                        }
                     }
                 )
             }
@@ -66,7 +85,7 @@ struct TodoListView: View {
             }
         }
         .sheet(isPresented: $showCamera) {
-            CameraView(imageData: $imageData)
+            CameraView(onPhotoCapture: $onPhotoCapture)
         }
         .animation(.default, value: todos)
         .navigationTitle("Todos")
@@ -134,9 +153,8 @@ struct TodoListView: View {
     }
 }
 
-
 struct CameraView: UIViewControllerRepresentable {
-    @Binding var imageData: Data?
+    @Binding var onPhotoCapture: ((_: Data) async throws -> Void)?
     @Environment(\.presentationMode) var presentationMode
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
@@ -163,7 +181,15 @@ struct CameraView: UIViewControllerRepresentable {
             if let image = info[.originalImage] as? UIImage {
                 // Convert UIImage to Data
                 if let jpegData = image.jpegData(compressionQuality: 0.8) {
-                    parent.imageData = jpegData
+                    if let photoCapture = parent.onPhotoCapture {
+                        Task {
+                            do {
+                                try await photoCapture(jpegData)
+                            } catch {
+                                print("Error saving photo: \(error)")
+                            }
+                        }
+                    }
                 }
             }
 
