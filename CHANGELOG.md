@@ -1,5 +1,26 @@
 # Changelog
 
+# 1.0.0-Beta.10 (unreleased)
+
+* Added the ability to specify a custom logging implementation
+```swift
+  let db = PowerSyncDatabase(
+    schema: Schema(
+        tables: [
+            Table(
+                name: "users",
+                columns: [
+                    .text("name"),
+                    .text("email")
+                ]
+            )
+        ]
+    ),
+    logger: DefaultLogger(minSeverity: .debug)
+)
+```
+* added `.close()` method on `PowerSyncDatabaseProtocol`
+
 ## 1.0.0-Beta.9
 
 * Update PowerSync SQLite core extension to 0.3.12.

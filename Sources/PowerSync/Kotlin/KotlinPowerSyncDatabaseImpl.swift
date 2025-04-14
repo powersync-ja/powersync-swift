@@ -8,13 +8,15 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     init(
         schema: Schema,
-        dbFilename: String
+        dbFilename: String,
+        logger: DatabaseLogger? = nil
     ) {
         let factory = PowerSyncKotlin.DatabaseDriverFactory()
         kotlinDatabase = PowerSyncDatabase(
             factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),
-            dbFilename: dbFilename
+            dbFilename: dbFilename,
+            logger: logger?.kLogger
         )
     }
 
@@ -231,5 +233,9 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
         return try safeCast(await kotlinDatabase.readTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
+    }
+    
+    func close() async throws{
+        try await kotlinDatabase.close()
     }
 }

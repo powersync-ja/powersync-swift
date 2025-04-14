@@ -2,7 +2,7 @@
   <a href="https://www.powersync.com" target="_blank"><img src="https://github.com/powersync-ja/.github/assets/7372448/d2538c43-c1a0-4c47-9a76-41462dba484f"/></a>
 </p>
 
-*[PowerSync](https://www.powersync.com) is a sync engine for building local-first apps with instantly-responsive UI/UX and simplified state transfer. Syncs between SQLite on the client-side and Postgres, MongoDB or MySQL on the server-side.*
+_[PowerSync](https://www.powersync.com) is a sync engine for building local-first apps with instantly-responsive UI/UX and simplified state transfer. Syncs between SQLite on the client-side and Postgres, MongoDB or MySQL on the server-side._
 
 # PowerSync Swift
 
@@ -16,7 +16,7 @@ This SDK is currently in a beta release it is suitable for production use, given
 
 - [Sources](./Sources/)
 
-    - This is the Swift SDK implementation.
+  - This is the Swift SDK implementation.
 
 ## Demo Apps / Example Projects
 
@@ -51,10 +51,34 @@ to your `Package.swift` file and pin the dependency to a specific version. The v
 
 to your `Package.swift` file and pin the dependency to a specific version. This is required because the package is in beta.
 
+## Usage
+
+Create a PowerSync client
+
+```swift
+import PowerSync
+
+let powersync = PowerSyncDatabase(
+    schema: Schema(
+        tables: [
+            Table(
+                name: "users",
+                columns: [
+                    .text("count"),
+                    .integer("is_active"),
+                    .real("weight"),
+                    .text("description")
+                ]
+            )
+        ]
+    ),
+    logger: DefaultLogger(minSeverity: .debug)
+)
+```
+
 ## Underlying Kotlin Dependency
 
 The PowerSync Swift SDK currently makes use of the [PowerSync Kotlin Multiplatform SDK](https://github.com/powersync-ja/powersync-kotlin) with the API tool [SKIE](https://skie.touchlab.co/) and KMMBridge under the hood to help generate and publish a native Swift package. We will move to an entirely Swift native API in v1 and do not expect there to be any breaking changes. For more details, see the [Swift SDK reference](https://docs.powersync.com/client-sdk-references/swift).
-
 
 ## Migration from Alpha to Beta
 

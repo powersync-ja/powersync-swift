@@ -18,13 +18,20 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         database = KotlinPowerSyncDatabaseImpl(
             schema: schema,
-            dbFilename: ":memory:"
+            dbFilename: ":memory:",
+            logger: DatabaseLogger(DefaultLogger())
         )
         try await database.disconnectAndClear()
     }
 
     override func tearDown() async throws {
         try await database.disconnectAndClear()
+        // Tests currently fail if this is called.
+        // The watched query tests try and read from the DB while it's closing. 
+        // This causes a PowerSyncException to be thrown in the Kotlin flow.
+        // Custom exceptions in flows are not supported by SKIEE. This causes a crash.
+        // FIXME: Reapply once watched query errors are handled better.
+        // try await database.close()
         database = nil
         try await super.tearDown()
     }
@@ -471,5 +478,48 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         ) { cursor in cursor.getLong(index: 0) }
 
         XCTAssertEqual(peopleCount, 1)
+    }
+    
+    func testCustomLogger() async throws {
+        let testWriter = TestLogWriterAdapter()
+        let logger = DefaultLogger(minSeverity: LogSeverity.debug, writers: [testWriter])
+        
+        let db2 = KotlinPowerSyncDatabaseImpl(
+            schema: schema,
+            dbFilename: ":memory:",
+            logger: DatabaseLogger(logger)
+        )
+        
+        try await db2.close()
+        
+        let warningIndex = testWriter.logs.firstIndex(
+            where: { value in
+                value.contains("warning: Multiple PowerSync instances for the same database have been detected")
+            }
+        )
+        
+        XCTAssert(warningIndex! >= 0)
+    }
+    
+    func testMinimumSeverity() async throws {
+        let testWriter = TestLogWriterAdapter()
+        let logger = DefaultLogger(minSeverity: LogSeverity.error, writers: [testWriter])
+        
+        let db2 = KotlinPowerSyncDatabaseImpl(
+            schema: schema,
+            dbFilename: ":memory:",
+            logger: DatabaseLogger(logger)
+        )
+        
+        try await db2.close()
+        
+        let warningIndex = testWriter.logs.firstIndex(
+            where: { value in
+                value.contains("warning: Multiple PowerSync instances for the same database have been detected")
+            }
+        )
+        
+        // The warning should not be present due to the min severity
+        XCTAssert(warningIndex == nil)
     }
 }

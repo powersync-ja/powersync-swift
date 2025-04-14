@@ -7,14 +7,17 @@ public let DEFAULT_DB_FILENAME = "powersync.db"
 /// - Parameters:
 ///   - schema: The database schema
 ///   - dbFilename: The database filename. Defaults to "powersync.db"
+///   - logger: Optional logging interface
 /// - Returns: A configured PowerSyncDatabase instance
 public func PowerSyncDatabase(
     schema: Schema,
-    dbFilename: String = DEFAULT_DB_FILENAME
+    dbFilename: String = DEFAULT_DB_FILENAME,
+    logger: (any LoggerProtocol) = DefaultLogger()
 ) -> PowerSyncDatabaseProtocol {
     
     return KotlinPowerSyncDatabaseImpl(
         schema: schema,
-        dbFilename: dbFilename
+        dbFilename: dbFilename,
+        logger: DatabaseLogger(logger)
     )
 }
