@@ -1,42 +1,5 @@
 import Combine
 import Foundation
-import OSLog
-
-/// A watched attachment record item.
-/// This is usually returned from watching all relevant attachment IDs.
-public struct WatchedAttachmentItem {
-    /// Id for the attachment record
-    public let id: String
-
-    /// File extension used to determine an internal filename for storage if no `filename` is provided
-    public let fileExtension: String?
-
-    /// Filename to store the attachment with
-    public let filename: String?
-
-    /// Metadata for the attachment (optional)
-    public let metaData: String?
-
-    /// Initializes a new `WatchedAttachmentItem`
-    /// - Parameters:
-    ///   - id: Attachment record ID
-    ///   - fileExtension: Optional file extension
-    ///   - filename: Optional filename
-    ///   - metaData: Optional metadata
-    public init(
-        id: String,
-        fileExtension: String? = nil,
-        filename: String? = nil,
-        metaData: String? = nil
-    ) {
-        self.id = id
-        self.fileExtension = fileExtension
-        self.filename = filename
-        self.metaData = metaData
-
-        precondition(fileExtension != nil || filename != nil, "Either fileExtension or filename must be provided.")
-    }
-}
 
 /// Class used to implement the attachment queue
 /// Requires a PowerSyncDatabase, a RemoteStorageAdapter implementation, and a directory name for attachments.
@@ -151,9 +114,10 @@ public actor AttachmentQueue {
 
     /// Starts the attachment sync process
     public func startSync() async throws {
-        if closed {
-            throw PowerSyncAttachmentError.closed("Cannot start syncing on closed attachment queue")
-        }
+        try guardClosed()
+
+        // Stop any active syncing before starting new Tasks
+        try await stopSyncing()
 
         // Ensure the directory where attachments are downloaded exists
         try await localStorage.makeDir(path: attachmentsDirectory)
@@ -165,48 +129,63 @@ public actor AttachmentQueue {
             }
         }
 
-        await syncingService.startPeriodicSync(period: syncInterval)
+        try await syncingService.startSync(period: syncInterval)
 
         syncStatusTask = Task {
             do {
-                // Create a task for watching connectivity changes
-                let connectivityTask = Task {
-                    var previousConnected = db.currentStatus.connected
-
-                    for await status in db.currentStatus.asFlow() {
-                        if !previousConnected && status.connected {
-                            await syncingService.triggerSync()
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    // Add connectivity monitoring task
+                    group.addTask {
+                        var previousConnected = self.db.currentStatus.connected
+                        for await status in self.db.currentStatus.asFlow() {
+                            if !previousConnected && status.connected {
+                                try await self.syncingService.triggerSync()
+                            }
+                            previousConnected = status.connected
                         }
-                        previousConnected = status.connected
                     }
-                }
 
-                // Create a task for watching attachment changes
-                let watchTask = Task {
-                    for try await items in self.watchedAttachments {
-                        try await self.processWatchedAttachments(items: items)
+                    // Add attachment watching task
+                    group.addTask {
+                        for try await items in self.watchedAttachments {
+                            try await self.processWatchedAttachments(items: items)
+                        }
                     }
-                }
 
-                // Wait for both tasks to complete (they shouldn't unless cancelled)
-                await connectivityTask.value
-                try await watchTask.value
+                    // Wait for any task to complete (which should only happen on cancellation)
+                    try await group.next()
+                }
             } catch {
                 if !(error is CancellationError) {
-                    logger.error("Error in sync job: \(error.localizedDescription)", tag: logTag)
+                    logger.error("Error in attachment sync job: \(error.localizedDescription)", tag: logTag)
                 }
             }
         }
     }
 
-    /// Closes the attachment queue and cancels all sync tasks
-    public func close() async throws {
-        if closed {
-            return
-        }
+    /// Stops active syncing tasks. Syncing can be resumed with ``startSync()``
+    public func stopSyncing() async throws {
+        try guardClosed()
 
         syncStatusTask?.cancel()
-        await syncingService.close()
+        // Wait for the task to actually complete
+        do {
+            _ = try await syncStatusTask?.value
+        } catch {
+            // Task completed with error (likely cancellation)
+            // This is okay
+        }
+        syncStatusTask = nil
+
+        try await syncingService.stopSync()
+    }
+
+    /// Closes the attachment queue and cancels all sync tasks
+    public func close() async throws {
+        try guardClosed()
+
+        try await stopSyncing()
+        try await syncingService.close()
         closed = true
     }
 
@@ -219,7 +198,7 @@ public actor AttachmentQueue {
         attachmentId: String,
         fileExtension: String?
     ) -> String {
-        return "\(attachmentId).\(fileExtension ?? "")"
+        return "\(attachmentId).\(fileExtension ?? "attachment")"
     }
 
     /// Processes watched attachment items and updates sync state
@@ -230,10 +209,10 @@ public actor AttachmentQueue {
         try await attachmentsService.withLock { context in
             let currentAttachments = try await context.getAttachments()
             var attachmentUpdates = [Attachment]()
-            
+
             for item in items {
                 let existingQueueItem = currentAttachments.first { $0.id == item.id }
-                
+
                 if existingQueueItem == nil {
                     if !self.downloadAttachments {
                         continue
@@ -246,7 +225,7 @@ public actor AttachmentQueue {
                         attachmentId: item.id,
                         fileExtension: item.fileExtension
                     )
-                    
+
                     attachmentUpdates.append(
                         Attachment(
                             id: item.id,
@@ -267,29 +246,29 @@ public actor AttachmentQueue {
                         // and has been synced. If it's missing and hasSynced is false then
                         // it must be an upload operation
                         let newState = existingQueueItem!.localUri == nil ?
-                        AttachmentState.queuedDownload :
-                        AttachmentState.queuedUpload
-                        
+                            AttachmentState.queuedDownload :
+                            AttachmentState.queuedUpload
+
                         attachmentUpdates.append(
                             existingQueueItem!.with(state: newState)
                         )
                     }
                 }
             }
-            
-            
+
             /**
              * Archive any items not specified in the watched items except for items pending delete.
              */
             for attachment in currentAttachments {
-                if attachment.state != AttachmentState.queuedDelete &&
-                    items.first(where: { $0.id == attachment.id }) == nil {
+                if attachment.state != AttachmentState.queuedDelete,
+                   items.first(where: { $0.id == attachment.id }) == nil
+                {
                     attachmentUpdates.append(
                         attachment.with(state: AttachmentState.archived)
                     )
                 }
             }
-            
+
             if !attachmentUpdates.isEmpty {
                 try await context.saveAttachments(attachments: attachmentUpdates)
             }
@@ -319,11 +298,11 @@ public actor AttachmentQueue {
 
         // Write the file to the filesystem
         let fileSize = try await localStorage.saveFile(filePath: localUri, data: data)
-        
+
         return try await attachmentsService.withLock { context in
             // Start a write transaction. The attachment record and relevant local relationship
             // assignment should happen in the same transaction.
-            return try await self.db.writeTransaction { tx in
+            try await self.db.writeTransaction { tx in
                 let attachment = Attachment(
                     id: id,
                     filename: filename,
@@ -385,7 +364,7 @@ public actor AttachmentQueue {
 
     /// Removes all archived items
     public func expireCache() async throws {
-       try await  attachmentsService.withLock { context in
+        try await attachmentsService.withLock { context in
             var done = false
             repeat {
                 done = try await self.syncingService.deleteArchivedAttachments(context)
@@ -399,6 +378,12 @@ public actor AttachmentQueue {
             try await context.clearQueue()
             // Remove the attachments directory
             try await self.localStorage.rmDir(path: self.attachmentsDirectory)
+        }
+    }
+
+    private func guardClosed() throws {
+        if closed {
+            throw PowerSyncAttachmentError.closed("Attachment queue is closed")
         }
     }
 }

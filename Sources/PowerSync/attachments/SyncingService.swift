@@ -18,8 +18,9 @@ actor SyncingService {
     private var periodicSyncTimer: Timer?
     private var syncTask: Task<Void, Never>?
     let logger: any LoggerProtocol
-    
+
     let logTag = "AttachmentSync"
+    var closed: Bool
 
     /// Initializes a new instance of `SyncingService`.
     ///
@@ -46,85 +47,61 @@ actor SyncingService {
         self.errorHandler = errorHandler
         self.syncThrottle = syncThrottle
         self.logger = logger
-
-        Task { await self.setupSyncFlow() }
-    }
-
-    /// Sets up the main attachment syncing pipeline and starts watching for changes.
-    private func setupSyncFlow() {
-        syncTask = Task {
-            let syncTrigger = AsyncStream<Void> { continuation in
-                let cancellable = syncTriggerSubject
-                    .throttle(for: .seconds(syncThrottle), scheduler: DispatchQueue.global(), latest: true)
-                    .sink { _ in continuation.yield(()) }
-
-                continuation.onTermination = { _ in
-                    cancellable.cancel()
-                }
-                self.cancellables.insert(cancellable)
-            }
-
-            let watchTask = Task {
-                for try await _ in try await attachmentsService.watchActiveAttachments() {
-                    syncTriggerSubject.send(())
-                }
-            }
-
-            for await _ in syncTrigger {
-                guard !Task.isCancelled else { break }
-
-                do {
-                    try await attachmentsService.withLock { context in
-                        let attachments = try await context.getActiveAttachments()
-                        try await self.handleSync(context: context, attachments: attachments)
-                        _ = try await self.deleteArchivedAttachments(context)
-                    }
-                } catch {
-                    if error is CancellationError { break }
-                     logger.error("Sync error: \(error)", tag: logTag)
-                }
-            }
-
-            watchTask.cancel()
-        }
+        closed = false
     }
 
     /// Starts periodic syncing of attachments.
     ///
     /// - Parameter period: The time interval in seconds between each sync.
-    func startPeriodicSync(period: TimeInterval) async {
-        if let timer = periodicSyncTimer {
-            timer.invalidate()
-            periodicSyncTimer = nil
-        }
+    public func startSync(period: TimeInterval) async throws {
+        try guardClosed()
 
-        periodicSyncTimer = Timer.scheduledTimer(withTimeInterval: period, repeats: true) { [weak self] _ in
+        // Close any active sync operations
+        try await stopSync()
+
+        setupSyncFlow()
+
+        periodicSyncTimer = Timer.scheduledTimer(
+            withTimeInterval: period,
+            repeats: true
+        ) { [weak self] _ in
             guard let self = self else { return }
-            Task { await self.triggerSync() }
+            Task { try? await self.triggerSync() }
         }
-
-        await triggerSync()
     }
 
-    /// Triggers a sync operation. Can be called manually.
-    func triggerSync() async {
-        syncTriggerSubject.send(())
-    }
+    public func stopSync() async throws {
+        try guardClosed()
 
-    /// Cleans up internal resources and cancels any ongoing syncing.
-    func close() async {
         if let timer = periodicSyncTimer {
             timer.invalidate()
             periodicSyncTimer = nil
         }
 
         syncTask?.cancel()
+
+        // Wait for the task to actually complete
+        _ = await syncTask?.value
         syncTask = nil
 
         for cancellable in cancellables {
             cancellable.cancel()
         }
         cancellables.removeAll()
+    }
+
+    /// Cleans up internal resources and cancels any ongoing syncing.
+    func close() async throws {
+        try guardClosed()
+
+        try await stopSync()
+        closed = true
+    }
+
+    /// Triggers a sync operation. Can be called manually.
+    func triggerSync() async throws {
+        try guardClosed()
+        syncTriggerSubject.send(())
     }
 
     /// Deletes attachments marked as archived that exist on local storage.
@@ -136,6 +113,68 @@ actor SyncingService {
                 guard let localUri = attachment.localUri else { continue }
                 if try await !self.localStorage.fileExists(filePath: localUri) { continue }
                 try await self.localStorage.deleteFile(filePath: localUri)
+            }
+        }
+    }
+
+    private func guardClosed() throws {
+        if closed {
+            throw PowerSyncAttachmentError.closed("Syncing service is closed")
+        }
+    }
+
+    private func createSyncTrigger() -> AsyncStream<Void> {
+        AsyncStream<Void> { continuation in
+            let cancellable = syncTriggerSubject
+                .throttle(
+                    for: .seconds(syncThrottle),
+                    scheduler: DispatchQueue.global(),
+                    latest: true
+                )
+                .sink { _ in continuation.yield(()) }
+
+            continuation.onTermination = { _ in
+                cancellable.cancel()
+            }
+            self.cancellables.insert(cancellable)
+        }
+    }
+
+    /// Sets up the main attachment syncing pipeline and starts watching for changes.
+    private func setupSyncFlow() {
+        syncTask = Task {
+            do {
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    // Handle sync trigger events
+                    group.addTask {
+                        let syncTrigger = await self.createSyncTrigger()
+
+                        for await _ in syncTrigger {
+                            try Task.checkCancellation()
+
+                            try await self.attachmentsService.withLock { context in
+                                let attachments = try await context.getActiveAttachments()
+                                try await self.handleSync(context: context, attachments: attachments)
+                                _ = try await self.deleteArchivedAttachments(context)
+                            }
+                        }
+                    }
+
+                    // Watch attachment records. Trigger a sync on change
+                    group.addTask {
+                        for try await _ in try await self.attachmentsService.watchActiveAttachments() {
+                            self.syncTriggerSubject.send(())
+                            try Task.checkCancellation()
+                        }
+                    }
+
+                    // Wait for any task to complete
+                    try await group.next()
+                }
+            } catch {
+                if !(error is CancellationError) {
+                    logger.error("Sync error: \(error)", tag: logTag)
+                }
             }
         }
     }
