@@ -1,14 +1,14 @@
 /// Enum representing the state of an attachment
 public enum AttachmentState: Int {
-    /// The attachment is queued for download
+    /// The attachment has been queued for download from the cloud storage
     case queuedDownload
-    /// The attachment is queued for upload
+    /// The attachment has been queued for upload to the cloud storage 
     case queuedUpload
-    /// The attachment is queued for deletion
+    /// The attachment has been queued for delete in the cloud storage (and locally) 
     case queuedDelete
-    /// The attachment is fully synced
+    /// The attachment has been synced 
     case synced
-    /// The attachment is archived
+    /// The attachment has been orphaned, i.e., the associated record has been deleted
     case archived
     
     enum AttachmentStateError: Error {

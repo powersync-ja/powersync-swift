@@ -23,6 +23,8 @@ An `AttachmentQueue` is used to manage and sync attachments in your app. The att
 
 ### Example
 
+See the [PowerSync Example Demo](../../../Demo/PowerSyncExample) for a basic example of attachment syncing.
+
 In this example, the user captures photos when checklist items are completed as part of an inspection workflow.
 
 The schema for the `checklist` table:
@@ -66,7 +68,7 @@ The default columns in `AttachmentTable`:
 | `has_synced` | `INTEGER` | Internal tracker which tracks if the attachment has ever been synced. This is used for caching/archiving purposes. |
 | `meta_data`  | `TEXT`    | Any extra meta data for the attachment. JSON is usually a good choice.                                             |
 
-### Steps to Implement
+#### Steps to Implement
 
 1. Implement a `RemoteStorageAdapter` which interfaces with a remote storage provider. This will be used for downloading, uploading, and deleting attachments.
 
@@ -179,9 +181,9 @@ let queue = AttachmentQueue(
 )
 ```
 
-# Implementation Details
+## Implementation Details
 
-## Attachment State
+### Attachment State
 
 The `AttachmentQueue` class manages attachments in your app by tracking their state.
 
@@ -195,13 +197,13 @@ The state of an attachment can be one of the following:
 | `SYNCED`          | The attachment has been synced                                                 |
 | `ARCHIVED`        | The attachment has been orphaned, i.e., the associated record has been deleted |
 
-## Syncing Attachments
+### Syncing Attachments
 
 The `AttachmentQueue` sets a watched query on the `attachments` table for records in the `QUEUED_UPLOAD`, `QUEUED_DELETE`, and `QUEUED_DOWNLOAD` states. An event loop triggers calls to the remote storage for these operations.
 
 In addition to watching for changes, the `AttachmentQueue` also triggers a sync periodically. This will retry any failed uploads/downloads, particularly after the app was offline. By default, this is every 30 seconds but can be configured by setting `syncInterval` in the `AttachmentQueue` constructor options or disabled by setting the interval to `0`.
 
-### Watching State
+#### Watching State
 
 The `watchedAttachments` publisher provided to the `AttachmentQueue` constructor is used to reconcile the local attachment state. Each emission of the publisher should represent the current attachment state. The updated state is constantly compared to the current queue state. Items are queued based on the difference.
 
@@ -212,7 +214,7 @@ The `watchedAttachments` publisher provided to the `AttachmentQueue` constructor
   - The attachment state will be updated to `SYNCED`.
 - Local attachments are archived if the watched state no longer includes the item. Archived items are cached and can be restored if the watched state includes them in the future. The number of cached items is defined by the `archivedCacheLimit` parameter in the `AttachmentQueue` constructor. Items are deleted once the cache limit is reached.
 
-### Uploading
+#### Uploading
 
 The `saveFile` method provides a simple method for creating attachments that should be uploaded to the backend. This method accepts the raw file content and metadata. This function:
 
@@ -228,7 +230,7 @@ The sync process after calling `saveFile` is:
 - The `AttachmentQueue` picks this up and, upon successful upload to the remote storage, sets the state to `SYNCED`.
 - If the upload is not successful, the record remains in the `QUEUED_UPLOAD` state, and uploading will be retried when syncing triggers again. Retries can be stopped by providing an `errorHandler`.
 
-### Downloading
+#### Downloading
 
 Attachments are scheduled for download when the `watchedAttachments` publisher emits a `WatchedAttachmentItem` not present in the queue.
 
@@ -238,7 +240,7 @@ Attachments are scheduled for download when the `watchedAttachments` publisher e
 - If this is successful, update the `AttachmentRecord` state to `SYNCED`.
 - If any of these fail, the download is retried in the next sync trigger.
 
-### Deleting Attachments
+#### Deleting Attachments
 
 Local attachments are archived and deleted (locally) if the `watchedAttachments` publisher no longer references them. Archived attachments are deleted locally after cache invalidation.
 
@@ -248,7 +250,7 @@ In some cases, users might want to explicitly delete an attachment in the backen
 - Updates the record to the `QUEUED_DELETE` state.
 - Allows removing assignments to relational data.
 
-### Expire Cache
+#### Expire Cache
 
 When PowerSync removes a record, as a result of coming back online or conflict resolution, for instance:
 
