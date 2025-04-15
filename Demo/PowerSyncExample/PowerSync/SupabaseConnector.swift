@@ -68,8 +68,12 @@ class SupabaseConnector: PowerSyncBackendConnector {
         return id.uuidString.lowercased()
     }
 
-    func getStorageBucket() -> StorageFileApi {
-        return client.storage.from(Secrets.supabaseStorageBucket)
+    func getStorageBucket() -> StorageFileApi? {
+        guard let bucket = Secrets.supabaseStorageBucket else {
+            return nil
+        }
+        
+        return client.storage.from(bucket)       
     }
 
     override func fetchCredentials() async throws -> PowerSyncCredentials? {

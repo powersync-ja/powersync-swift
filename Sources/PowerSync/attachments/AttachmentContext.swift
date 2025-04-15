@@ -28,7 +28,10 @@ public class AttachmentContext {
 
     /// Deletes the attachment from the attachment queue.
     public func deleteAttachment(id: String) async throws {
-        _ = try await db.execute(sql: "DELETE FROM \(table) WHERE id = ?", parameters: [id])
+        _ = try await db.execute(
+            sql: "DELETE FROM \(table) WHERE id = ?",
+            parameters: [id]
+        )
     }
 
     /// Sets the state of the attachment to ignored (archived).
@@ -41,9 +44,12 @@ public class AttachmentContext {
 
     /// Gets the attachment from the attachment queue using an ID.
     public func getAttachment(id: String) async throws -> Attachment? {
-        return try await db.getOptional(sql: "SELECT * FROM \(table) WHERE id = ?", parameters: [id], mapper: { cursor in
+        return try await db.getOptional(
+            sql: "SELECT * FROM \(table) WHERE id = ?",
+            parameters: [id]
+        ) { cursor in
             try Attachment.fromCursor(cursor)
-        })
+        }
     }
 
     /// Saves the attachment to the attachment queue.
@@ -70,11 +76,10 @@ public class AttachmentContext {
     public func getAttachmentIds() async throws -> [String] {
         return try await db.getAll(
             sql: "SELECT id FROM \(table) WHERE id IS NOT NULL",
-            parameters: [],
-            mapper: { cursor in
-                try cursor.getString(name: "id")
-            }
-        )
+            parameters: []
+        ) { cursor in
+            try cursor.getString(name: "id")
+        }
     }
 
     /// Gets all attachments in the attachment queue.
@@ -90,11 +95,10 @@ public class AttachmentContext {
             ORDER BY 
                 timestamp ASC
             """,
-            parameters: [],
-            mapper: { cursor in
-                try Attachment.fromCursor(cursor)
-            }
-        )
+            parameters: []
+        ) { cursor in
+            try Attachment.fromCursor(cursor)
+        }
     }
 
     /// Gets all active attachments that require an operation to be performed.
@@ -206,11 +210,10 @@ public class AttachmentContext {
                 updatedRecord.mediaType ?? NSNull(),
                 updatedRecord.size ?? NSNull(),
                 updatedRecord.state.rawValue,
-                updatedRecord.hasSynced ?? 0
+                updatedRecord.hasSynced ?? 0,
             ]
         )
 
         return attachment
     }
 }
-

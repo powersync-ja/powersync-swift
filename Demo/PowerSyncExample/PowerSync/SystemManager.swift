@@ -16,40 +16,54 @@ class SystemManager {
     let connector = SupabaseConnector()
     let schema = AppSchema
     let db: PowerSyncDatabaseProtocol
-    let attachments: AttachmentQueue?
-
+    
+    var attachments: AttachmentQueue?
+    
     init() {
         db = PowerSyncDatabase(
             schema: schema,
             dbFilename: "powersync-swift.sqlite"
         )
-        // Try and configure attachments
-        do {
-            let attachmentsDir = try getAttachmentsDirectoryPath()
-            let watchedAttachments = try db.watch(
-                options: WatchOptions(
-                    sql: "SELECT photo_id FROM \(TODOS_TABLE) WHERE photo_id IS NOT NULL",
-                    parameters: [],
-                    mapper: { cursor in
-                        try WatchedAttachmentItem(
-                            id: cursor.getString(name: "photo_id"),
-                            fileExtension: "jpg"
-                        )
-                    }
-                )
-            )
-
-            attachments = AttachmentQueue(
-                db: db,
-                remoteStorage: SupabaseRemoteStorage(storage: connector.getStorageBucket()),
-                attachmentsDirectory: attachmentsDir,
-                watchedAttachments: watchedAttachments
-            )
-        } catch {
-            print("Failed to initialize attachments queue: \(error)")
-            attachments = nil
-        }
+        attachments = Self.createAttachments(
+            db: db,
+            connector: connector
+        )
     }
+    
+    private static func createAttachments(
+            db: PowerSyncDatabaseProtocol,
+            connector: SupabaseConnector
+        ) -> AttachmentQueue? {
+            guard let bucket = connector.getStorageBucket() else {
+                return nil
+            }
+
+            do {
+                let attachmentsDir = try getAttachmentsDirectoryPath()
+                let watchedAttachments = try db.watch(
+                    options: WatchOptions(
+                        sql: "SELECT photo_id FROM \(TODOS_TABLE) WHERE photo_id IS NOT NULL",
+                        parameters: [],
+                        mapper: { cursor in
+                            try WatchedAttachmentItem(
+                                id: cursor.getString(name: "photo_id"),
+                                fileExtension: "jpg"
+                            )
+                        }
+                    )
+                )
+
+                return AttachmentQueue(
+                    db: db,
+                    remoteStorage: SupabaseRemoteStorage(storage: bucket),
+                    attachmentsDirectory: attachmentsDir,
+                    watchedAttachments: watchedAttachments
+                )
+            } catch {
+                print("Failed to initialize attachments queue: \(error)")
+                return nil
+            }
+        }
 
     func connect() async {
         do {
