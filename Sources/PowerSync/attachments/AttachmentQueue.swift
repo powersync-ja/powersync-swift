@@ -152,7 +152,7 @@ public actor AttachmentQueue {
     /// Starts the attachment sync process
     public func startSync() async throws {
         if closed {
-            throw NSError(domain: "AttachmentError", code: 4, userInfo: [NSLocalizedDescriptionKey: "Attachment queue has been closed"])
+            throw PowerSyncAttachmentError.closed("Cannot start syncing on closed attachment queue")
         }
 
         // Ensure the directory where attachments are downloaded exists
@@ -251,24 +251,24 @@ public actor AttachmentQueue {
                         Attachment(
                             id: item.id,
                             filename: filename,
-                            state: AttachmentState.queuedDownload.rawValue
+                            state: AttachmentState.queuedDownload
                         )
                     )
-                } else if existingQueueItem!.state == AttachmentState.archived.rawValue {
+                } else if existingQueueItem!.state == AttachmentState.archived {
                     // The attachment is present again. Need to queue it for sync.
                     // We might be able to optimize this in future
                     if existingQueueItem!.hasSynced == 1 {
                         // No remote action required, we can restore the record (avoids deletion)
                         attachmentUpdates.append(
-                            existingQueueItem!.with(state: AttachmentState.synced.rawValue)
+                            existingQueueItem!.with(state: AttachmentState.synced)
                         )
                     } else {
                         // The localURI should be set if the record was meant to be downloaded
                         // and has been synced. If it's missing and hasSynced is false then
                         // it must be an upload operation
                         let newState = existingQueueItem!.localUri == nil ?
-                        AttachmentState.queuedDownload.rawValue :
-                        AttachmentState.queuedUpload.rawValue
+                        AttachmentState.queuedDownload :
+                        AttachmentState.queuedUpload
                         
                         attachmentUpdates.append(
                             existingQueueItem!.with(state: newState)
@@ -282,10 +282,10 @@ public actor AttachmentQueue {
              * Archive any items not specified in the watched items except for items pending delete.
              */
             for attachment in currentAttachments {
-                if attachment.state != AttachmentState.queuedDelete.rawValue &&
+                if attachment.state != AttachmentState.queuedDelete &&
                     items.first(where: { $0.id == attachment.id }) == nil {
                     attachmentUpdates.append(
-                        attachment.with(state: AttachmentState.archived.rawValue)
+                        attachment.with(state: AttachmentState.archived)
                     )
                 }
             }
@@ -327,7 +327,7 @@ public actor AttachmentQueue {
                 let attachment = Attachment(
                     id: id,
                     filename: filename,
-                    state: AttachmentState.queuedUpload.rawValue,
+                    state: AttachmentState.queuedUpload,
                     localUri: localUri,
                     mediaType: mediaType,
                     size: fileSize
@@ -352,12 +352,7 @@ public actor AttachmentQueue {
     ) async throws -> Attachment {
         try await attachmentsService.withLock { context in
             guard let attachment = try await context.getAttachment(id: attachmentId) else {
-                // TODO defined errors
-                throw NSError(
-                    domain: "AttachmentError",
-                    code: 5,
-                    userInfo: [NSLocalizedDescriptionKey: "Attachment record with id \(attachmentId) was not found."]
-                )
+                throw PowerSyncAttachmentError.notFound("Attachment record with id \(attachmentId) was not found.")
             }
 
             self.logger.debug("Marking attachment as deleted", tag: nil)
@@ -367,7 +362,7 @@ public actor AttachmentQueue {
                 let updatedAttachment = Attachment(
                     id: attachment.id,
                     filename: attachment.filename,
-                    state: AttachmentState.queuedDelete.rawValue,
+                    state: AttachmentState.queuedDelete,
                     hasSynced: attachment.hasSynced,
                     localUri: attachment.localUri,
                     mediaType: attachment.mediaType,

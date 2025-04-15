@@ -69,8 +69,11 @@ struct TodoListView: View {
             }
             .onDelete { indexSet in
                 Task {
-                    if let toDelete = indexSet.map({ todos[$0] }).first {
-                        await delete(todo: toDelete)
+                    let selectedItems = indexSet.compactMap { index in
+                        todos.indices.contains(index) ? todos[index] : nil
+                    }
+                    for try todo in selectedItems {
+                        await delete(todo: todo)
                     }
                 }
             }

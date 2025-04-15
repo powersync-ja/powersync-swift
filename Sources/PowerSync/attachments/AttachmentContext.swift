@@ -205,7 +205,7 @@ public class AttachmentContext {
                 updatedRecord.localUri as Any,
                 updatedRecord.mediaType ?? NSNull(),
                 updatedRecord.size ?? NSNull(),
-                updatedRecord.state,
+                updatedRecord.state.rawValue,
                 updatedRecord.hasSynced ?? 0
             ]
         )

@@ -94,7 +94,7 @@ func getAttachmentsDirectoryPath() throws -> String {
         for: .documentDirectory,
         in: .userDomainMask
     ).first else {
-        throw PowerSyncError.attachmentError("Could not determine attachments directory path")
+        throw PowerSyncAttachmentError.attachmentError("Could not determine attachments directory path")
     }
     return documentsURL.appendingPathComponent("attachments").path
 }

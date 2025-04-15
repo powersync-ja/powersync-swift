@@ -29,14 +29,14 @@ public class FileManagerStorageAdapter: LocalStorageAdapter {
             let url = URL(fileURLWithPath: filePath)
 
             if !fileManager.fileExists(atPath: filePath) {
-                throw PowerSyncError.fileNotFound(filePath)
+                throw PowerSyncAttachmentError.fileNotFound(filePath)
             }
 
             // Read data from file
             do {
                 return try Data(contentsOf: url)
             } catch {
-                throw PowerSyncError.ioError(error)
+                throw PowerSyncAttachmentError.ioError(error)
             }
         }.value
     }
@@ -74,7 +74,7 @@ public class FileManagerStorageAdapter: LocalStorageAdapter {
     public func copyFile(sourcePath: String, targetPath: String) async throws {
         try await Task {
             if !fileManager.fileExists(atPath: sourcePath) {
-                throw PowerSyncError.fileNotFound(sourcePath)
+                throw PowerSyncAttachmentError.fileNotFound(sourcePath)
             }
 
             // Ensure target directory exists

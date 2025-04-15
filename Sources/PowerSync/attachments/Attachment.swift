@@ -10,6 +10,17 @@ public enum AttachmentState: Int {
     case synced
     /// The attachment is archived
     case archived
+    
+    enum AttachmentStateError: Error {
+        case invalidState(Int)
+    }
+    
+    static func from(_ rawValue: Int) throws -> AttachmentState {
+        guard let state = AttachmentState(rawValue: rawValue) else {
+            throw AttachmentStateError.invalidState(rawValue)
+        }
+        return state
+    }
 }
 
 /// Struct representing an attachment
@@ -23,8 +34,8 @@ public struct Attachment {
     /// Attachment filename, e.g. `[id].jpg`
     public let filename: String
 
-    /// Current attachment state, represented by the raw value of `AttachmentState`
-    public let state: Int
+    /// Current attachment state
+    public let state: AttachmentState
 
     /// Local URI pointing to the attachment file
     public let localUri: String?
@@ -46,7 +57,7 @@ public struct Attachment {
     public init(
         id: String,
         filename: String,
-        state: Int,
+        state: AttachmentState,
         timestamp: Int = 0,
         hasSynced: Int? = 0,
         localUri: String? = nil,
@@ -79,7 +90,7 @@ public struct Attachment {
     /// - Returns: A new `Attachment` with updated values.
     func with(
         filename _: String? = nil,
-        state: Int? = nil,
+        state: AttachmentState? = nil,
         timestamp _: Int = 0,
         hasSynced: Int? = 0,
         localUri: String? = nil,
@@ -108,7 +119,7 @@ public struct Attachment {
         return try Attachment(
             id: cursor.getString(name: "id"),
             filename: cursor.getString(name: "filename"),
-            state: cursor.getLong(name: "state"),
+            state: AttachmentState.from(cursor.getLong(name: "state")),
             timestamp: cursor.getLong(name: "timestamp"),
             hasSynced: cursor.getLongOptional(name: "has_synced"),
             localUri: cursor.getStringOptional(name: "local_uri"),

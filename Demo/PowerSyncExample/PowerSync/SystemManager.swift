@@ -6,7 +6,7 @@ func getAttachmentsDirectoryPath() throws -> String {
         for: .documentDirectory,
         in: .userDomainMask
     ).first else {
-        throw PowerSyncError.attachmentError("Could not determine attachments directory path")
+        throw PowerSyncAttachmentError.invalidPath("Could not determine attachments directory path")
     }
     return documentsURL.appendingPathComponent("attachments").path
 }
@@ -112,7 +112,7 @@ class SystemManager {
                 sql: "DELETE FROM \(LISTS_TABLE) WHERE id = ?",
                 parameters: [id]
             )
-            
+
             // Attachments linked to these will be archived and deleted eventually
             // Attachments should be deleted explicitly if required
             _ = try transaction.execute(
@@ -184,7 +184,7 @@ class SystemManager {
         if let attachments, let photoId = todo.photoId {
             try await attachments.deleteFile(
                 attachmentId: photoId
-            ) { (tx, _) in
+            ) { tx, _ in
                 try self.deleteTodoInTX(
                     id: todo.id,
                     tx: tx
@@ -199,7 +199,7 @@ class SystemManager {
             }
         }
     }
-    
+
     func deleteTodoInTX(id: String, tx: ConnectionContext) throws {
         _ = try tx.execute(
             sql: "DELETE FROM \(TODOS_TABLE) WHERE id = ?",

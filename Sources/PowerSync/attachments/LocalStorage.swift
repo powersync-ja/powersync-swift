@@ -1,9 +1,12 @@
 import Foundation
 
 /// Error type for PowerSync operations
-public enum PowerSyncError: Error {
+public enum PowerSyncAttachmentError: Error {
     /// A general error with an associated message
     case generalError(String)
+    
+    /// Indicates no matching attachment record could be found
+    case notFound(String)
 
     /// Indicates that a file was not found at the given path
     case fileNotFound(String)
@@ -13,9 +16,9 @@ public enum PowerSyncError: Error {
 
     /// The given file or directory path was invalid
     case invalidPath(String)
-
-    /// An error related to attachment handling
-    case attachmentError(String)
+    
+    /// The attachments queue or sub services have been closed
+    case closed(String)
 }
 
 /// Protocol defining an adapter interface for local file storage
@@ -26,7 +29,7 @@ public protocol LocalStorageAdapter {
     ///   - filePath: The full path where the file should be saved.
     ///   - data: The binary data to save.
     /// - Returns: The byte size of the saved file.
-    /// - Throws: `PowerSyncError` if saving fails.
+    /// - Throws: `PowerSyncAttachmentError` if saving fails.
     func saveFile(
         filePath: String,
         data: Data
@@ -38,7 +41,7 @@ public protocol LocalStorageAdapter {
     ///   - filePath: The full path to the file.
     ///   - mediaType: An optional media type (MIME type) to help determine how to handle the file.
     /// - Returns: The contents of the file as `Data`.
-    /// - Throws: `PowerSyncError` if reading fails or the file doesn't exist.
+    /// - Throws: `PowerSyncAttachmentError` if reading fails or the file doesn't exist.
     func readFile(
         filePath: String,
         mediaType: String?
@@ -47,26 +50,26 @@ public protocol LocalStorageAdapter {
     /// Deletes a file at the specified path.
     ///
     /// - Parameter filePath: The full path to the file to delete.
-    /// - Throws: `PowerSyncError` if deletion fails or file doesn't exist.
+    /// - Throws: `PowerSyncAttachmentError` if deletion fails or file doesn't exist.
     func deleteFile(filePath: String) async throws
 
     /// Checks if a file exists at the specified path.
     ///
     /// - Parameter filePath: The path to the file.
     /// - Returns: `true` if the file exists, `false` otherwise.
-    /// - Throws: `PowerSyncError` if checking fails.
+    /// - Throws: `PowerSyncAttachmentError` if checking fails.
     func fileExists(filePath: String) async throws -> Bool
 
     /// Creates a directory at the specified path.
     ///
     /// - Parameter path: The full path to the directory.
-    /// - Throws: `PowerSyncError` if creation fails.
+    /// - Throws: `PowerSyncAttachmentError` if creation fails.
     func makeDir(path: String) async throws
 
     /// Removes a directory at the specified path.
     ///
     /// - Parameter path: The full path to the directory.
-    /// - Throws: `PowerSyncError` if removal fails.
+    /// - Throws: `PowerSyncAttachmentError` if removal fails.
     func rmDir(path: String) async throws
 
     /// Copies a file from the source path to the target path.
@@ -74,7 +77,7 @@ public protocol LocalStorageAdapter {
     /// - Parameters:
     ///   - sourcePath: The original file path.
     ///   - targetPath: The destination file path.
-    /// - Throws: `PowerSyncError` if the copy operation fails.
+    /// - Throws: `PowerSyncAttachmentError` if the copy operation fails.
     func copyFile(
         sourcePath: String,
         targetPath: String
@@ -87,7 +90,7 @@ public extension LocalStorageAdapter {
     ///
     /// - Parameter filePath: The full path to the file.
     /// - Returns: The contents of the file as `Data`.
-    /// - Throws: `PowerSyncError` if reading fails.
+    /// - Throws: `PowerSyncAttachmentError` if reading fails.
     func readFile(filePath: String) async throws -> Data {
         return try await readFile(filePath: filePath, mediaType: nil)
     }

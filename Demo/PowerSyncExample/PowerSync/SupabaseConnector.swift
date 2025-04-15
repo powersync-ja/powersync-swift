@@ -131,4 +131,8 @@ class SupabaseConnector: PowerSyncBackendConnector {
             throw error
         }
     }
+
+    deinit {
+        observeAuthStateChangesTask?.cancel()
+    }
 }

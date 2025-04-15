@@ -41,7 +41,6 @@
 		B6B3698A2C64F4B30033C307 /* Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B369892C64F4B30033C307 /* Navigation.swift */; };
 		B6FFD5322D06DA8000EEE60F /* PowerSync in Frameworks */ = {isa = PBXBuildFile; productRef = B6FFD5312D06DA8000EEE60F /* PowerSync */; };
 		BE2F26EC2DA54B2F0080F1AE /* SupabaseRemoteStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2F26EB2DA54B2A0080F1AE /* SupabaseRemoteStorage.swift */; };
-		BE2F26EE2DA555E10080F1AE /* PhotoPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2F26ED2DA555DD0080F1AE /* PhotoPicker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -109,7 +108,6 @@
 		B6F4213D2BC42F5B0005D0D0 /* sqlite3.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = sqlite3.c; path = "../powersync-kotlin/core/build/interop/sqlite/sqlite3.c"; sourceTree = "<group>"; };
 		B6F421402BC430B60005D0D0 /* sqlite3.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = sqlite3.h; path = "../powersync-kotlin/core/build/interop/sqlite/sqlite3.h"; sourceTree = "<group>"; };
 		BE2F26EB2DA54B2A0080F1AE /* SupabaseRemoteStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseRemoteStorage.swift; sourceTree = "<group>"; };
-		BE2F26ED2DA555DD0080F1AE /* PhotoPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPicker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -197,7 +195,6 @@
 		B65C4D6B2C60D36700176007 /* Screens */ = {
 			isa = PBXGroup;
 			children = (
-				BE2F26ED2DA555DD0080F1AE /* PhotoPicker.swift */,
 				6A9669032B9EE6FA00B05DCF /* SignInScreen.swift */,
 				B65C4D6C2C60D38B00176007 /* HomeScreen.swift */,
 				B65C4D702C60D7D800176007 /* SignUpScreen.swift */,
@@ -574,7 +571,6 @@
 				B66658632C621CA700159A81 /* AddTodoListView.swift in Sources */,
 				B666585D2C620E9E00159A81 /* WifiIcon.swift in Sources */,
 				6A9669042B9EE6FA00B05DCF /* SignInScreen.swift in Sources */,
-				BE2F26EE2DA555E10080F1AE /* PhotoPicker.swift in Sources */,
 				6A7315BB2B98BDD30004CB17 /* SystemManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

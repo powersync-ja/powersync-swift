@@ -149,9 +149,7 @@ actor SyncingService {
         var updatedAttachments = [Attachment]()
 
         for attachment in attachments {
-            let state = AttachmentState(rawValue: attachment.state)
-
-            switch state {
+            switch attachment.state {
             case .queuedDownload:
                 let updated = try await downloadAttachment(attachment: attachment)
                 updatedAttachments.append(updated)
@@ -177,18 +175,18 @@ actor SyncingService {
         logger.info("Uploading attachment \(attachment.filename)", tag: logTag)
         do {
             guard let localUri = attachment.localUri else {
-                throw PowerSyncError.attachmentError("No localUri for attachment \(attachment.id)")
+                throw PowerSyncAttachmentError.generalError("No localUri for attachment \(attachment.id)")
             }
 
             let fileData = try await localStorage.readFile(filePath: localUri)
             try await remoteStorage.uploadFile(fileData: fileData, attachment: attachment)
 
-            return attachment.with(state: AttachmentState.synced.rawValue, hasSynced: 1)
+            return attachment.with(state: AttachmentState.synced, hasSynced: 1)
         } catch {
             if let errorHandler = errorHandler {
                 let shouldRetry = await errorHandler.onUploadError(attachment: attachment, error: error)
                 if !shouldRetry {
-                    return attachment.with(state: AttachmentState.archived.rawValue)
+                    return attachment.with(state: AttachmentState.archived)
                 }
             }
             return attachment
@@ -207,7 +205,7 @@ actor SyncingService {
             _ = try await localStorage.saveFile(filePath: attachmentPath, data: fileData)
 
             return attachment.with(
-                state: AttachmentState.synced.rawValue,
+                state: AttachmentState.synced,
                 hasSynced: 1,
                 localUri: attachmentPath
             )
@@ -215,7 +213,7 @@ actor SyncingService {
             if let errorHandler = errorHandler {
                 let shouldRetry = await errorHandler.onDownloadError(attachment: attachment, error: error)
                 if !shouldRetry {
-                    return attachment.with(state: AttachmentState.archived.rawValue)
+                    return attachment.with(state: AttachmentState.archived)
                 }
             }
             return attachment
@@ -235,12 +233,12 @@ actor SyncingService {
                 try await localStorage.deleteFile(filePath: localUri)
             }
 
-            return attachment.with(state: AttachmentState.archived.rawValue)
+            return attachment.with(state: AttachmentState.archived)
         } catch {
             if let errorHandler = errorHandler {
                 let shouldRetry = await errorHandler.onDeleteError(attachment: attachment, error: error)
                 if !shouldRetry {
-                    return attachment.with(state: AttachmentState.archived.rawValue)
+                    return attachment.with(state: AttachmentState.archived)
                 }
             }
             return attachment
