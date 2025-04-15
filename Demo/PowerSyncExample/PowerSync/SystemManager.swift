@@ -1,6 +1,7 @@
 import Foundation
 import PowerSync
 
+
 @Observable
 class SystemManager {
     let connector = SupabaseConnector()
@@ -8,8 +9,14 @@ class SystemManager {
     var db: PowerSyncDatabaseProtocol!
 
     // openDb must be called before connect
-    func openDb() {
+    func openDb() async throws {
         db = PowerSyncDatabase(schema: schema, dbFilename: "powersync-swift.sqlite")
+        do {
+            try await configureFts(db: db, schema: schema)
+        } catch {
+            print("Failed to configure FTS: \(error.localizedDescription)")
+            
+        }
     }
 
     func connect() async {
@@ -131,5 +138,95 @@ class SystemManager {
                 parameters: [id]
             )
         })
+    }
+    
+    /// Helper function to prepare the search term for FTS5 query syntax.
+    private func createSearchTermWithOptions(_ searchTerm: String) -> String {
+        let trimmedSearchTerm = searchTerm.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSearchTerm.isEmpty else {
+            return ""
+        }
+        return "\(trimmedSearchTerm)*"
+    }
+    
+    /// Searches across lists and todos using FTS.
+    ///
+    /// - Parameter searchTerm: The text to search for.
+    /// - Returns: An array of search results, containing either `ListContent` or `Todo` objects.
+    /// - Throws: An error if the database query fails.
+    func searchListsAndTodos(searchTerm: String) async throws -> [AnyHashable] {
+        let preparedSearchTerm = createSearchTermWithOptions(searchTerm)
+
+        guard !preparedSearchTerm.isEmpty else {
+            print("[FTS] Prepared search term is empty, returning no results.")
+            return []
+        }
+
+        print("[FTS] Searching for term: \(preparedSearchTerm)")
+
+        var results: [AnyHashable] = []
+
+        // --- Search Lists ---
+        let listSql = """
+            SELECT l.*
+            FROM \(LISTS_TABLE) l
+            JOIN fts_\(LISTS_TABLE) fts ON l.id = fts.id
+            WHERE fts.fts_\(LISTS_TABLE) MATCH ? ORDER BY fts.rank
+        """
+        do {
+            let listsFound = try await db.getAll(
+                sql: listSql,
+                parameters: [preparedSearchTerm],
+                mapper: { cursor in
+                    try ListContent(
+                        id: cursor.getString(name: "id"),
+                        name: cursor.getString(name: "name"),
+                        createdAt: cursor.getString(name: "created_at"),
+                        ownerId: cursor.getString(name: "owner_id")
+                    )
+                }
+            )
+            results.append(contentsOf: listsFound)
+            print("[FTS] Found \(listsFound.count) lists matching term.")
+        } catch {
+            print("[FTS] Error searching lists: \(error.localizedDescription)")
+            throw error
+        }
+
+
+        // --- Search Todos ---
+        let todoSql = """
+            SELECT t.*
+            FROM \(TODOS_TABLE) t
+            JOIN fts_\(TODOS_TABLE) fts ON t.id = fts.id
+            WHERE fts.fts_\(TODOS_TABLE) MATCH ? ORDER BY fts.rank
+        """
+        do {
+            let todosFound = try await db.getAll(
+                sql: todoSql,
+                parameters: [preparedSearchTerm],
+                mapper: { cursor in
+                     try Todo(
+                        id: cursor.getString(name: "id"),
+                        listId: cursor.getString(name: "list_id"),
+                        photoId: cursor.getStringOptional(name: "photo_id"),
+                        description: cursor.getString(name: "description"),
+                        isComplete: cursor.getBoolean(name: "completed"),
+                        createdAt: cursor.getString(name: "created_at"),
+                        completedAt: cursor.getStringOptional(name: "completed_at"),
+                        createdBy: cursor.getStringOptional(name: "created_by"),
+                        completedBy: cursor.getStringOptional(name: "completed_by")
+                     )
+                }
+            )
+            results.append(contentsOf: todosFound)
+            print("[FTS] Found \(todosFound.count) todos matching term.")
+        } catch {
+            print("[FTS] Error searching todos: \(error.localizedDescription)")
+            throw error
+        }
+
+        print("[FTS] Total results found: \(results.count)")
+        return results
     }
 }
