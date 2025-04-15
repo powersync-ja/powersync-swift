@@ -2,8 +2,6 @@
 
 A [PowerSync](https://powersync.com) library to manage attachments in Swift apps.
 
-This package is included in the PowerSync Core module.
-
 ## Alpha Release
 
 Attachment helpers are currently in an alpha state, intended strictly for testing. Expect breaking changes and instability as development continues.
@@ -25,7 +23,7 @@ An `AttachmentQueue` is used to manage and sync attachments in your app. The att
 
 See the [PowerSync Example Demo](../../../Demo/PowerSyncExample) for a basic example of attachment syncing.
 
-In this example, the user captures photos when checklist items are completed as part of an inspection workflow.
+In this example below, the user captures photos when checklist items are completed as part of an inspection workflow.
 
 The schema for the `checklist` table:
 
@@ -47,26 +45,7 @@ let schema = Schema(
 )
 ```
 
-The `createAttachmentTable` function defines the local-only attachment state storage table.
-
-An attachments table definition can be created with the following options:
-
-| Option | Description           | Default       |
-| ------ | --------------------- | ------------- |
-| `name` | The name of the table | `attachments` |
-
-The default columns in `AttachmentTable`:
-
-| Column Name  | Type      | Description                                                                                                        |
-| ------------ | --------- | ------------------------------------------------------------------------------------------------------------------ |
-| `id`         | `TEXT`    | The ID of the attachment record                                                                                    |
-| `filename`   | `TEXT`    | The filename of the attachment                                                                                     |
-| `media_type` | `TEXT`    | The media type of the attachment                                                                                   |
-| `state`      | `INTEGER` | The state of the attachment, one of `AttachmentState` enum values                                                  |
-| `timestamp`  | `INTEGER` | The timestamp of the last update to the attachment record                                                          |
-| `size`       | `INTEGER` | The size of the attachment in bytes                                                                                |
-| `has_synced` | `INTEGER` | Internal tracker which tracks if the attachment has ever been synced. This is used for caching/archiving purposes. |
-| `meta_data`  | `TEXT`    | Any extra meta data for the attachment. JSON is usually a good choice.                                             |
+The `createAttachmentTable` function defines the `local-only` attachment state storage table. See the [Implementation Details](#implementation-details) section for more details.
 
 #### Steps to Implement
 
@@ -153,7 +132,7 @@ try await queue.saveFile(
 }
 ```
 
-#### Handling Errors
+#### (Optional) Handling Errors
 
 The attachment queue automatically retries failed sync operations. Retries continue indefinitely until success. A `SyncErrorHandler` can be provided to the `AttachmentQueue` constructor. This handler provides methods invoked on a remote sync exception. The handler can return a Boolean indicating if the attachment sync should be retried or archived.
 
@@ -182,6 +161,21 @@ let queue = AttachmentQueue(
 ```
 
 ## Implementation Details
+
+### Attachment Table
+
+The default columns in `AttachmentTable`:
+
+| Column Name  | Type      | Description                                                                                                        |
+| ------------ | --------- | ------------------------------------------------------------------------------------------------------------------ |
+| `id`         | `TEXT`    | The ID of the attachment record                                                                                    |
+| `filename`   | `TEXT`    | The filename of the attachment                                                                                     |
+| `media_type` | `TEXT`    | The media type of the attachment                                                                                   |
+| `state`      | `INTEGER` | The state of the attachment, one of `AttachmentState` enum values                                                  |
+| `timestamp`  | `INTEGER` | The timestamp of the last update to the attachment record                                                          |
+| `size`       | `INTEGER` | The size of the attachment in bytes                                                                                |
+| `has_synced` | `INTEGER` | Internal tracker which tracks if the attachment has ever been synced. This is used for caching/archiving purposes. |
+| `meta_data`  | `TEXT`    | Any extra meta data for the attachment. JSON is usually a good choice.                                             |
 
 ### Attachment State
 
