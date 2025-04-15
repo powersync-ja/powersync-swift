@@ -181,12 +181,12 @@ func waitForMatch<T, E: Error>(
     where predicate: @escaping (T) -> Bool,
     timeout: TimeInterval
 ) async throws -> T {
-    var localIterator = iterator
     let timeoutNanoseconds = UInt64(timeout * 1_000_000_000)
 
     return try await withThrowingTaskGroup(of: T.self) { group in
         // Task to wait for a matching value
         group.addTask {
+            var localIterator = iterator
             while let value = try await localIterator.next() {
                 if predicate(value) {
                     return value
