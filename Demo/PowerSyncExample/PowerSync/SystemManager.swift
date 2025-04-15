@@ -11,36 +11,45 @@ func getAttachmentsDirectoryPath() throws -> String {
     return documentsURL.appendingPathComponent("attachments").path
 }
 
+let logTag = "SystemManager"
+
 @Observable
 class SystemManager {
     let connector = SupabaseConnector()
     let schema = AppSchema
     let db: PowerSyncDatabaseProtocol
-    
+
     var attachments: AttachmentQueue?
-    
+
     init() {
         db = PowerSyncDatabase(
             schema: schema,
             dbFilename: "powersync-swift.sqlite"
         )
-        attachments = Self.createAttachments(
+        attachments = Self.createAttachmentQueue(
             db: db,
             connector: connector
         )
     }
-    
-    private static func createAttachments(
-            db: PowerSyncDatabaseProtocol,
-            connector: SupabaseConnector
-        ) -> AttachmentQueue? {
-            guard let bucket = connector.getStorageBucket() else {
-                return nil
-            }
 
-            do {
-                let attachmentsDir = try getAttachmentsDirectoryPath()
-                let watchedAttachments = try db.watch(
+    /// Creates an AttachmentQueue if a Supabase Storage bucket has been specified in the config
+    private static func createAttachmentQueue(
+        db: PowerSyncDatabaseProtocol,
+        connector: SupabaseConnector
+    ) -> AttachmentQueue? {
+        guard let bucket = connector.getStorageBucket() else {
+            db.logger.info("No Supabase Storage bucket specified. Skipping attachment queue setup.", tag: logTag)
+            return nil
+        }
+
+        do {
+            let attachmentsDir = try getAttachmentsDirectoryPath()
+
+            return AttachmentQueue(
+                db: db,
+                remoteStorage: SupabaseRemoteStorage(storage: bucket),
+                attachmentsDirectory: attachmentsDir,
+                watchAttachments: { try db.watch(
                     options: WatchOptions(
                         sql: "SELECT photo_id FROM \(TODOS_TABLE) WHERE photo_id IS NOT NULL",
                         parameters: [],
@@ -51,24 +60,16 @@ class SystemManager {
                             )
                         }
                     )
-                )
-
-                return AttachmentQueue(
-                    db: db,
-                    remoteStorage: SupabaseRemoteStorage(storage: bucket),
-                    attachmentsDirectory: attachmentsDir,
-                    watchedAttachments: watchedAttachments
-                )
-            } catch {
-                print("Failed to initialize attachments queue: \(error)")
-                return nil
-            }
+                ) }
+            )
+        } catch {
+            db.logger.error("Failed to initialize attachments queue: \(error)", tag: logTag)
+            return nil
         }
+    }
 
     func connect() async {
         do {
-            // Only for testing purposes
-            try await attachments?.clearQueue()
             try await db.connect(connector: connector)
             try await attachments?.startSync()
         } catch {
@@ -87,8 +88,8 @@ class SystemManager {
     func signOut() async throws {
         try await db.disconnectAndClear()
         try await connector.client.auth.signOut()
+        try await attachments?.stopSyncing()
         try await attachments?.clearQueue()
-        try await attachments?.close()
     }
 
     func watchLists(_ callback: @escaping (_ lists: [ListContent]) -> Void) async {
@@ -121,19 +122,34 @@ class SystemManager {
     }
 
     func deleteList(id: String) async throws {
-        _ = try await db.writeTransaction(callback: { transaction in
+        let attachmentIds = try await db.writeTransaction(callback: { transaction in
+            let attachmentIDs = try transaction.getAll(
+                sql: "SELECT photo_id FROM \(TODOS_TABLE) WHERE list_id = ? AND photo_id IS NOT NULL",
+                parameters: [id]
+            ) { cursor in
+                cursor.getString(index: 0)! // :(
+            } as? [String] // :(
+
             _ = try transaction.execute(
                 sql: "DELETE FROM \(LISTS_TABLE) WHERE id = ?",
                 parameters: [id]
             )
 
-            // Attachments linked to these will be archived and deleted eventually
-            // Attachments should be deleted explicitly if required
             _ = try transaction.execute(
                 sql: "DELETE FROM \(TODOS_TABLE) WHERE list_id = ?",
                 parameters: [id]
             )
+
+            return attachmentIDs ?? [] // :(
         })
+
+        if let attachments {
+            for id in attachmentIds {
+                try await attachments.deleteFile(
+                    attachmentId: id
+                ) { _, _ in }
+            }
+        }
     }
 
     func watchTodos(_ listId: String, _ callback: @escaping (_ todos: [Todo]) -> Void) async {
@@ -214,7 +230,7 @@ class SystemManager {
         }
     }
 
-    func deleteTodoInTX(id: String, tx: ConnectionContext) throws {
+    private func deleteTodoInTX(id: String, tx: ConnectionContext) throws {
         _ = try tx.execute(
             sql: "DELETE FROM \(TODOS_TABLE) WHERE id = ?",
             parameters: [id]

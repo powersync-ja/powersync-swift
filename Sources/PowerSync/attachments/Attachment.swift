@@ -2,19 +2,19 @@
 public enum AttachmentState: Int {
     /// The attachment has been queued for download from the cloud storage
     case queuedDownload
-    /// The attachment has been queued for upload to the cloud storage 
+    /// The attachment has been queued for upload to the cloud storage
     case queuedUpload
-    /// The attachment has been queued for delete in the cloud storage (and locally) 
+    /// The attachment has been queued for delete in the cloud storage (and locally)
     case queuedDelete
-    /// The attachment has been synced 
+    /// The attachment has been synced
     case synced
     /// The attachment has been orphaned, i.e., the associated record has been deleted
     case archived
-    
+
     enum AttachmentStateError: Error {
         case invalidState(Int)
     }
-    
+
     static func from(_ rawValue: Int) throws -> AttachmentState {
         guard let state = AttachmentState(rawValue: rawValue) else {
             throw AttachmentStateError.invalidState(rawValue)
@@ -92,21 +92,22 @@ public struct Attachment {
         filename _: String? = nil,
         state: AttachmentState? = nil,
         timestamp _: Int = 0,
-        hasSynced: Int? = 0,
-        localUri: String? = nil,
-        mediaType: String? = nil,
-        size: Int64? = nil,
-        metaData: String? = nil
+        hasSynced: Int?? = 0,
+        localUri: String?? = .none,
+        mediaType: String?? = .none,
+        size: Int64?? = .none,
+        metaData: String?? = .none
     ) -> Attachment {
         return Attachment(
             id: id,
-            filename: filename,
-            state: state ?? self.state,
-            hasSynced: hasSynced ?? self.hasSynced,
-            localUri: localUri ?? self.localUri,
-            mediaType: mediaType ?? self.mediaType,
-            size: size ?? self.size,
-            metaData: metaData ?? self.metaData
+            filename: filename ?? filename,
+            state: state.map { $0 } ?? self.state,
+            timestamp: timestamp > 0 ? timestamp : timestamp,
+            hasSynced: hasSynced.map { $0 } ?? self.hasSynced,
+            localUri: localUri.map { $0 } ?? self.localUri,
+            mediaType: mediaType.map { $0 } ?? self.mediaType,
+            size: size.map { $0 } ?? self.size,
+            metaData: metaData.map { $0 } ?? self.metaData
         )
     }
 

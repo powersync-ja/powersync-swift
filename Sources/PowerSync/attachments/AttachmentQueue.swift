@@ -18,8 +18,8 @@ public actor AttachmentQueue {
     /// Directory name for attachments
     private let attachmentsDirectory: String
 
-    /// Stream of watched attachments
-    private let watchedAttachments: AsyncThrowingStream<[WatchedAttachmentItem], Error>
+    /// Closure which creates a Stream of ``WatchedAttachmentItem``
+    private let watchAttachments: () throws -> AsyncThrowingStream<[WatchedAttachmentItem], Error>
 
     /// Local file system adapter
     public let localStorage: LocalStorageAdapter
@@ -79,7 +79,7 @@ public actor AttachmentQueue {
         db: PowerSyncDatabaseProtocol,
         remoteStorage: RemoteStorageAdapter,
         attachmentsDirectory: String,
-        watchedAttachments: AsyncThrowingStream<[WatchedAttachmentItem], Error>,
+        watchAttachments: @escaping () throws -> AsyncThrowingStream<[WatchedAttachmentItem], Error>,
         localStorage: LocalStorageAdapter = FileManagerStorageAdapter(),
         attachmentsQueueTableName: String = defaultTableName,
         errorHandler: SyncErrorHandler? = nil,
@@ -93,7 +93,7 @@ public actor AttachmentQueue {
         self.db = db
         self.remoteStorage = remoteStorage
         self.attachmentsDirectory = attachmentsDirectory
-        self.watchedAttachments = watchedAttachments
+        self.watchAttachments = watchAttachments
         self.localStorage = localStorage
         self.attachmentsQueueTableName = attachmentsQueueTableName
         self.errorHandler = errorHandler
@@ -128,6 +128,11 @@ public actor AttachmentQueue {
                 try await localStorage.makeDir(path: path)
             }
         }
+        
+        // Verify initial state
+        try await attachmentsService.withLock {context in
+            try await self.verifyAttachments(context: context)
+        }
 
         try await syncingService.startSync(period: syncInterval)
 
@@ -147,7 +152,7 @@ public actor AttachmentQueue {
 
                     // Add attachment watching task
                     group.addTask {
-                        for try await items in self.watchedAttachments {
+                        for try await items in try self.watchAttachments() {
                             try await self.processWatchedAttachments(items: items)
                         }
                     }
@@ -379,6 +384,31 @@ public actor AttachmentQueue {
             // Remove the attachments directory
             try await self.localStorage.rmDir(path: self.attachmentsDirectory)
         }
+    }
+    
+    /// Verifies attachment records are present in the filesystem
+    private func verifyAttachments(context: AttachmentContext) async throws {
+        let attachments = try await context.getAttachments()
+        var updates: [Attachment] = []
+        
+        for attachment in attachments {
+            guard let localUri = attachment.localUri else {
+                continue
+            }
+            
+            let exists = try await localStorage.fileExists(filePath: localUri)
+            if attachment.state == AttachmentState.synced ||
+                attachment.state == AttachmentState.queuedUpload &&
+                !exists {
+                // The file must have been removed from the local storage
+                updates.append(attachment.with(
+                    state: .archived,
+                    localUri: .some(nil) // Clears the value
+                ))
+            }
+        }
+        
+        try await context.saveAttachments(attachments: updates)
     }
 
     private func guardClosed() throws {

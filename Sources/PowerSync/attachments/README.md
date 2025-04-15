@@ -84,7 +84,7 @@ let queue = AttachmentQueue(
     db: db,
     attachmentsDirectory: try getAttachmentsDirectoryPath(),
     remoteStorage: RemoteStorage(),
-    watchedAttachments: try db.watch(
+    watchAttachments: { try db.watch(
         options: WatchOptions(
             sql: "SELECT photo_id FROM checklists WHERE photo_id IS NOT NULL",
             parameters: [],
@@ -95,13 +95,13 @@ let queue = AttachmentQueue(
                 )
             }
         )
-    )
+    ) }
 )
 ```
 
 - The `attachmentsDirectory` specifies where local attachment files should be stored. `FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("attachments")` is a good choice.
 - The `remoteStorage` is responsible for connecting to the attachments backend. See the `RemoteStorageAdapter` protocol definition.
-- `watchedAttachments` is a publisher of `WatchedAttachmentItem`. These items represent the attachments that should be present in the application.
+- `watchAttachmens` is closure which generates a publisher of `WatchedAttachmentItem`. These items represent the attachments that should be present in the application.
 
 3. Call `startSync()` to start syncing attachments.
 
