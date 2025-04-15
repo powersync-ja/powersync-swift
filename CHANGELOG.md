@@ -1,6 +1,6 @@
 # Changelog
 
-# 1.0.0-Beta.10 (unreleased)
+# 1.0.0-Beta.10
 
 * Added the ability to specify a custom logging implementation
 ```swift
@@ -20,6 +20,13 @@
 )
 ```
 * added `.close()` method on `PowerSyncDatabaseProtocol`
+* Update `powersync-kotlin` dependency to version `1.0.0-BETA29`, which fixes these issues:
+  * Fix potential race condition between jobs in `connect()` and `disconnect()`.
+  * Fix race condition causing data received during uploads not to be applied.
+  * Fixed issue where automatic driver migrations would fail with the error:
+```
+Sqlite operation failure database is locked attempted to run migration and failed. closing connection
+```
 
 ## 1.0.0-Beta.9
 
