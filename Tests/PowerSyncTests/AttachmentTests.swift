@@ -84,7 +84,7 @@ final class AttachmentTests: XCTestCase {
         
        let attachmentRecord = try await waitForMatch(
             iterator: attachmentsWatch,
-            where: {results in results.first?.state == AttachmentState.synced.rawValue},
+            where: {results in results.first?.state == AttachmentState.synced},
             timeout: 5
        ).first
         
@@ -159,7 +159,7 @@ final class AttachmentTests: XCTestCase {
         
        _  = try await waitForMatch(
             iterator: attachmentsWatch,
-            where: {results in results.first?.state == AttachmentState.synced.rawValue},
+            where: {results in results.first?.state == AttachmentState.synced},
             timeout: 5
        ).first
         
