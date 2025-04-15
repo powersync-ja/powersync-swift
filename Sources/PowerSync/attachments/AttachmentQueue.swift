@@ -2,9 +2,6 @@ import Combine
 import Foundation
 import OSLog
 
-// TODO: should not need this
-import PowerSyncKotlin
-
 /// A watched attachment record item.
 /// This is usually returned from watching all relevant attachment IDs.
 public struct WatchedAttachmentItem {
@@ -45,7 +42,7 @@ public struct WatchedAttachmentItem {
 /// Requires a PowerSyncDatabase, a RemoteStorageAdapter implementation, and a directory name for attachments.
 public actor AttachmentQueue {
     /// Default name of the attachments table
-    public static let DEFAULT_TABLE_NAME = "attachments"
+    public static let defaultTableName = "attachments"
 
     let logTag = "AttachmentQueue"
 
@@ -121,7 +118,7 @@ public actor AttachmentQueue {
         attachmentsDirectory: String,
         watchedAttachments: AsyncThrowingStream<[WatchedAttachmentItem], Error>,
         localStorage: LocalStorageAdapter = FileManagerStorageAdapter(),
-        attachmentsQueueTableName: String = DEFAULT_TABLE_NAME,
+        attachmentsQueueTableName: String = defaultTableName,
         errorHandler: SyncErrorHandler? = nil,
         syncInterval: TimeInterval = 30.0,
         archivedCacheLimit: Int64 = 100,
@@ -230,70 +227,72 @@ public actor AttachmentQueue {
     public func processWatchedAttachments(items: [WatchedAttachmentItem]) async throws {
         // Need to get all the attachments which are tracked in the DB.
         // We might need to restore an archived attachment.
-        let currentAttachments = try await attachmentsService.getAttachments()
-        var attachmentUpdates = [Attachment]()
-
-        for item in items {
-            let existingQueueItem = currentAttachments.first { $0.id == item.id }
-
-            if existingQueueItem == nil {
-                if !downloadAttachments {
-                    continue
-                }
-                // This item should be added to the queue
-                // This item is assumed to be coming from an upstream sync
-                // Locally created new items should be persisted using saveFile before
-                // this point.
-                let filename = resolveNewAttachmentFilename(
-                    attachmentId: item.id,
-                    fileExtension: item.fileExtension
-                )
-
-                attachmentUpdates.append(
-                    Attachment(
-                        id: item.id,
-                        filename: filename,
-                        state: AttachmentState.queuedDownload.rawValue
+        try await attachmentsService.withLock { context in
+            let currentAttachments = try await context.getAttachments()
+            var attachmentUpdates = [Attachment]()
+            
+            for item in items {
+                let existingQueueItem = currentAttachments.first { $0.id == item.id }
+                
+                if existingQueueItem == nil {
+                    if !self.downloadAttachments {
+                        continue
+                    }
+                    // This item should be added to the queue
+                    // This item is assumed to be coming from an upstream sync
+                    // Locally created new items should be persisted using saveFile before
+                    // this point.
+                    let filename = await self.resolveNewAttachmentFilename(
+                        attachmentId: item.id,
+                        fileExtension: item.fileExtension
                     )
-                )
-            } else if existingQueueItem!.state == AttachmentState.archived.rawValue {
-                // The attachment is present again. Need to queue it for sync.
-                // We might be able to optimize this in future
-                if existingQueueItem!.hasSynced == 1 {
-                    // No remote action required, we can restore the record (avoids deletion)
+                    
                     attachmentUpdates.append(
-                        existingQueueItem!.with(state: AttachmentState.synced.rawValue)
+                        Attachment(
+                            id: item.id,
+                            filename: filename,
+                            state: AttachmentState.queuedDownload.rawValue
+                        )
                     )
-                } else {
-                    // The localURI should be set if the record was meant to be downloaded
-                    // and has been synced. If it's missing and hasSynced is false then
-                    // it must be an upload operation
-                    let newState = existingQueueItem!.localUri == nil ?
+                } else if existingQueueItem!.state == AttachmentState.archived.rawValue {
+                    // The attachment is present again. Need to queue it for sync.
+                    // We might be able to optimize this in future
+                    if existingQueueItem!.hasSynced == 1 {
+                        // No remote action required, we can restore the record (avoids deletion)
+                        attachmentUpdates.append(
+                            existingQueueItem!.with(state: AttachmentState.synced.rawValue)
+                        )
+                    } else {
+                        // The localURI should be set if the record was meant to be downloaded
+                        // and has been synced. If it's missing and hasSynced is false then
+                        // it must be an upload operation
+                        let newState = existingQueueItem!.localUri == nil ?
                         AttachmentState.queuedDownload.rawValue :
                         AttachmentState.queuedUpload.rawValue
-
+                        
+                        attachmentUpdates.append(
+                            existingQueueItem!.with(state: newState)
+                        )
+                    }
+                }
+            }
+            
+            
+            /**
+             * Archive any items not specified in the watched items except for items pending delete.
+             */
+            for attachment in currentAttachments {
+                if attachment.state != AttachmentState.queuedDelete.rawValue &&
+                    items.first(where: { $0.id == attachment.id }) == nil {
                     attachmentUpdates.append(
-                        existingQueueItem!.with(state: newState)
+                        attachment.with(state: AttachmentState.archived.rawValue)
                     )
                 }
             }
-        }
-
-        /**
-         * Archive any items not specified in the watched items except for items pending delete.
-         */
-        for attachment in currentAttachments {
-            if attachment.state != AttachmentState.queuedDelete.rawValue,
-               items.first(where: { $0.id == attachment.id }) == nil
-            {
-                attachmentUpdates.append(
-                    attachment.with(state: AttachmentState.archived.rawValue)
-                )
+            
+            if !attachmentUpdates.isEmpty {
+                try await context.saveAttachments(attachments: attachmentUpdates)
             }
-        }
-
-        if !attachmentUpdates.isEmpty {
-            try await attachmentsService.saveAttachments(attachments: attachmentUpdates)
         }
     }
 
@@ -309,7 +308,7 @@ public actor AttachmentQueue {
         data: Data,
         mediaType: String,
         fileExtension: String?,
-        updateHook: @escaping (PowerSyncTransaction, Attachment) throws -> Void
+        updateHook: @escaping (ConnectionContext, Attachment) throws -> Void
     ) async throws -> Attachment {
         let id = try await db.get(sql: "SELECT uuid() as id", parameters: [], mapper: { cursor in
             try cursor.getString(name: "id")
@@ -320,23 +319,25 @@ public actor AttachmentQueue {
 
         // Write the file to the filesystem
         let fileSize = try await localStorage.saveFile(filePath: localUri, data: data)
+        
+        return try await attachmentsService.withLock { context in
+            // Start a write transaction. The attachment record and relevant local relationship
+            // assignment should happen in the same transaction.
+            return try await self.db.writeTransaction { tx in
+                let attachment = Attachment(
+                    id: id,
+                    filename: filename,
+                    state: AttachmentState.queuedUpload.rawValue,
+                    localUri: localUri,
+                    mediaType: mediaType,
+                    size: fileSize
+                )
 
-        // Start a write transaction. The attachment record and relevant local relationship
-        // assignment should happen in the same transaction.
-        return try await db.writeTransaction { tx in
-            let attachment = Attachment(
-                id: id,
-                filename: filename,
-                state: AttachmentState.queuedUpload.rawValue,
-                localUri: localUri,
-                mediaType: mediaType,
-                size: fileSize
-            )
+                // Allow consumers to set relationships to this attachment id
+                try updateHook(tx, attachment)
 
-            // Allow consumers to set relationships to this attachment id
-            try updateHook(tx, attachment)
-
-            return try self.attachmentsService.upsertAttachment(attachment, context: tx)
+                return try context.upsertAttachment(attachment, context: tx)
+            }
         }
     }
 
@@ -349,24 +350,34 @@ public actor AttachmentQueue {
         attachmentId: String,
         updateHook: @escaping (ConnectionContext, Attachment) throws -> Void
     ) async throws -> Attachment {
-        guard let attachment = try await attachmentsService.getAttachment(id: attachmentId) else {
-            throw NSError(domain: "AttachmentError", code: 5, userInfo: [NSLocalizedDescriptionKey: "Attachment record with id \(attachmentId) was not found."])
-        }
+        try await attachmentsService.withLock { context in
+            guard let attachment = try await context.getAttachment(id: attachmentId) else {
+                // TODO defined errors
+                throw NSError(
+                    domain: "AttachmentError",
+                    code: 5,
+                    userInfo: [NSLocalizedDescriptionKey: "Attachment record with id \(attachmentId) was not found."]
+                )
+            }
 
-        return try await db.writeTransaction { tx in
-            try updateHook(tx, attachment)
+            self.logger.debug("Marking attachment as deleted", tag: nil)
+            let result = try await self.db.writeTransaction { tx in
+                try updateHook(tx, attachment)
 
-            let updatedAttachment = Attachment(
-                id: attachment.id,
-                filename: attachment.filename,
-                state: AttachmentState.queuedDelete.rawValue,
-                hasSynced: attachment.hasSynced,
-                localUri: attachment.localUri,
-                mediaType: attachment.mediaType,
-                size: attachment.size
-            )
+                let updatedAttachment = Attachment(
+                    id: attachment.id,
+                    filename: attachment.filename,
+                    state: AttachmentState.queuedDelete.rawValue,
+                    hasSynced: attachment.hasSynced,
+                    localUri: attachment.localUri,
+                    mediaType: attachment.mediaType,
+                    size: attachment.size
+                )
 
-            return try self.attachmentsService.upsertAttachment(updatedAttachment, context: tx)
+                return try context.upsertAttachment(updatedAttachment, context: tx)
+            }
+            self.logger.debug("Marked attachment as deleted", tag: nil)
+            return result
         }
     }
 
@@ -379,16 +390,20 @@ public actor AttachmentQueue {
 
     /// Removes all archived items
     public func expireCache() async throws {
-        var done = false
-        repeat {
-            done = try await syncingService.deleteArchivedAttachments()
-        } while !done
+       try await  attachmentsService.withLock { context in
+            var done = false
+            repeat {
+                done = try await self.syncingService.deleteArchivedAttachments(context)
+            } while !done
+        }
     }
 
     /// Clears the attachment queue and deletes all attachment files
     public func clearQueue() async throws {
-        try await attachmentsService.clearQueue()
-        // Remove the attachments directory
-        try await localStorage.rmDir(path: attachmentsDirectory)
+        try await attachmentsService.withLock { context in
+            try await context.clearQueue()
+            // Remove the attachments directory
+            try await self.localStorage.rmDir(path: self.attachmentsDirectory)
+        }
     }
 }

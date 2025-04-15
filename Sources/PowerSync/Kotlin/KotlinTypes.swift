@@ -9,3 +9,5 @@ public typealias JsonParam = PowerSyncKotlin.JsonParam
 public typealias CrudTransaction = PowerSyncKotlin.CrudTransaction
 typealias KotlinPowerSyncCredentials = PowerSyncKotlin.PowerSyncCredentials
 typealias KotlinPowerSyncDatabase = PowerSyncKotlin.PowerSyncDatabase
+public typealias Transaction = PowerSyncKotlin.PowerSyncTransaction
+public typealias ConnectionContext = PowerSyncKotlin.ConnectionContext

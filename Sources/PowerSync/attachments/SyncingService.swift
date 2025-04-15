@@ -65,7 +65,7 @@ actor SyncingService {
             }
 
             let watchTask = Task {
-                for try await _ in try attachmentsService.watchActiveAttachments() {
+                for try await _ in try await attachmentsService.watchActiveAttachments() {
                     syncTriggerSubject.send(())
                 }
             }
@@ -74,9 +74,11 @@ actor SyncingService {
                 guard !Task.isCancelled else { break }
 
                 do {
-                    let attachments = try await attachmentsService.getActiveAttachments()
-                    try await handleSync(attachments: attachments)
-                    _ = try await deleteArchivedAttachments()
+                    try await attachmentsService.withLock { context in
+                        let attachments = try await context.getActiveAttachments()
+                        try await self.handleSync(context: context, attachments: attachments)
+                        _ = try await self.deleteArchivedAttachments(context)
+                    }
                 } catch {
                     if error is CancellationError { break }
                      logger.error("Sync error: \(error)", tag: logTag)
@@ -128,8 +130,8 @@ actor SyncingService {
     /// Deletes attachments marked as archived that exist on local storage.
     ///
     /// - Returns: `true` if any deletions occurred, `false` otherwise.
-    func deleteArchivedAttachments() async throws -> Bool {
-        return try await attachmentsService.deleteArchivedAttachments { pendingDelete in
+    func deleteArchivedAttachments(_ context: AttachmentContext) async throws -> Bool {
+        return try await context.deleteArchivedAttachments { pendingDelete in
             for attachment in pendingDelete {
                 guard let localUri = attachment.localUri else { continue }
                 if try await !self.localStorage.fileExists(filePath: localUri) { continue }
@@ -143,7 +145,7 @@ actor SyncingService {
     /// This includes queued downloads, uploads, and deletions.
     ///
     /// - Parameter attachments: The attachments to process.
-    private func handleSync(attachments: [Attachment]) async throws {
+    private func handleSync(context: AttachmentContext, attachments: [Attachment]) async throws {
         var updatedAttachments = [Attachment]()
 
         for attachment in attachments {
@@ -164,7 +166,7 @@ actor SyncingService {
             }
         }
 
-        try await attachmentsService.saveAttachments(attachments: updatedAttachments)
+        try await context.saveAttachments(attachments: updatedAttachments)
     }
 
     /// Uploads an attachment to remote storage.

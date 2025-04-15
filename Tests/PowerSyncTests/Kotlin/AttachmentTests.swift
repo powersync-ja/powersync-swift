@@ -14,7 +14,7 @@ final class AttachmentTests: XCTestCase {
                 .text("email"),
                 .text("photo_id")
             ]),
-            createAttachmentsTable(name: "attachments")
+            createAttachmentTable(name: "attachments")
         ])
 
         database = PowerSyncDatabase(

@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-import PowerSyncKotlin
 
 public let DEFAULT_WATCH_THROTTLE_MS = Int64(30)
 
@@ -90,10 +89,10 @@ public protocol Queries {
     ) throws -> AsyncThrowingStream<[RowType], Error>
 
     /// Execute a write transaction with the given callback
-    func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R
+    func writeTransaction<R>(callback: @escaping (any Transaction) throws -> R) async throws -> R
 
     /// Execute a read transaction with the given callback
-    func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R
+    func readTransaction<R>(callback: @escaping (any Transaction) throws -> R) async throws -> R
 }
 
 public extension Queries {

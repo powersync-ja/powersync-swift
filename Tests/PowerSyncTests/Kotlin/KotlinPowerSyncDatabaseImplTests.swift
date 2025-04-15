@@ -12,8 +12,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 .text("name"),
                 .text("email"),
                 .text("photo_id")
-            ]),
-            createAttachmentsTable(name: "attachments")
+            ])
         ])
 
         database = KotlinPowerSyncDatabaseImpl(

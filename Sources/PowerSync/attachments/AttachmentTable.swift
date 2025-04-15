@@ -1,5 +1,5 @@
 /// Creates a PowerSync Schema table for attachment state
-public func createAttachmentsTable(name: String) -> Table {
+public func createAttachmentTable(name: String) -> Table {
     return Table(
         name: name,
         columns: [

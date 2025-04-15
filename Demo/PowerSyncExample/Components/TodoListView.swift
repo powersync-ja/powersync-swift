@@ -69,7 +69,9 @@ struct TodoListView: View {
             }
             .onDelete { indexSet in
                 Task {
-                    await delete(at: indexSet)
+                    if let toDelete = indexSet.map({ todos[$0] }).first {
+                        await delete(todo: toDelete)
+                    }
                 }
             }
         }
@@ -124,12 +126,10 @@ struct TodoListView: View {
         }
     }
 
-    func delete(at offset: IndexSet) async {
+    func delete(todo: Todo) async {
         do {
             error = nil
-            let todosToDelete = offset.map { todos[$0] }
-
-            try await system.deleteTodo(id: todosToDelete[0].id)
+            try await system.deleteTodo(todo: todo)
 
         } catch {
             self.error = error

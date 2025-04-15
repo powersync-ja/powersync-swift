@@ -40,12 +40,12 @@ let checklists = Table(
 let schema = Schema(
     tables: [
         checklists,
-        createAttachmentsTable(name: "attachments") // Includes the table which stores attachment states
+        createAttachmentTable(name: "attachments") // Includes the table which stores attachment states
     ]
 )
 ```
 
-The `createAttachmentsTable` function defines the local-only attachment state storage table.
+The `createAttachmentTable` function defines the local-only attachment state storage table.
 
 An attachments table definition can be created with the following options:
 

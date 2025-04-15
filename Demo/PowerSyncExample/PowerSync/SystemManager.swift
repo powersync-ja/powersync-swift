@@ -79,7 +79,7 @@ class SystemManager {
 
     func watchLists(_ callback: @escaping (_ lists: [ListContent]) -> Void) async {
         do {
-            for try await lists in try db.watch<ListContent>(
+            for try await lists in try db.watch(
                 options: WatchOptions(
                     sql: "SELECT * FROM \(LISTS_TABLE)",
                     mapper: { cursor in
@@ -100,7 +100,7 @@ class SystemManager {
     }
 
     func insertList(_ list: NewListContent) async throws {
-        let result = try await db.execute(
+        _ = try await db.execute(
             sql: "INSERT INTO \(LISTS_TABLE) (id, created_at, name, owner_id) VALUES (uuid(), datetime(), ?, ?)",
             parameters: [list.name, connector.currentUserID]
         )
@@ -112,6 +112,9 @@ class SystemManager {
                 sql: "DELETE FROM \(LISTS_TABLE) WHERE id = ?",
                 parameters: [id]
             )
+            
+            // Attachments linked to these will be archived and deleted eventually
+            // Attachments should be deleted explicitly if required
             _ = try transaction.execute(
                 sql: "DELETE FROM \(TODOS_TABLE) WHERE list_id = ?",
                 parameters: [id]
@@ -177,12 +180,30 @@ class SystemManager {
         }
     }
 
-    func deleteTodo(id: String) async throws {
-        _ = try await db.writeTransaction(callback: { transaction in
-            try transaction.execute(
-                sql: "DELETE FROM \(TODOS_TABLE) WHERE id = ?",
-                parameters: [id]
-            )
-        })
+    func deleteTodo(todo: Todo) async throws {
+        if let attachments, let photoId = todo.photoId {
+            try await attachments.deleteFile(
+                attachmentId: photoId
+            ) { (tx, _) in
+                try self.deleteTodoInTX(
+                    id: todo.id,
+                    tx: tx
+                )
+            }
+        } else {
+            try await db.writeTransaction { tx in
+                try self.deleteTodoInTX(
+                    id: todo.id,
+                    tx: tx
+                )
+            }
+        }
+    }
+    
+    func deleteTodoInTX(id: String, tx: ConnectionContext) throws {
+        _ = try tx.execute(
+            sql: "DELETE FROM \(TODOS_TABLE) WHERE id = ?",
+            parameters: [id]
+        )
     }
 }
