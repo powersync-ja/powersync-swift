@@ -1,5 +1,9 @@
 # Changelog
 
+# 1.0.0-beta.11
+
+* Fix deadlock when `connect()` is called immediately after opening a database.
+
 # 1.0.0-Beta.10
 
 * Added the ability to specify a custom logging implementation
