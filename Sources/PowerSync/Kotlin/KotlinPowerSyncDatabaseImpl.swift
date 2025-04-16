@@ -1,13 +1,12 @@
 import Foundation
 import PowerSyncKotlin
 
-internal final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
+final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     let logger: any LoggerProtocol
-    
+
     private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
 
     var currentStatus: SyncStatus { kotlinDatabase.currentStatus }
-    
 
     init(
         schema: Schema,
@@ -189,43 +188,51 @@ internal final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         options: WatchOptions<RowType>
     ) throws -> AsyncThrowingStream<[RowType], Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            // Create an outer task to monitor cancellation
+            let task = Task {
                 do {
                     var mapperError: Error?
-                    // HACK!
-                    // SKIEE doesn't support custom exceptions in Flows
-                    // Exceptions which occur in the Flow itself cause runtime crashes.
-                    // The most probable crash would be the internal EXPLAIN statement.
-                    // This attempts to EXPLAIN the query before passing it to Kotlin
-                    // We could introduce an onChange API in Kotlin which we use to implement watches here.
-                    // This would prevent most issues with exceptions.
+
+                    // EXPLAIN statement to prevent crashes in SKIEE
                     _ = try await self.kotlinDatabase.getAll(
                         sql: "EXPLAIN \(options.sql)",
                         parameters: options.parameters,
                         mapper: { _ in "" }
                     )
+
+                    // Watching for changes in the database
                     for try await values in try self.kotlinDatabase.watch(
                         sql: options.sql,
                         parameters: options.parameters,
                         throttleMs: KotlinLong(value: options.throttleMs),
-                        mapper: { cursor in do {
-                            return try options.mapper(cursor)
-                        } catch {
-                            mapperError = error
-                            // The value here does not matter. We will throw the exception later
-                            // This is not ideal, this is only a workaround until we expose fine grained access to Kotlin SDK internals.
-                            return nil as RowType?
-                        } }
+                        mapper: { cursor in
+                            do {
+                                return try options.mapper(cursor)
+                            } catch {
+                                mapperError = error
+                                return nil as RowType?
+                            }
+                        }
                     ) {
+                        // Check if the outer task is cancelled
+                        try Task.checkCancellation() // This checks if the calling task was cancelled
+
                         if mapperError != nil {
                             throw mapperError!
                         }
+
                         try continuation.yield(safeCast(values, to: [RowType].self))
                     }
+
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
                 }
+            }
+
+            // Propagate cancellation from the outer task to the inner task
+            continuation.onTermination = { @Sendable _ in
+                task.cancel() // This cancels the inner task when the stream is terminated
             }
         }
     }
@@ -237,8 +244,8 @@ internal final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
         return try safeCast(await kotlinDatabase.readTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
     }
-    
-    func close() async throws{
+
+    func close() async throws {
         try await kotlinDatabase.close()
     }
 }

@@ -166,8 +166,8 @@ public class SyncingService {
                     // Watch attachment records. Trigger a sync on change
                     group.addTask {
                         for try await _ in try self.attachmentsService.watchActiveAttachments() {
-                            self.syncTriggerSubject.send(())
                             try Task.checkCancellation()
+                            self.syncTriggerSubject.send(())
                         }
                     }
 
