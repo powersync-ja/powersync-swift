@@ -3,10 +3,10 @@ import Foundation
 
 /// A service that synchronizes attachments between local and remote storage.
 ///
-/// This actor watches for changes to active attachments and performs queued
+/// This watches for changes to active attachments and performs queued
 /// download, upload, and delete operations. Syncs can be triggered manually,
 /// periodically, or based on database changes.
-actor SyncingService {
+public class SyncingService {
     private let remoteStorage: RemoteStorageAdapter
     private let localStorage: LocalStorageAdapter
     private let attachmentsService: AttachmentService
@@ -17,6 +17,7 @@ actor SyncingService {
     private let syncTriggerSubject = PassthroughSubject<Void, Never>()
     private var periodicSyncTimer: Timer?
     private var syncTask: Task<Void, Never>?
+    private let lock: LockActor
     let logger: any LoggerProtocol
 
     let logTag = "AttachmentSync"
@@ -47,32 +48,32 @@ actor SyncingService {
         self.errorHandler = errorHandler
         self.syncThrottle = syncThrottle
         self.logger = logger
-        closed = false
+        self.closed = false
+        self.lock = LockActor()
     }
 
     /// Starts periodic syncing of attachments.
     ///
     /// - Parameter period: The time interval in seconds between each sync.
     public func startSync(period: TimeInterval) async throws {
-        try guardClosed()
+        try await lock.withLock {
+            try guardClosed()
 
-        // Close any active sync operations
-        try await stopSync()
+            // Close any active sync operations
+            try await _stopSync()
 
-        setupSyncFlow()
-
-        periodicSyncTimer = Timer.scheduledTimer(
-            withTimeInterval: period,
-            repeats: true
-        ) { [weak self] _ in
-            guard let self = self else { return }
-            Task { try? await self.triggerSync() }
+            setupSyncFlow(period: period)
         }
     }
 
     public func stopSync() async throws {
-        try guardClosed()
+        try await lock.withLock {
+            try guardClosed()
+            try await _stopSync()
+        }
+    }
 
+    private func _stopSync() async throws {
         if let timer = periodicSyncTimer {
             timer.invalidate()
             periodicSyncTimer = nil
@@ -92,10 +93,12 @@ actor SyncingService {
 
     /// Cleans up internal resources and cancels any ongoing syncing.
     func close() async throws {
-        try guardClosed()
+        try await lock.withLock {
+            try guardClosed()
 
-        try await stopSync()
-        closed = true
+            try await _stopSync()
+            closed = true
+        }
     }
 
     /// Triggers a sync operation. Can be called manually.
@@ -141,13 +144,13 @@ actor SyncingService {
     }
 
     /// Sets up the main attachment syncing pipeline and starts watching for changes.
-    private func setupSyncFlow() {
+    private func setupSyncFlow(period: TimeInterval) {
         syncTask = Task {
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
                     // Handle sync trigger events
                     group.addTask {
-                        let syncTrigger = await self.createSyncTrigger()
+                        let syncTrigger = self.createSyncTrigger()
 
                         for await _ in syncTrigger {
                             try Task.checkCancellation()
@@ -162,12 +165,20 @@ actor SyncingService {
 
                     // Watch attachment records. Trigger a sync on change
                     group.addTask {
-                        for try await _ in try await self.attachmentsService.watchActiveAttachments() {
+                        for try await _ in try self.attachmentsService.watchActiveAttachments() {
                             self.syncTriggerSubject.send(())
                             try Task.checkCancellation()
                         }
                     }
 
+                    group.addTask {
+                        let delay = UInt64(period * 1_000_000_000)
+                        while !Task.isCancelled {
+                            try await Task.sleep(nanoseconds: delay)
+                            try await self.triggerSync()
+                        }
+                    }
+                    
                     // Wait for any task to complete
                     try await group.next()
                 }
