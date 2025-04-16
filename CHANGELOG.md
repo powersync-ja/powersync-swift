@@ -3,6 +3,7 @@
 # 1.0.0-Beta.12
 
 - Added attachment sync helpers
+- Added support for cancellations in watched queries
 
 # 1.0.0-beta.11
 
