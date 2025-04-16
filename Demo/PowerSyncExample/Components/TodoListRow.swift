@@ -23,7 +23,9 @@ struct TodoListRow: View {
                     // Show progress while loading the image
                     ProgressView()
                         .onAppear {
-                            loadImage()
+                            Task {
+                                await loadImage()
+                            }
                         }
                 } else if todo.photoId != nil {
                     // Show progres, wait for a URI to be present
@@ -75,15 +77,19 @@ struct TodoListRow: View {
         }
     }
 
-    private func loadImage() {
-        guard let urlString = todo.photoUri else {
-            return
-        }
+    private func loadImage() async {
+        guard let urlString = todo.photoUri else { return }
+        let url = URL(fileURLWithPath: urlString)
 
-        if let imageData = try? Data(contentsOf: URL(fileURLWithPath: urlString)),
-           let loadedImage = UIImage(data: imageData)
-        {
-            image = loadedImage
+        do {
+            let data = try Data(contentsOf: url)
+            if let loadedImage = UIImage(data: data) {
+                image = loadedImage
+            } else {
+                print("Failed to decode image from data.")
+            }
+        } catch {
+            print("Error loading image from disk:", error)
         }
     }
 }

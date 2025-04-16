@@ -127,7 +127,8 @@ class SystemManager {
                 sql: "SELECT photo_id FROM \(TODOS_TABLE) WHERE list_id = ? AND photo_id IS NOT NULL",
                 parameters: [id]
             ) { cursor in
-                cursor.getString(index: 0)! // :(
+                // FIXME Transactions should allow throwing in the mapper and should use generics correctly
+                cursor.getString(index: 0) ?? "invalid" // :(
             } as? [String] // :(
 
             _ = try transaction.execute(
