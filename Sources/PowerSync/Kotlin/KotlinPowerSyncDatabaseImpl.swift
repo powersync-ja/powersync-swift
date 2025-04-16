@@ -226,7 +226,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
                     continuation.finish()
                 } catch {
-                    continuation.finish(throwing: error)
+                    if error is CancellationError {
+                        continuation.finish()
+                    } else {
+                        continuation.finish(throwing: error)
+                    }
                 }
             }
 
