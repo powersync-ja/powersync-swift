@@ -3,7 +3,7 @@ import Foundation
 
 /// Class used to implement the attachment queue
 /// Requires a PowerSyncDatabase, a RemoteStorageAdapter implementation, and a directory name for attachments.
-public actor AttachmentQueue {
+public class AttachmentQueue {
     /// Default name of the attachments table
     public static let defaultTableName = "attachments"
 
@@ -67,11 +67,13 @@ public actor AttachmentQueue {
         logger: self.logger,
         getLocalUri: { [weak self] filename in
             guard let self = self else { return filename }
-            return await self.getLocalUri(filename)
+            return self.getLocalUri(filename)
         },
         errorHandler: self.errorHandler,
         syncThrottle: self.syncThrottleDuration
     )
+
+    private let lock: LockActor
 
     /// Initializes the attachment queue
     /// - Parameters match the stored properties
@@ -103,66 +105,68 @@ public actor AttachmentQueue {
         self.subdirectories = subdirectories
         self.downloadAttachments = downloadAttachments
         self.logger = logger ?? db.logger
-
-        attachmentsService = AttachmentService(
+        self.attachmentsService = AttachmentService(
             db: db,
             tableName: attachmentsQueueTableName,
             logger: self.logger,
             maxArchivedCount: archivedCacheLimit
         )
+        self.lock = LockActor()
     }
 
     /// Starts the attachment sync process
     public func startSync() async throws {
-        try guardClosed()
+        try await lock.withLock {
+            try guardClosed()
 
-        // Stop any active syncing before starting new Tasks
-        try await stopSyncing()
+            // Stop any active syncing before starting new Tasks
+            try await _stopSyncing()
 
-        // Ensure the directory where attachments are downloaded exists
-        try await localStorage.makeDir(path: attachmentsDirectory)
+            // Ensure the directory where attachments are downloaded exists
+            try await localStorage.makeDir(path: attachmentsDirectory)
 
-        if let subdirectories = subdirectories {
-            for subdirectory in subdirectories {
-                let path = URL(fileURLWithPath: attachmentsDirectory).appendingPathComponent(subdirectory).path
-                try await localStorage.makeDir(path: path)
-            }
-        }
-        
-        // Verify initial state
-        try await attachmentsService.withLock {context in
-            try await self.verifyAttachments(context: context)
-        }
-
-        try await syncingService.startSync(period: syncInterval)
-
-        syncStatusTask = Task {
-            do {
-                try await withThrowingTaskGroup(of: Void.self) { group in
-                    // Add connectivity monitoring task
-                    group.addTask {
-                        var previousConnected = self.db.currentStatus.connected
-                        for await status in self.db.currentStatus.asFlow() {
-                            if !previousConnected && status.connected {
-                                try await self.syncingService.triggerSync()
-                            }
-                            previousConnected = status.connected
-                        }
-                    }
-
-                    // Add attachment watching task
-                    group.addTask {
-                        for try await items in try self.watchAttachments() {
-                            try await self.processWatchedAttachments(items: items)
-                        }
-                    }
-
-                    // Wait for any task to complete (which should only happen on cancellation)
-                    try await group.next()
+            if let subdirectories = subdirectories {
+                for subdirectory in subdirectories {
+                    let path = URL(fileURLWithPath: attachmentsDirectory).appendingPathComponent(subdirectory).path
+                    try await localStorage.makeDir(path: path)
                 }
-            } catch {
-                if !(error is CancellationError) {
-                    logger.error("Error in attachment sync job: \(error.localizedDescription)", tag: logTag)
+            }
+
+            // Verify initial state
+            try await attachmentsService.withLock { context in
+                try await self.verifyAttachments(context: context)
+            }
+
+            try await syncingService.startSync(period: syncInterval)
+
+            syncStatusTask = Task {
+                do {
+                    try await withThrowingTaskGroup(of: Void.self) { group in
+                        // Add connectivity monitoring task
+                        group.addTask {
+                            var previousConnected = self.db.currentStatus.connected
+                            for await status in self.db.currentStatus.asFlow() {
+                                if !previousConnected && status.connected {
+                                    try await self.syncingService.triggerSync()
+                                }
+                                previousConnected = status.connected
+                            }
+                        }
+
+                        // Add attachment watching task
+                        group.addTask {
+                            for try await items in try self.watchAttachments() {
+                                try await self.processWatchedAttachments(items: items)
+                            }
+                        }
+
+                        // Wait for any task to complete (which should only happen on cancellation)
+                        try await group.next()
+                    }
+                } catch {
+                    if !(error is CancellationError) {
+                        logger.error("Error in attachment sync job: \(error.localizedDescription)", tag: logTag)
+                    }
                 }
             }
         }
@@ -170,6 +174,12 @@ public actor AttachmentQueue {
 
     /// Stops active syncing tasks. Syncing can be resumed with ``startSync()``
     public func stopSyncing() async throws {
+        try await lock.withLock {
+            try await _stopSyncing()
+        }
+    }
+
+    private func _stopSyncing() async throws {
         try guardClosed()
 
         syncStatusTask?.cancel()
@@ -187,11 +197,13 @@ public actor AttachmentQueue {
 
     /// Closes the attachment queue and cancels all sync tasks
     public func close() async throws {
-        try guardClosed()
+        try await lock.withLock {
+            try guardClosed()
 
-        try await stopSyncing()
-        try await syncingService.close()
-        closed = true
+            try await _stopSyncing()
+            try await syncingService.close()
+            closed = true
+        }
     }
 
     /// Resolves the filename for a new attachment
@@ -226,7 +238,7 @@ public actor AttachmentQueue {
                     // This item is assumed to be coming from an upstream sync
                     // Locally created new items should be persisted using saveFile before
                     // this point.
-                    let filename = await self.resolveNewAttachmentFilename(
+                    let filename = self.resolveNewAttachmentFilename(
                         attachmentId: item.id,
                         fileExtension: item.fileExtension
                     )
@@ -385,21 +397,22 @@ public actor AttachmentQueue {
             try await self.localStorage.rmDir(path: self.attachmentsDirectory)
         }
     }
-    
+
     /// Verifies attachment records are present in the filesystem
     private func verifyAttachments(context: AttachmentContext) async throws {
         let attachments = try await context.getAttachments()
         var updates: [Attachment] = []
-        
+
         for attachment in attachments {
             guard let localUri = attachment.localUri else {
                 continue
             }
-            
+
             let exists = try await localStorage.fileExists(filePath: localUri)
             if attachment.state == AttachmentState.synced ||
                 attachment.state == AttachmentState.queuedUpload &&
-                !exists {
+                !exists
+            {
                 // The file must have been removed from the local storage
                 updates.append(attachment.with(
                     state: .archived,
@@ -407,7 +420,7 @@ public actor AttachmentQueue {
                 ))
             }
         }
-        
+
         try await context.saveAttachments(attachments: updates)
     }
 
