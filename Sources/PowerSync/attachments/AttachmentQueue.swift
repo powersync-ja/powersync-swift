@@ -133,7 +133,7 @@ public class AttachmentQueue {
             }
 
             // Verify initial state
-            try await attachmentsService.withLock { context in
+            try await attachmentsService.withContext { context in
                 try await self.verifyAttachments(context: context)
             }
 
@@ -146,6 +146,7 @@ public class AttachmentQueue {
                         group.addTask {
                             var previousConnected = self.db.currentStatus.connected
                             for await status in self.db.currentStatus.asFlow() {
+                                try Task.checkCancellation()
                                 if !previousConnected && status.connected {
                                     try await self.syncingService.triggerSync()
                                 }
@@ -223,7 +224,7 @@ public class AttachmentQueue {
     public func processWatchedAttachments(items: [WatchedAttachmentItem]) async throws {
         // Need to get all the attachments which are tracked in the DB.
         // We might need to restore an archived attachment.
-        try await attachmentsService.withLock { context in
+        try await attachmentsService.withContext { context in
             let currentAttachments = try await context.getAttachments()
             var attachmentUpdates = [Attachment]()
 
@@ -316,7 +317,7 @@ public class AttachmentQueue {
         // Write the file to the filesystem
         let fileSize = try await localStorage.saveFile(filePath: localUri, data: data)
 
-        return try await attachmentsService.withLock { context in
+        return try await attachmentsService.withContext { context in
             // Start a write transaction. The attachment record and relevant local relationship
             // assignment should happen in the same transaction.
             try await self.db.writeTransaction { tx in
@@ -346,12 +347,11 @@ public class AttachmentQueue {
         attachmentId: String,
         updateHook: @escaping (ConnectionContext, Attachment) throws -> Void
     ) async throws -> Attachment {
-        try await attachmentsService.withLock { context in
+        try await attachmentsService.withContext { context in
             guard let attachment = try await context.getAttachment(id: attachmentId) else {
                 throw PowerSyncAttachmentError.notFound("Attachment record with id \(attachmentId) was not found.")
             }
 
-            self.logger.debug("Marking attachment as deleted", tag: nil)
             let result = try await self.db.writeTransaction { tx in
                 try updateHook(tx, attachment)
 
@@ -367,7 +367,6 @@ public class AttachmentQueue {
 
                 return try context.upsertAttachment(updatedAttachment, context: tx)
             }
-            self.logger.debug("Marked attachment as deleted", tag: nil)
             return result
         }
     }
@@ -381,7 +380,7 @@ public class AttachmentQueue {
 
     /// Removes all archived items
     public func expireCache() async throws {
-        try await attachmentsService.withLock { context in
+        try await attachmentsService.withContext { context in
             var done = false
             repeat {
                 done = try await self.syncingService.deleteArchivedAttachments(context)
@@ -391,7 +390,7 @@ public class AttachmentQueue {
 
     /// Clears the attachment queue and deletes all attachment files
     public func clearQueue() async throws {
-        try await attachmentsService.withLock { context in
+        try await attachmentsService.withContext { context in
             try await context.clearQueue()
             // Remove the attachments directory
             try await self.localStorage.rmDir(path: self.attachmentsDirectory)

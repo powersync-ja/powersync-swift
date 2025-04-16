@@ -57,7 +57,7 @@ public class AttachmentService {
     }
 
     /// Executes a callback with exclusive access to the attachment context.
-    public func withLock<R>(callback: @Sendable @escaping (AttachmentContext) async throws -> R) async throws -> R {
+    public func withContext<R>(callback: @Sendable @escaping (AttachmentContext) async throws -> R) async throws -> R {
         try await lock.withLock {
             try await callback(context)
         }

@@ -155,7 +155,7 @@ public class SyncingService {
                         for await _ in syncTrigger {
                             try Task.checkCancellation()
 
-                            try await self.attachmentsService.withLock { context in
+                            try await self.attachmentsService.withContext { context in
                                 let attachments = try await context.getActiveAttachments()
                                 try await self.handleSync(context: context, attachments: attachments)
                                 _ = try await self.deleteArchivedAttachments(context)

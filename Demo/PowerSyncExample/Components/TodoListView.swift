@@ -173,7 +173,13 @@ struct TodoListView: View {
     private func checkCameraAvailability() {
         // https://developer.apple.com/forums/thread/748448
         // On MacOS MetalAPI validation needs to be disabled
+
+#if targetEnvironment(simulator)
+        // Camera does not work on the simulator
+        isCameraAvailable = false
+#else
         isCameraAvailable = UIImagePickerController.isSourceTypeAvailable(.camera)
+#endif
     }
 }
 

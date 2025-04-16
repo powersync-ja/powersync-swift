@@ -192,7 +192,13 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             let task = Task {
                 do {
                     var mapperError: Error?
-
+                    // HACK!
+                    // SKIEE doesn't support custom exceptions in Flows
+                    // Exceptions which occur in the Flow itself cause runtime crashes.
+                    // The most probable crash would be the internal EXPLAIN statement.
+                    // This attempts to EXPLAIN the query before passing it to Kotlin
+                    // We could introduce an onChange API in Kotlin which we use to implement watches here.
+                    // This would prevent most issues with exceptions.
                     // EXPLAIN statement to prevent crashes in SKIEE
                     _ = try await self.kotlinDatabase.getAll(
                         sql: "EXPLAIN \(options.sql)",
@@ -210,7 +216,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
                                 return try options.mapper(cursor)
                             } catch {
                                 mapperError = error
-                                return nil as RowType?
+                                return ()
                             }
                         }
                     ) {
