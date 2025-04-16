@@ -45,7 +45,7 @@ let schema = Schema(
 )
 ```
 
-The `createAttachmentTable` function defines the `local-only` attachment state storage table. See the [Implementation Details](#implementation-details) section for more details.
+The `createAttachmentTable` function defines a `local-only` attachment state storage table. See the [Implementation Details](#implementation-details) section for more details.
 
 #### Steps to Implement
 
@@ -101,7 +101,7 @@ let queue = AttachmentQueue(
 
 - The `attachmentsDirectory` specifies where local attachment files should be stored. `FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("attachments")` is a good choice.
 - The `remoteStorage` is responsible for connecting to the attachments backend. See the `RemoteStorageAdapter` protocol definition.
-- `watchAttachmens` is closure which generates a publisher of `WatchedAttachmentItem`. These items represent the attachments that should be present in the application.
+- `watchAttachments` is closure which generates a publisher of `WatchedAttachmentItem`. These items represent the attachments that should be present in the application.
 
 3. Call `startSync()` to start syncing attachments.
 
