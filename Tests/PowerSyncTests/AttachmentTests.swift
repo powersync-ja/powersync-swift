@@ -44,26 +44,25 @@ final class AttachmentTests: XCTestCase {
                      * Download a file from remote storage
                      */
                     func downloadFile(attachment: Attachment) async throws -> Data {
-                        return Data([1,2,3])
+                        return Data([1, 2, 3])
                     }
                     
                     /**
                      * Delete a file from remote storage
                      */
                     func deleteFile(attachment: Attachment) async throws {}
-                    
                 }
         
                 return MockRemoteStorage()
             }(),
             attachmentsDirectory: NSTemporaryDirectory(),
-            watchedAttachments: try database.watch(options: WatchOptions(
+            watchAttachments: { try self.database.watch(options: WatchOptions(
                 sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
-                mapper: { cursor in WatchedAttachmentItem(
-                    id: try cursor.getString(name: "photo_id"),
+                mapper: { cursor in try WatchedAttachmentItem(
+                    id: cursor.getString(name: "photo_id"),
                     fileExtension: "jpg"
-                )}
-            ))
+                ) }
+            )) }
         )
         
         try await queue.startSync()
@@ -79,14 +78,14 @@ final class AttachmentTests: XCTestCase {
         let attachmentsWatch = try database.watch(
             options: WatchOptions(
                 sql: "SELECT * FROM attachments",
-                mapper: {cursor in try Attachment.fromCursor(cursor)}
+                mapper: { cursor in try Attachment.fromCursor(cursor) }
             )).makeAsyncIterator()
         
-       let attachmentRecord = try await waitForMatch(
+        let attachmentRecord = try await waitForMatch(
             iterator: attachmentsWatch,
-            where: {results in results.first?.state == AttachmentState.synced},
+            where: { results in results.first?.state == AttachmentState.synced },
             timeout: 5
-       ).first
+        ).first
         
         // The file should exist
         let localData = try await queue.localStorage.readFile(filePath: attachmentRecord!.localUri!)
@@ -97,7 +96,6 @@ final class AttachmentTests: XCTestCase {
     }
     
     func testAttachmentUpload() async throws {
-        
         class MockRemoteStorage: RemoteStorageAdapter {
             public var uploadCalled = false
             
@@ -105,38 +103,35 @@ final class AttachmentTests: XCTestCase {
                 fileData: Data,
                 attachment: Attachment
             ) async throws {
-                self.uploadCalled = true
+                uploadCalled = true
             }
             
             /**
              * Download a file from remote storage
              */
             func downloadFile(attachment: Attachment) async throws -> Data {
-                return Data([1,2,3])
+                return Data([1, 2, 3])
             }
             
             /**
              * Delete a file from remote storage
              */
             func deleteFile(attachment: Attachment) async throws {}
-            
         }
 
-        
-        
         let mockedRemote = MockRemoteStorage()
         
         let queue = AttachmentQueue(
             db: database,
             remoteStorage: mockedRemote,
             attachmentsDirectory: NSTemporaryDirectory(),
-            watchedAttachments: try database.watch(options: WatchOptions(
+            watchAttachments: { try self.database.watch(options: WatchOptions(
                 sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
-                mapper: { cursor in WatchedAttachmentItem(
-                    id: try cursor.getString(name: "photo_id"),
+                mapper: { cursor in try WatchedAttachmentItem(
+                    id: cursor.getString(name: "photo_id"),
                     fileExtension: "jpg"
-                )}
-            ))
+                ) }
+            )) }
         )
         
         try await queue.startSync()
@@ -144,24 +139,25 @@ final class AttachmentTests: XCTestCase {
         let attachmentsWatch = try database.watch(
             options: WatchOptions(
                 sql: "SELECT * FROM attachments",
-                mapper: {cursor in try Attachment.fromCursor(cursor)}
+                mapper: { cursor in try Attachment.fromCursor(cursor) }
             )).makeAsyncIterator()
         
         _ = try await queue.saveFile(
-            data: Data([3,4,5]),
+            data: Data([3, 4, 5]),
             mediaType: "image/jpg",
-            fileExtension: "jpg") {tx, attachment in
-             _ = try tx.execute(
-                    sql: "INSERT INTO users (id, name, email, photo_id) VALUES (uuid(), 'john', 'j@j.com', ?)",
-                    parameters: [attachment.id]
-                )
-            }
+            fileExtension: "jpg"
+        ) { tx, attachment in
+            _ = try tx.execute(
+                sql: "INSERT INTO users (id, name, email, photo_id) VALUES (uuid(), 'john', 'j@j.com', ?)",
+                parameters: [attachment.id]
+            )
+        }
         
-       _  = try await waitForMatch(
+        _ = try await waitForMatch(
             iterator: attachmentsWatch,
-            where: {results in results.first?.state == AttachmentState.synced},
+            where: { results in results.first?.state == AttachmentState.synced },
             timeout: 5
-       ).first
+        ).first
         
         // Upload should have been called
         XCTAssertTrue(mockedRemote.uploadCalled)
@@ -170,7 +166,6 @@ final class AttachmentTests: XCTestCase {
         try await queue.close()
     }
 }
-
 
 enum WaitForMatchError: Error {
     case timeout

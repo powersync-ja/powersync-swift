@@ -1,3 +1,4 @@
+import AVFoundation
 import IdentifiedCollections
 import SwiftUI
 import SwiftUINavigation
@@ -15,6 +16,7 @@ struct TodoListView: View {
     @State private var onMediaSelect: ((_: Data) async throws -> Void)?
     @State private var pickMediaType: UIImagePickerController.SourceType = .camera
     @State private var showMediaPicker = false
+    @State private var isCameraAvailable: Bool = false
 
     var body: some View {
         List {
@@ -33,6 +35,7 @@ struct TodoListView: View {
             ForEach(todos) { todo in
                 TodoListRow(
                     todo: todo,
+                    isCameraAvailable: isCameraAvailable,
                     completeTapped: {
                         Task {
                             await toggleCompletion(of: todo)
@@ -59,13 +62,12 @@ struct TodoListView: View {
                         registerMediaCallback(todo: todo)
                         pickMediaType = .camera
                         showMediaPicker = true
-                    },
-                    selectPhotoTapped: {
-                        registerMediaCallback(todo: todo)
-                        pickMediaType = .photoLibrary
-                        showMediaPicker = true
                     }
-                )
+                ) {
+                    registerMediaCallback(todo: todo)
+                    pickMediaType = .photoLibrary
+                    showMediaPicker = true
+                }
             }
             .onDelete { indexSet in
                 Task {
@@ -109,6 +111,9 @@ struct TodoListView: View {
                 }
             }
         }
+        .onAppear {
+            checkCameraAvailability()
+        }
         .task {
             await system.watchTodos(listId) { tds in
                 withAnimation {
@@ -138,7 +143,7 @@ struct TodoListView: View {
             self.error = error
         }
     }
-    
+
     ///  Registers a callback which saves a photo for the specified Todo item if media is sucessfully loaded.
     func registerMediaCallback(todo: Todo) {
         // Register a callback for successful image capture
@@ -164,6 +169,12 @@ struct TodoListView: View {
             }
         }
     }
+
+    private func checkCameraAvailability() {
+        // https://developer.apple.com/forums/thread/748448
+        // On MacOS MetalAPI validation needs to be disabled
+        isCameraAvailable = UIImagePickerController.isSourceTypeAvailable(.camera)
+    }
 }
 
 #Preview {
@@ -177,7 +188,7 @@ struct TodoListView: View {
 struct CameraView: UIViewControllerRepresentable {
     @Binding var onMediaSelect: ((_: Data) async throws -> Void)?
     @Binding var mediaType: UIImagePickerController.SourceType
-    
+
     @Environment(\.presentationMode) var presentationMode
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
@@ -214,6 +225,7 @@ struct CameraView: UIViewControllerRepresentable {
                             }
                         }
                     }
+                    parent.onMediaSelect = nil
                 }
             }
 
@@ -222,6 +234,7 @@ struct CameraView: UIViewControllerRepresentable {
 
         func imagePickerControllerDidCancel(_: UIImagePickerController) {
             parent.presentationMode.wrappedValue.dismiss()
+            parent.onMediaSelect = nil
         }
     }
 }

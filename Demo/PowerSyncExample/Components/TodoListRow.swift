@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TodoListRow: View {
     let todo: Todo
+    let isCameraAvailable: Bool
     let completeTapped: () -> Void
     let deletePhotoTapped: () -> Void
     let capturePhotoTapped: () -> Void
@@ -13,19 +14,20 @@ struct TodoListRow: View {
         HStack {
             Text(todo.description)
             Group {
-                if todo.photoUri == nil {
-                    // Nothing to display when photoURI is nil
-                    EmptyView()
-                } else if let image = image {
+                if let image = image {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
+
                 } else if todo.photoUri != nil {
-                    // Only show loading indicator if we have a URL string
+                    // Show progress while loading the image
                     ProgressView()
                         .onAppear {
                             loadImage()
                         }
+                } else if todo.photoId != nil {
+                    // Show progres, wait for a URI to be present
+                    ProgressView()
                 } else {
                     EmptyView()
                 }
@@ -34,12 +36,14 @@ struct TodoListRow: View {
             VStack {
                 if todo.photoId == nil {
                     HStack {
-                        Button {
-                            capturePhotoTapped()
-                        } label: {
-                            Image(systemName: "camera.fill")
+                        if isCameraAvailable {
+                            Button {
+                                capturePhotoTapped()
+                            } label: {
+                                Image(systemName: "camera.fill")
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                         Button {
                             selectPhotoTapped()
                         } label: {
@@ -62,6 +66,11 @@ struct TodoListRow: View {
                     Image(systemName: todo.isComplete ? "checkmark.circle.fill" : "circle")
                 }
                 .buttonStyle(.plain)
+            }.onChange(of: todo.photoId) { _, newPhotoId in
+                if newPhotoId == nil {
+                    // Clear the image when photoId becomes nil
+                    image = nil
+                }
             }
         }
     }
@@ -93,6 +102,7 @@ struct TodoListRow: View {
             completedBy: nil,
 
         ),
+        isCameraAvailable: true,
         completeTapped: {},
         deletePhotoTapped: {},
         capturePhotoTapped: {}
