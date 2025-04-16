@@ -29,6 +29,10 @@ final class AttachmentTests: XCTestCase {
         database = nil
         try await super.tearDown()
     }
+    
+    func getAttachmentDirectory() -> String {
+        URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("attachments").path
+    }
 
     func testAttachmentDownload() async throws {
         let queue = AttachmentQueue(
@@ -55,7 +59,7 @@ final class AttachmentTests: XCTestCase {
         
                 return MockRemoteStorage()
             }(),
-            attachmentsDirectory: NSTemporaryDirectory(),
+            attachmentsDirectory: getAttachmentDirectory(),
             watchAttachments: { try self.database.watch(options: WatchOptions(
                 sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
                 mapper: { cursor in try WatchedAttachmentItem(
@@ -124,7 +128,7 @@ final class AttachmentTests: XCTestCase {
         let queue = AttachmentQueue(
             db: database,
             remoteStorage: mockedRemote,
-            attachmentsDirectory: NSTemporaryDirectory(),
+            attachmentsDirectory: getAttachmentDirectory(),
             watchAttachments: { try self.database.watch(options: WatchOptions(
                 sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
                 mapper: { cursor in try WatchedAttachmentItem(
