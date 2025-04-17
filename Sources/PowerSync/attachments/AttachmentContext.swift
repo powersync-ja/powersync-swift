@@ -198,19 +198,20 @@ public class AttachmentContext {
         try context.execute(
             sql: """
             INSERT OR REPLACE INTO 
-                \(table) (id, timestamp, filename, local_uri, media_type, size, state, has_synced) 
+                \(table) (id, timestamp, filename, local_uri, media_type, size, state, has_synced, meta_data) 
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             parameters: [
                 updatedRecord.id,
                 updatedRecord.timestamp,
                 updatedRecord.filename,
-                updatedRecord.localUri as Any,
+                updatedRecord.localUri ?? NSNull(),
                 updatedRecord.mediaType ?? NSNull(),
                 updatedRecord.size ?? NSNull(),
                 updatedRecord.state.rawValue,
                 updatedRecord.hasSynced ?? 0,
+                updatedRecord.metaData ?? NSNull()
             ]
         )
 
