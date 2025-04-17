@@ -18,24 +18,18 @@ struct RootView: View {
             }
             .navigationDestination(for: Route.self) { route in
                 switch route {
-                    case .home:
-                        HomeScreen()
-                    case .signIn:
-                        SignInScreen()
-                    case .signUp:
-                        SignUpScreen()
-                    }
-            }
-        }
-        .task {
-            if(system.db == nil) {
-                system.openDb()
+                case .home:
+                    HomeScreen()
+                case .signIn:
+                    SignInScreen()
+                case .signUp:
+                    SignUpScreen()
+                }
             }
         }
         .environment(authModel)
         .environment(navigationModel)
     }
-
 }
 
 #Preview {

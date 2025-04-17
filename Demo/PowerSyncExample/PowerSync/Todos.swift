@@ -11,7 +11,8 @@ struct Todo: Identifiable, Hashable, Decodable {
     var completedAt: String?
     var createdBy: String?
     var completedBy: String?
-    
+    var photoUri: String?
+
     enum CodingKeys: String, CodingKey {
         case id
         case listId = "list_id"
@@ -22,7 +23,7 @@ struct Todo: Identifiable, Hashable, Decodable {
         case createdBy = "created_by"
         case completedBy = "completed_by"
         case photoId = "photo_id"
-        
+        case photoUri = "photo_uri"
     }
 }
 

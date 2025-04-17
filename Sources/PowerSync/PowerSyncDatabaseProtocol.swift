@@ -11,6 +11,9 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     /// The current sync status.
     var currentStatus: SyncStatus { get }
     
+    /// Logger used for PowerSync operations
+    var logger: any LoggerProtocol { get }
+    
     /// Wait for the first sync to occur
     func waitForFirstSync() async throws
     
