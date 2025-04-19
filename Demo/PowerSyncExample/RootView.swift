@@ -3,7 +3,6 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(SystemManager.self) var system
-
     @State private var authModel = AuthModel()
     @State private var navigationModel = NavigationModel()
 
@@ -24,12 +23,19 @@ struct RootView: View {
                         SignInScreen()
                     case .signUp:
                         SignUpScreen()
+                    case .search:
+                        SearchScreen()
                     }
             }
         }
         .task {
             if(system.db == nil) {
-                system.openDb()
+                do {
+                    try await system.openDb()
+                    await system.connect()
+                } catch {
+                    print("Failed to open db: \(error.localizedDescription)")
+                }
             }
         }
         .environment(authModel)
