@@ -6,5 +6,5 @@ enum Secrets {
     static let supabaseURL = URL(string: "https://your-id.supabase.co")!
     static let supabaseAnonKey = "anon-key"
     // Optional storage bucket name. Set to nil if you don't want to use storage.
-    static let supabaseStorageBucket = "media"
+    static let supabaseStorageBucket: String? = nil
 }
