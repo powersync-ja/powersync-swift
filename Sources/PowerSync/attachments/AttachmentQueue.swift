@@ -278,8 +278,9 @@ public class AttachmentQueue {
              * Archive any items not specified in the watched items except for items pending delete.
              */
             for attachment in currentAttachments {
-                if attachment.state != AttachmentState.queuedDelete,
-                   items.first(where: { $0.id == attachment.id }) == nil
+                if attachment.state != AttachmentState.queuedDelete &&
+                    attachment.state != AttachmentState.queuedUpload,
+                    items.first(where: { $0.id == attachment.id }) == nil
                 {
                     attachmentUpdates.append(
                         attachment.with(state: AttachmentState.archived)
