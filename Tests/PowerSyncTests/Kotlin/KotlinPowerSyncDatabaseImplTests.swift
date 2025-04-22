@@ -11,7 +11,8 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             Table(name: "users", columns: [
                 .text("name"),
                 .text("email"),
-            ]),
+                .text("photo_id")
+            ])
         ])
 
         database = KotlinPowerSyncDatabaseImpl(
@@ -70,6 +71,8 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(user.1, "Test User")
         XCTAssertEqual(user.2, "test@example.com")
     }
+    
+   
 
     func testGetError() async throws {
         do {
