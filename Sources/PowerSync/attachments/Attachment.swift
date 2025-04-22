@@ -48,7 +48,7 @@ public struct Attachment {
 
     /// Specifies if the attachment has been synced locally before.
     /// This is particularly useful for restoring archived attachments in edge cases.
-    public let hasSynced: Int?
+    public let hasSynced: Bool?
 
     /// Extra attachment metadata
     public let metaData: String?
@@ -59,7 +59,7 @@ public struct Attachment {
         filename: String,
         state: AttachmentState,
         timestamp: Int = 0,
-        hasSynced: Int? = 0,
+        hasSynced: Bool? = false,
         localUri: String? = nil,
         mediaType: String? = nil,
         size: Int64? = nil,
@@ -89,10 +89,10 @@ public struct Attachment {
     ///   - metaData: Optional new metadata.
     /// - Returns: A new `Attachment` with updated values.
     func with(
-        filename _: String? = nil,
+        filename: String? = nil,
         state: AttachmentState? = nil,
-        timestamp _: Int = 0,
-        hasSynced: Int?? = 0,
+        timestamp : Int = 0,
+        hasSynced: Bool? = nil,
         localUri: String?? = .none,
         mediaType: String?? = .none,
         size: Int64?? = .none,
@@ -100,16 +100,29 @@ public struct Attachment {
     ) -> Attachment {
         return Attachment(
             id: id,
-            filename: filename ?? filename,
-            state: state.map { $0 } ?? self.state,
-            timestamp: timestamp > 0 ? timestamp : timestamp,
-            hasSynced: hasSynced.map { $0 } ?? self.hasSynced,
-            localUri: localUri.map { $0 } ?? self.localUri,
-            mediaType: mediaType.map { $0 } ?? self.mediaType,
-            size: size.map { $0 } ?? self.size,
-            metaData: metaData.map { $0 } ?? self.metaData
+            filename: filename ?? self.filename,
+            state: state ?? self.state,
+            timestamp: timestamp > 0 ? timestamp : self.timestamp,
+            hasSynced: hasSynced ?? self.hasSynced,
+            localUri: resolveOverride(localUri, current: self.localUri),
+            mediaType: resolveOverride(mediaType, current: self.mediaType),
+            size: resolveOverride(size, current: self.size),
+            metaData: resolveOverride(metaData, current: self.metaData)
         )
     }
+    
+    /// Resolves double optionals
+    /// if a non nil value is provided: the override will be used
+    /// if .some(nil) is provided: The value will be set to nil
+    /// // if nil is provided:  the current value will be preserved
+    private func resolveOverride<T>(_ override: T??, current: T?) -> T? {
+        if let value = override {
+            return value  // could be nil (explicit clear) or a value
+        } else {
+            return current  // not provided, use current
+        }
+    }
+
 
     /// Constructs an `Attachment` from a `SqlCursor`.
     ///
@@ -122,7 +135,7 @@ public struct Attachment {
             filename: cursor.getString(name: "filename"),
             state: AttachmentState.from(cursor.getLong(name: "state")),
             timestamp: cursor.getLong(name: "timestamp"),
-            hasSynced: cursor.getLongOptional(name: "has_synced"),
+            hasSynced: cursor.getLong(name: "has_synced") > 0,
             localUri: cursor.getStringOptional(name: "local_uri"),
             mediaType: cursor.getStringOptional(name: "media_type"),
             size: cursor.getLongOptional(name: "size")?.int64Value,

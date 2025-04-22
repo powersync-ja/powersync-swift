@@ -231,7 +231,7 @@ public class SyncingService {
             let fileData = try await localStorage.readFile(filePath: localUri)
             try await remoteStorage.uploadFile(fileData: fileData, attachment: attachment)
 
-            return attachment.with(state: AttachmentState.synced, hasSynced: 1)
+            return attachment.with(state: AttachmentState.synced, hasSynced: true)
         } catch {
             if let errorHandler = errorHandler {
                 let shouldRetry = await errorHandler.onUploadError(attachment: attachment, error: error)
@@ -256,7 +256,7 @@ public class SyncingService {
 
             return attachment.with(
                 state: AttachmentState.synced,
-                hasSynced: 1,
+                hasSynced: true,
                 localUri: attachmentPath
             )
         } catch {

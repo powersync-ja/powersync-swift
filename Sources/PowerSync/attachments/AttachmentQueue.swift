@@ -229,16 +229,14 @@ public class AttachmentQueue {
             var attachmentUpdates = [Attachment]()
 
             for item in items {
-                let existingQueueItem = currentAttachments.first { $0.id == item.id }
-
-                if existingQueueItem == nil {
+                guard let existingQueueItem = currentAttachments.first(where: { $0.id == item.id }) else {
+                    // Item is not present in the queue
+                    
                     if !self.downloadAttachments {
                         continue
                     }
+
                     // This item should be added to the queue
-                    // This item is assumed to be coming from an upstream sync
-                    // Locally created new items should be persisted using saveFile before
-                    // this point.
                     let filename = self.resolveNewAttachmentFilename(
                         attachmentId: item.id,
                         fileExtension: item.fileExtension
@@ -248,43 +246,53 @@ public class AttachmentQueue {
                         Attachment(
                             id: item.id,
                             filename: filename,
-                            state: AttachmentState.queuedDownload
+                            state: .queuedDownload,
+                            hasSynced: false
                         )
                     )
-                } else if existingQueueItem!.state == AttachmentState.archived {
+                    continue
+                }
+
+                if existingQueueItem.state == AttachmentState.archived {
                     // The attachment is present again. Need to queue it for sync.
                     // We might be able to optimize this in future
-                    if existingQueueItem!.hasSynced == 1 {
+                    if existingQueueItem.hasSynced == true {
                         // No remote action required, we can restore the record (avoids deletion)
                         attachmentUpdates.append(
-                            existingQueueItem!.with(state: AttachmentState.synced)
+                            existingQueueItem.with(state: AttachmentState.synced)
                         )
                     } else {
                         // The localURI should be set if the record was meant to be downloaded
                         // and has been synced. If it's missing and hasSynced is false then
                         // it must be an upload operation
-                        let newState = existingQueueItem!.localUri == nil ?
+                        let newState = existingQueueItem.localUri == nil ?
                             AttachmentState.queuedDownload :
                             AttachmentState.queuedUpload
 
                         attachmentUpdates.append(
-                            existingQueueItem!.with(state: newState)
+                            existingQueueItem.with(state: newState)
                         )
                     }
                 }
             }
 
-            /**
-             * Archive any items not specified in the watched items except for items pending delete.
-             */
             for attachment in currentAttachments {
-                if attachment.state != AttachmentState.queuedDelete &&
-                    attachment.state != AttachmentState.queuedUpload,
-                    items.first(where: { $0.id == attachment.id }) == nil
-                {
-                    attachmentUpdates.append(
-                        attachment.with(state: AttachmentState.archived)
-                    )
+                let notInWatchedItems = items.first(where: { $0.id == attachment.id }) == nil
+                if notInWatchedItems {
+                    switch attachment.state {
+                    case .queuedDelete, .queuedUpload:
+                        // Only archive if it has synced
+                        if attachment.hasSynced == true {
+                            attachmentUpdates.append(
+                                attachment.with(state: .archived)
+                            )
+                        }
+                    default:
+                        // Archive other states such as QUEUED_DOWNLOAD
+                        attachmentUpdates.append(
+                            attachment.with(state: .archived)
+                        )
+                    }
                 }
             }
 
