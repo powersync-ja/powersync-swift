@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (e.g., 1.0.0 or 1.0.0-Beta.1)'
+        description: "Version number (e.g., 1.0.0 or 1.0.0-Beta.1)"
         required: true
         type: string
       release_notes:
-        description: 'Release notes'
+        description: "Release notes"
         required: true
         type: string
 
@@ -45,14 +45,14 @@ jobs:
 
       - name: Create Git tag
         run: |
-          git tag v${{ github.event.inputs.version }}
-          git push origin v${{ github.event.inputs.version }}
+          git tag ${{ github.event.inputs.version }}
+          git push origin ${{ github.event.inputs.version }}
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          tag: v${{ github.event.inputs.version }}
-          name: PowerSync v${{ github.event.inputs.version }}
+          tag: ${{ github.event.inputs.version }}
+          name: PowerSync ${{ github.event.inputs.version }}
           body: ${{ github.event.inputs.release_notes }}
           draft: false
           prerelease: ${{ steps.version_check.outputs.is_prerelease }}
