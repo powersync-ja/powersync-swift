@@ -1,3 +1,4 @@
+import PowerSyncKotlin
 
 // The Kotlin SDK does not gracefully handle exceptions thrown from Swift callbacks.
 // If a Swift callback throws an exception, it results in a `BAD ACCESS` crash.
@@ -12,18 +13,48 @@
 // from a "core" package in Kotlin that provides better control over exception handling
 // and other functionality—without modifying the public `PowerSyncDatabase` API to include
 // Swift-specific logic.
-internal func wrapQueryCursor<RowType, ReturnType>(
+func wrapQueryCursorSync<RowType, ReturnType>(
     mapper: @escaping (SqlCursor) throws -> RowType,
     //    The Kotlin APIs return the results as Any, we can explicitly cast internally
-    executor: @escaping (_ wrappedMapper: @escaping (SqlCursor) -> RowType?) async throws -> ReturnType
+    executor: @escaping (_ wrappedMapper: @escaping (PowerSyncKotlin.SqlCursor) -> RowType?) throws -> ReturnType
+) throws -> ReturnType {
+    var mapperException: Error?
+
+    // Wrapped version of the mapper that catches exceptions and sets `mapperException`
+    // In the case of an exception this will return an empty result.
+    let wrappedMapper: (PowerSyncKotlin.SqlCursor) -> RowType? = { cursor in
+        do {
+            return try mapper(KotlinSqlCursor(base: cursor))
+        } catch {
+            // Store the error in order to propagate it
+            mapperException = error
+            // Return nothing here. Kotlin should handle this as an empty object/row
+            return nil
+        }
+    }
+
+    let executionResult = try executor(wrappedMapper)
+    if mapperException != nil {
+        //        Allow propagating the error
+        throw mapperException!
+    }
+
+    return executionResult
+}
+
+
+func wrapQueryCursor<RowType, ReturnType>(
+    mapper: @escaping (SqlCursor) throws -> RowType,
+    //    The Kotlin APIs return the results as Any, we can explicitly cast internally
+    executor: @escaping (_ wrappedMapper: @escaping (PowerSyncKotlin.SqlCursor) -> RowType?) async throws -> ReturnType
 ) async throws -> ReturnType {
     var mapperException: Error?
 
     // Wrapped version of the mapper that catches exceptions and sets `mapperException`
     // In the case of an exception this will return an empty result.
-    let wrappedMapper: (SqlCursor) -> RowType? = { cursor in
+    let wrappedMapper: (PowerSyncKotlin.SqlCursor) -> RowType? = { cursor in
         do {
-            return try mapper(cursor)
+            return try mapper(KotlinSqlCursor(base: cursor))
         } catch {
             // Store the error in order to propagate it
             mapperException = error
@@ -41,11 +72,33 @@ internal func wrapQueryCursor<RowType, ReturnType>(
     return executionResult
 }
 
-internal func wrapQueryCursorTyped<RowType, ReturnType>(
+
+func wrapQueryCursorTyped<RowType, ReturnType>(
     mapper: @escaping (SqlCursor) throws -> RowType,
     //    The Kotlin APIs return the results as Any, we can explicitly cast internally
-    executor: @escaping (_ wrappedMapper: @escaping (SqlCursor) -> RowType?) async throws -> Any?,
+    executor: @escaping (_ wrappedMapper: @escaping (PowerSyncKotlin.SqlCursor) -> RowType?) async throws -> Any?,
     resultType: ReturnType.Type
 ) async throws -> ReturnType {
-    return try safeCast(await wrapQueryCursor(mapper: mapper, executor: executor), to: resultType)
+    return try safeCast(
+        await wrapQueryCursor(
+            mapper: mapper,
+            executor: executor
+        ), to:
+        resultType
+    )
+}
+
+func wrapQueryCursorTypedSync<RowType, ReturnType>(
+    mapper: @escaping (SqlCursor) throws -> RowType,
+    //    The Kotlin APIs return the results as Any, we can explicitly cast internally
+    executor: @escaping (_ wrappedMapper: @escaping (PowerSyncKotlin.SqlCursor) -> RowType?) throws -> Any?,
+    resultType: ReturnType.Type
+) throws -> ReturnType {
+    return try safeCast(
+         wrapQueryCursorSync(
+            mapper: mapper,
+            executor: executor
+        ), to:
+        resultType
+    )
 }

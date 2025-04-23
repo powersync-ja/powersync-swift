@@ -57,7 +57,7 @@ final class SqlCursorTests: XCTestCase {
         ) { cursor in
             User(
                 id: try cursor.getString(name: "id"),
-                count: try cursor.getLong(name: "count"),
+                count: try cursor.getInt(name: "count"),
                 isActive: try cursor.getBoolean(name: "is_active"),
                 weight: try cursor.getDouble(name: "weight")
             )
@@ -81,7 +81,7 @@ final class SqlCursorTests: XCTestCase {
         ) { cursor in
             UserOptional(
                 id: try cursor.getString(name: "id"),
-                count: try cursor.getLongOptional(name: "count"),
+                count: try cursor.getIntOptional(name: "count"),
                 isActive: try cursor.getBooleanOptional(name: "is_active"),
                 weight: try cursor.getDoubleOptional(name: "weight"),
                 description: try cursor.getStringOptional(name: "description")

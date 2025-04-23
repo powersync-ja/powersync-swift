@@ -133,12 +133,12 @@ public struct Attachment {
         return try Attachment(
             id: cursor.getString(name: "id"),
             filename: cursor.getString(name: "filename"),
-            state: AttachmentState.from(cursor.getLong(name: "state")),
-            timestamp: cursor.getLong(name: "timestamp"),
-            hasSynced: cursor.getLong(name: "has_synced") > 0,
+            state: AttachmentState.from(cursor.getInt(name: "state")),
+            timestamp: cursor.getInt(name: "timestamp"),
+            hasSynced: cursor.getInt(name: "has_synced") > 0,
             localUri: cursor.getStringOptional(name: "local_uri"),
             mediaType: cursor.getStringOptional(name: "media_type"),
-            size: cursor.getLongOptional(name: "size")?.int64Value,
+            size: cursor.getInt64Optional(name: "size"),
             metaData: cursor.getStringOptional(name: "meta_data")
         )
     }

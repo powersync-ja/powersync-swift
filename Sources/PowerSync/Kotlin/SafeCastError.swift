@@ -1,3 +1,5 @@
+import Foundation
+
 enum SafeCastError: Error, CustomStringConvertible {
     case typeMismatch(expected: Any.Type, actual: Any?)
 
@@ -11,6 +13,15 @@ enum SafeCastError: Error, CustomStringConvertible {
 }
 
 internal func safeCast<T>(_ value: Any?, to type: T.Type) throws -> T {
+    // Special handling for nil when T is an optional type
+     if value == nil || value is NSNull {
+         // Check if T is an optional type that can accept nil
+         let nilValue: Any? = nil
+         if let nilAsT = nilValue as? T {
+             return nilAsT
+         }
+     }
+    
     if let castedValue = value as? T {
         return castedValue
     } else {

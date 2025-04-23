@@ -1,9 +1,9 @@
 import PowerSyncKotlin
 
 class TransactionCallback<R>: PowerSyncKotlin.ThrowableTransactionCallback {
-    let callback: (PowerSyncTransaction) throws -> R
+    let callback: (ConnectionContext) throws -> R
 
-    init(callback: @escaping (PowerSyncTransaction) throws -> R) {
+    init(callback: @escaping (ConnectionContext) throws -> R) {
         self.callback = callback
     }
 
@@ -23,7 +23,11 @@ class TransactionCallback<R>: PowerSyncKotlin.ThrowableTransactionCallback {
     // Swift-specific logic.
     func execute(transaction: PowerSyncKotlin.PowerSyncTransaction) throws -> Any {
         do {
-            return try callback(transaction)
+            return try callback(
+                KotlinConnectionContext(
+                    ctx: transaction
+                )
+            )
         } catch {
             return PowerSyncKotlin.PowerSyncException(
                 message: error.localizedDescription,
@@ -32,4 +36,3 @@ class TransactionCallback<R>: PowerSyncKotlin.ThrowableTransactionCallback {
         }
     }
 }
-

@@ -100,7 +100,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "SELECT name FROM users WHERE id = ?",
             parameters: ["999"]
         ) { cursor in
-            cursor.getString(index: 0)!
+            try cursor.getString(name: "")
         }
 
         XCTAssertNil(nonExistent)
@@ -328,10 +328,10 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "SELECT COUNT(*) FROM users",
             parameters: []
         ) { cursor in
-            cursor.getLong(index: 0)
+            cursor.getInt(index: 0)
         }
 
-        XCTAssertEqual(result as! Int, 2)
+        XCTAssertEqual(result, 2)
     }
 
     func testWriteLongerTransaction() async throws {
@@ -355,10 +355,10 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "SELECT COUNT(*) FROM users",
             parameters: []
         ) { cursor in
-            cursor.getLong(index: 0)
+            cursor.getInt(index: 0)
         }
 
-        XCTAssertEqual(result as! Int, 2 * loopCount)
+        XCTAssertEqual(result, 2 * loopCount)
     }
 
     func testWriteTransactionError() async throws {
@@ -400,7 +400,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let result = try await database.getOptional(
             sql: "SELECT COUNT(*) FROM users",
             parameters: []
-        ) { cursor in try cursor.getLong(index: 0)
+        ) { cursor in cursor.getInt(index: 0)
         }
 
         XCTAssertEqual(result, 0)
@@ -417,10 +417,10 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 sql: "SELECT COUNT(*) FROM users",
                 parameters: []
             ) { cursor in
-                cursor.getLong(index: 0)
+                cursor.getInt(index: 0)
             }
 
-            XCTAssertEqual(result as! Int, 1)
+            XCTAssertEqual(result, 1)
         }
     }
 
@@ -431,7 +431,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                     sql: "SELECT COUNT(*) FROM usersfail",
                     parameters: []
                 ) { cursor in
-                    cursor.getLong(index: 0)
+                    cursor.getInt(index: 0)
                 }
             }
         } catch {
@@ -446,7 +446,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let supported = try await database.get(
             "SELECT sqlite_compileoption_used('ENABLE_FTS5');"
         ) { cursor in
-            cursor.getLong(index: 0)
+            cursor.getInt(index: 0)
         }
 
         XCTAssertEqual(supported, 1)
@@ -474,7 +474,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let peopleCount = try await database.get(
             sql: "SELECT COUNT(*) FROM people",
             parameters: []
-        ) { cursor in cursor.getLong(index: 0) }
+        ) { cursor in cursor.getInt(index: 0) }
 
         XCTAssertEqual(peopleCount, 1)
     }
