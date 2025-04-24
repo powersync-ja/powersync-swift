@@ -1,0 +1,20 @@
+name: Deploy Docs
+
+on:
+  push:
+    branches:
+      - main
+      - api-ref
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docs
+        run: |
+          xcodebuild docbuild -scheme PowerSync -destination 'platform=macOS' -derivedDataPath ./DerivedData
+          xcrun docc process-archive transform-for-static-hosting \                                           
+            ./DerivedData/Build/Products/Debug/PowerSync.doccarchive \
+            --output-path ./docs
