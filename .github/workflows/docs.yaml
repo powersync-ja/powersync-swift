@@ -25,13 +25,13 @@ jobs:
 
       - name: Process Docs
         run: |
-          xcrun docc process-archive transform-for-static-hosting ./DerivedData/Build/Products/Debug/PowerSync.doccarchive/ --output-path ./docs --hosting-base-path /powersync-swift
+          xcrun docc process-archive transform-for-static-hosting ./DerivedData/Build/Products/Debug/PowerSync.doccarchive/ --output-path ./docs-site --hosting-base-path /powersync-swift
 
       - name: Upload static files as artifact
         id: deployment
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/documentation/PowerSync
+          path: docs-site
 
   # Deployment job
   deploy:
