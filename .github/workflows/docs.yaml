@@ -18,11 +18,6 @@ jobs:
         run: |
           xcodebuild docbuild -scheme PowerSync -destination 'platform=macOS' -derivedDataPath ./DerivedData
 
-      - name: Debug
-        run: |
-          ls -la ./DerivedData/Build/Products/Debug
-          ls -la ./DerivedData/Build/Products/Debug/PowerSync.doccarchive
-
       - name: Process Docs
         run: |
           xcrun docc process-archive transform-for-static-hosting ./DerivedData/Build/Products/Debug/PowerSync.doccarchive/ --output-path ./docs-site --hosting-base-path /powersync-swift
@@ -30,7 +25,7 @@ jobs:
       #  The Docs are available at the path mentioned below. We can override the index.html to automatically redirect to the documentation page.
       - name: Prepare static files
         run: |
-          echo '<script>window.location.href += "/documentation/powersync"</script>' > .docs/index.html
+          echo '<script>window.location.href += "/documentation/powersync"</script>' > .docs-site/index.html
 
       - name: Upload static files as artifact
         id: deployment
