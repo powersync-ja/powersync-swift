@@ -21,3 +21,7 @@ jobs:
       - name: Process Docs
         run: |
           xcrun docc process-archive transform-for-static-hosting ./DerivedData/Build/Products/Debug/PowerSync.doccarchive/ --output-path ./docs
+
+      - name: Debug
+        run: |
+          ls -la ./docs
