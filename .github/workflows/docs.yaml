@@ -12,6 +12,14 @@ jobs:
       - name: Build Docs
         run: |
           xcodebuild docbuild -scheme PowerSync -destination 'platform=macOS' -derivedDataPath ./DerivedData
+
+      - name: Debug
+        run: |
+          ls -la ./DerivedData/Build/Products/Debug
+          ls -la ./DerivedData/Build/Products/Debug/PowerSync.doccarchive
+
+      - name: Process Docs
+        run: |
           xcrun docc process-archive transform-for-static-hosting \                                           
-            ./DerivedData/Build/Products/Debug/PowerSync.doccarchive \
-            --output-path ./docs
+          ./DerivedData/Build/Products/Debug/PowerSync.doccarchive \
+          --output-path ./docs
