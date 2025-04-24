@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and test
+    name: Build
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
