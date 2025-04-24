@@ -25,7 +25,7 @@ jobs:
       #  The Docs are available at the path mentioned below. We can override the index.html to automatically redirect to the documentation page.
       - name: Prepare static files
         run: |
-          echo '<script>window.location.href += "/documentation/powersync"</script>' > .docs-site/index.html
+          echo '<script>window.location.href += "/documentation/powersync"</script>' > ./docs-site/index.html
 
       - name: Upload static files as artifact
         id: deployment
