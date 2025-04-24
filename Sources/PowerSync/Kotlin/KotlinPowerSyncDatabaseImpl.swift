@@ -210,7 +210,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
                     for try await values in try self.kotlinDatabase.watch(
                         sql: options.sql,
                         parameters: options.parameters,
-                        throttleMs: KotlinLong(value: options.throttleMs),
+                        throttleMs: options.throttleMs,
                         mapper: { cursor in
                             do {
                                 return try options.mapper(cursor)
