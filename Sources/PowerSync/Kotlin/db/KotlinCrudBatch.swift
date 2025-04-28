@@ -1,19 +1,21 @@
 import PowerSyncKotlin
 
 struct KotlinCrudBatch: CrudBatch {
-    let base: PowerSyncKotlin.CrudBatch
+    let batch: PowerSyncKotlin.CrudBatch
     let crud: [CrudEntry]
     
-    init (_ base: PowerSyncKotlin.CrudBatch) throws {
-        self.base = base
-        self.crud = try base.crud.map { try KotlinCrudEntry($0) }
+    init (batch: PowerSyncKotlin.CrudBatch) throws {
+        self.batch = batch
+        self.crud = try batch.crud.map { try KotlinCrudEntry(
+            entry: $0
+        ) }
     }
     
     var hasMore: Bool {
-        base.hasMore
+        batch.hasMore
     }
     
     func complete(writeCheckpoint: String?) async throws {
-        _ = try await base.complete.invoke(p1: writeCheckpoint)
+        _ = try await batch.complete.invoke(p1: writeCheckpoint)
     }
 }

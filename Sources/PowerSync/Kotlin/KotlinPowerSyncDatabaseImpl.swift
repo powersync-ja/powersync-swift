@@ -20,7 +20,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             logger: logger.kLogger
         )
         self.logger = logger
-        self.currentStatus = KotlinSyncStatus(
+        currentStatus = KotlinSyncStatus(
             baseStatus: kotlinDatabase.currentStatus
         )
     }
@@ -30,18 +30,22 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
 
     func updateSchema(schema: any SchemaProtocol) async throws {
-        try await kotlinDatabase.updateSchema(schema: KotlinAdapter.Schema.toKotlin(schema))
+        try await kotlinDatabase.updateSchema(
+            schema: KotlinAdapter.Schema.toKotlin(schema)
+        )
     }
 
     func waitForFirstSync(priority: Int32) async throws {
-        try await kotlinDatabase.waitForFirstSync(priority: priority)
+        try await kotlinDatabase.waitForFirstSync(
+            priority: priority
+        )
     }
 
     func connect(
         connector: PowerSyncBackendConnector,
         crudThrottleMs: Int64 = 1000,
         retryDelayMs: Int64 = 5000,
-        params: [String: JsonParam?] = [:]
+        params: JsonParam = [:]
     ) async throws {
         let connectorAdapter = PowerSyncBackendConnectorAdapter(
             swiftBackendConnector: connector,
@@ -52,7 +56,8 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             connector: connectorAdapter,
             crudThrottleMs: crudThrottleMs,
             retryDelayMs: retryDelayMs,
-            params: params
+            // We map to basic values and use NSNull to avoid SKIEE thinking the values must be of Any type
+            params: params.mapValues { $0.toValue() ?? NSNull() }
         )
     }
 
@@ -60,14 +65,18 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         guard let base = try await kotlinDatabase.getCrudBatch(limit: limit) else {
             return nil
         }
-       return try KotlinCrudBatch(base)
+        return try KotlinCrudBatch(
+            batch: base
+        )
     }
 
     func getNextCrudTransaction() async throws -> CrudTransaction? {
         guard let base = try await kotlinDatabase.getNextCrudTransaction() else {
             return nil
         }
-       return try KotlinCrudTransaction(base)
+        return try KotlinCrudTransaction(
+            transaction: base
+        )
     }
 
     func getPowerSyncVersion() async throws -> String {
@@ -85,7 +94,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
 
     func execute(sql: String, parameters: [Any?]?) async throws -> Int64 {
-        try await writeTransaction {ctx in
+        try await writeTransaction { ctx in
             try ctx.execute(
                 sql: sql,
                 parameters: parameters
@@ -98,7 +107,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any?]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> RowType {
-        try await readTransaction { ctx in
+        try await readLock { ctx in
             try ctx.get(
                 sql: sql,
                 parameters: parameters,
@@ -112,7 +121,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType {
-        try await readTransaction { ctx in
+        try await readLock { ctx in
             try ctx.get(
                 sql: sql,
                 parameters: parameters,
@@ -126,7 +135,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any?]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> [RowType] {
-        try await readTransaction { ctx in
+        try await readLock { ctx in
             try ctx.getAll(
                 sql: sql,
                 parameters: parameters,
@@ -140,7 +149,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> [RowType] {
-        try await readTransaction { ctx in
+        try await readLock { ctx in
             try ctx.getAll(
                 sql: sql,
                 parameters: parameters,
@@ -154,7 +163,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any?]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> RowType? {
-        try await readTransaction { ctx in
+        try await readLock { ctx in
             try ctx.getOptional(
                 sql: sql,
                 parameters: parameters,
@@ -168,7 +177,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         parameters: [Any?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType? {
-        try await readTransaction { ctx in
+        try await readLock { ctx in
             try ctx.getOptional(
                 sql: sql,
                 parameters: parameters,
@@ -176,7 +185,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             )
         }
     }
-    
+
     func watch<RowType>(
         sql: String,
         parameters: [Any?]?,
@@ -268,7 +277,22 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         }
     }
 
-    func writeTransaction<R>(callback: @escaping (any ConnectionContext) throws -> R) async throws -> R {
+    func writeLock<R>(
+        callback: @escaping (any ConnectionContext) throws -> R
+    ) async throws -> R {
+        return try safeCast(
+            await kotlinDatabase.writeLock(
+                callback: LockCallback(
+                    callback: callback
+                )
+            ),
+            to: R.self
+        )
+    }
+
+    func writeTransaction<R>(
+        callback: @escaping (any Transaction) throws -> R
+    ) async throws -> R {
         return try safeCast(
             await kotlinDatabase.writeTransaction(
                 callback: TransactionCallback(
@@ -279,7 +303,24 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         )
     }
 
-    func readTransaction<R>(callback: @escaping (any ConnectionContext) throws -> R) async throws -> R {
+    func readLock<R>(
+        callback: @escaping (any ConnectionContext) throws -> R
+    )
+        async throws -> R
+    {
+        return try safeCast(
+            await kotlinDatabase.readLock(
+                callback: LockCallback(
+                    callback: callback
+                )
+            ),
+            to: R.self
+        )
+    }
+
+    func readTransaction<R>(
+        callback: @escaping (any Transaction) throws -> R
+    ) async throws -> R {
         return try safeCast(
             await kotlinDatabase.readTransaction(
                 callback: TransactionCallback(

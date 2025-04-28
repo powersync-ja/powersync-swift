@@ -28,7 +28,10 @@ extension KotlinSyncStatusDataProtocol {
     
     var lastSyncedAt: Date? {
         guard let lastSyncedAt = base.lastSyncedAt else { return nil }
-        return Date(timeIntervalSince1970: Double(lastSyncedAt.epochSeconds))
+        return Date(
+            timeIntervalSince1970: Double(lastSyncedAt.epochSeconds
+                                         )
+        )
     }
     
     var hasSynced: Bool? {
@@ -48,12 +51,14 @@ extension KotlinSyncStatusDataProtocol {
     }
     
     public var priorityStatusEntries: [PriorityStatusEntry] {
-        base.priorityStatusEntries.map { mapPriorityStatus($0)}
+        base.priorityStatusEntries.map { mapPriorityStatus($0) }
     }
     
     public func statusForPriority(_ priority: BucketPriority) -> PriorityStatusEntry {
         mapPriorityStatus(
-            base.statusForPriority(priority: priority.priorityCode)
+            base.statusForPriority(
+                priority: Int32(priority.priorityCode)
+            )
         )
     }
     

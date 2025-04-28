@@ -1,13 +1,11 @@
 import Foundation
 import PowerSyncKotlin
 
-class KotlinConnectionContext: ConnectionContext {
-    private let ctx: PowerSyncKotlin.ConnectionContext
-    
-    init(ctx: PowerSyncKotlin.ConnectionContext) {
-        self.ctx = ctx
-    }
-    
+protocol KotlinConnectionContextProtocol: ConnectionContext {
+    var ctx: PowerSyncKotlin.ConnectionContext { get }
+}
+
+extension KotlinConnectionContextProtocol {
     func execute(sql: String, parameters: [Any?]?) throws -> Int64 {
         try ctx.execute(
             sql: sql,
@@ -15,8 +13,12 @@ class KotlinConnectionContext: ConnectionContext {
         )
     }
     
-    func getOptional<RowType>(sql: String, parameters: [Any?]?, mapper: @escaping (any SqlCursor) throws -> RowType) throws -> RowType? {
-        return try wrapQueryCursorTypedSync(
+    func getOptional<RowType>(
+        sql: String,
+        parameters: [Any?]?,
+        mapper: @escaping (any SqlCursor) throws -> RowType
+    ) throws -> RowType? {
+        return try wrapQueryCursorTyped(
             mapper: mapper,
             executor: { wrappedMapper in
                 try self.ctx.getOptional(
@@ -29,8 +31,12 @@ class KotlinConnectionContext: ConnectionContext {
         )
     }
     
-    func getAll<RowType>(sql: String, parameters: [Any?]?, mapper: @escaping (any SqlCursor) throws -> RowType) throws -> [RowType] {
-        return try wrapQueryCursorTypedSync(
+    func getAll<RowType>(
+        sql: String,
+        parameters: [Any?]?,
+        mapper: @escaping (any SqlCursor) throws -> RowType
+    ) throws -> [RowType] {
+        return try wrapQueryCursorTyped(
             mapper: mapper,
             executor: { wrappedMapper in
                 try self.ctx.getAll(
@@ -43,8 +49,12 @@ class KotlinConnectionContext: ConnectionContext {
         )
     }
     
-    func get<RowType>(sql: String, parameters: [Any?]?, mapper: @escaping (any SqlCursor) throws -> RowType) throws -> RowType {
-        return try wrapQueryCursorTypedSync(
+    func get<RowType>(
+        sql: String,
+        parameters: [Any?]?,
+        mapper: @escaping (any SqlCursor) throws -> RowType
+    ) throws -> RowType {
+        return try wrapQueryCursorTyped(
             mapper: mapper,
             executor: { wrappedMapper in
                 try self.ctx.get(
@@ -55,6 +65,22 @@ class KotlinConnectionContext: ConnectionContext {
             },
             resultType: RowType.self
         )
+    }
+}
+
+class KotlinConnectionContext: KotlinConnectionContextProtocol {
+    let ctx: PowerSyncKotlin.ConnectionContext
+    
+    init(ctx: PowerSyncKotlin.ConnectionContext) {
+        self.ctx = ctx
+    }
+}
+
+class KotlinTransactionContext: Transaction, KotlinConnectionContextProtocol {
+    let ctx: PowerSyncKotlin.ConnectionContext
+    
+    init(ctx: PowerSyncKotlin.PowerSyncTransaction) {
+        self.ctx = ctx
     }
 }
 

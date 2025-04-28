@@ -5,7 +5,7 @@ public protocol CrudTransaction {
     /// Unique transaction id.
     ///
     /// If nil, this contains a list of changes recorded without an explicit transaction associated.
-    var transactionId: Int32? { get }
+    var transactionId: Int64? { get }
 
     /// List of client-side changes.
     var crud: [any CrudEntry] { get }

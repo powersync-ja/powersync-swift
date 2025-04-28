@@ -11,8 +11,8 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             Table(name: "users", columns: [
                 .text("name"),
                 .text("email"),
-                .text("photo_id")
-            ])
+                .text("photo_id"),
+            ]),
         ])
 
         database = KotlinPowerSyncDatabaseImpl(
@@ -26,7 +26,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     override func tearDown() async throws {
         try await database.disconnectAndClear()
         // Tests currently fail if this is called.
-        // The watched query tests try and read from the DB while it's closing. 
+        // The watched query tests try and read from the DB while it's closing.
         // This causes a PowerSyncException to be thrown in the Kotlin flow.
         // Custom exceptions in flows are not supported by SKIEE. This causes a crash.
         // FIXME: Reapply once watched query errors are handled better.
@@ -71,8 +71,6 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(user.1, "Test User")
         XCTAssertEqual(user.2, "test@example.com")
     }
-    
-   
 
     func testGetError() async throws {
         do {
@@ -151,7 +149,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 sql: "SELECT id, name, email FROM users WHERE id = ?",
                 parameters: ["1"]
             ) { _ throws in
-                throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "cursor error"])
+                throw NSError(
+                    domain: "TestError",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "cursor error"]
+                )
             }
             XCTFail("Expected an error to be thrown")
         } catch {
@@ -427,7 +429,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     func testReadTransactionError() async throws {
         do {
             _ = try await database.readTransaction { transaction in
-                let result = try transaction.get(
+                _ = try transaction.get(
                     sql: "SELECT COUNT(*) FROM usersfail",
                     parameters: []
                 ) { cursor in
@@ -478,46 +480,46 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         XCTAssertEqual(peopleCount, 1)
     }
-    
+
     func testCustomLogger() async throws {
         let testWriter = TestLogWriterAdapter()
         let logger = DefaultLogger(minSeverity: LogSeverity.debug, writers: [testWriter])
-        
+
         let db2 = KotlinPowerSyncDatabaseImpl(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(logger)
         )
-        
+
         try await db2.close()
-        
+
         let warningIndex = testWriter.logs.firstIndex(
             where: { value in
                 value.contains("warning: Multiple PowerSync instances for the same database have been detected")
             }
         )
-        
+
         XCTAssert(warningIndex! >= 0)
     }
-    
+
     func testMinimumSeverity() async throws {
         let testWriter = TestLogWriterAdapter()
         let logger = DefaultLogger(minSeverity: LogSeverity.error, writers: [testWriter])
-        
+
         let db2 = KotlinPowerSyncDatabaseImpl(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(logger)
         )
-        
+
         try await db2.close()
-        
+
         let warningIndex = testWriter.logs.firstIndex(
             where: { value in
                 value.contains("warning: Multiple PowerSync instances for the same database have been detected")
             }
         )
-        
+
         // The warning should not be present due to the min severity
         XCTAssert(warningIndex == nil)
     }
