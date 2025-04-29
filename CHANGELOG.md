@@ -4,6 +4,8 @@
 
 - Improved the stability of watched queries. Watched queries were previously susceptible to runtime crashes if an exception was thrown in the update stream. Errors are now gracefully handled.
 
+- Deprecated `PowerSyncCredentials` `userId` field. This value is not used by the PowerSync service.
+
 - Added `readLock` and `writeLock` APIs. These methods allow obtaining a SQLite connection context without starting a transaction.
 
 - Removed references to the PowerSync Kotlin SDK from all public API protocols. Dedicated Swift protocols are now defined. These protocols align better with Swift primitives. See the `BRAKING CHANGES` section for more details. Updated protocols include:

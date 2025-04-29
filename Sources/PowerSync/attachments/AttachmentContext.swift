@@ -206,12 +206,12 @@ open class AttachmentContext {
                 updatedRecord.id,
                 updatedRecord.timestamp,
                 updatedRecord.filename,
-                updatedRecord.localUri ?? NSNull(),
-                updatedRecord.mediaType ?? NSNull(),
-                updatedRecord.size ?? NSNull(),
+                updatedRecord.localUri,
+                updatedRecord.mediaType,
+                updatedRecord.size,
                 updatedRecord.state.rawValue,
                 updatedRecord.hasSynced ?? 0,
-                updatedRecord.metaData ?? NSNull()
+                updatedRecord.metaData
             ]
         )
 

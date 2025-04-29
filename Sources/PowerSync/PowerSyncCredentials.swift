@@ -12,22 +12,35 @@ public struct PowerSyncCredentials: Codable {
     public let token: String
 
     /// User ID.
-    public let userId: String?
+    @available(*, deprecated, message: "This value is not used anymore.")
+    public let userId: String? = nil
+    
+    enum CodingKeys: String, CodingKey {
+           case endpoint
+            case token
+       }
 
-    public init(endpoint: String, token: String, userId: String? = nil) {
+    @available(*, deprecated, message: "Use init(endpoint:token:) instead. `userId` is no longer used.")
+    public init(
+        endpoint: String,
+        token: String,
+        userId: String? = nil) {
         self.endpoint = endpoint
         self.token = token
-        self.userId = userId
+    }
+
+    public init(endpoint: String, token: String) {
+        self.endpoint = endpoint
+        self.token = token
     }
 
     internal init(kotlin: KotlinPowerSyncCredentials) {
         self.endpoint = kotlin.endpoint
         self.token = kotlin.token
-        self.userId = kotlin.userId
     }
 
     internal var kotlinCredentials: KotlinPowerSyncCredentials {
-        return KotlinPowerSyncCredentials(endpoint: endpoint, token: token, userId: userId)
+        return KotlinPowerSyncCredentials(endpoint: endpoint, token: token, userId: nil)
     }
 
     public func endpointUri(path: String) -> String {
@@ -37,6 +50,6 @@ public struct PowerSyncCredentials: Codable {
 
 extension PowerSyncCredentials: CustomStringConvertible {
     public var description: String {
-        return "PowerSyncCredentials<endpoint: \(endpoint) userId: \(userId ?? "nil")>"
+        return "PowerSyncCredentials<endpoint: \(endpoint))>"
     }
 }
