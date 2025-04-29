@@ -154,7 +154,7 @@ public enum SqlCursorError: Error {
     }
 }
 
-public extension SqlCursorError: LocalizedError {
+extension SqlCursorError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .columnNotFound(let name):

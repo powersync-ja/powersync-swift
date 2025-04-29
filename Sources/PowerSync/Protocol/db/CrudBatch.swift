@@ -1,5 +1,3 @@
-
-
 import Foundation
 
 /// A transaction of client-side changes.

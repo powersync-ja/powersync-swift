@@ -127,7 +127,6 @@ class SystemManager {
                 sql: "SELECT photo_id FROM \(TODOS_TABLE) WHERE list_id = ? AND photo_id IS NOT NULL",
                 parameters: [id]
             ) { cursor in
-
                 try cursor.getString(index: 0)
             }
 

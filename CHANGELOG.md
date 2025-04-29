@@ -4,7 +4,19 @@
 
 - Improved the stability of watched queries. Watched queries were previously susceptible to runtime crashes if an exception was thrown in the update stream. Errors are now gracefully handled.
 
-- Removed references to the PowerSync Kotlin SDK from all public API protocols. Dedicated Swift protocols are now defined. These protocols align better with Swift primitives.
+- Added `readLock` and `writeLock` APIs. These methods allow obtaining a SQLite connection context without starting a transaction.
+
+- Removed references to the PowerSync Kotlin SDK from all public API protocols. Dedicated Swift protocols are now defined. These protocols align better with Swift primitives. See the `BRAKING CHANGES` section for more details. Updated protocols include:
+
+  - `ConnectionContext` - The context provided by `readLock` and `writeLock`
+  - `Transaction` - The context provided by `readTransaction` and `writeTransaction`
+  - `CrudBatch` - Response from `getCrudBatch`
+  - `CrudTransaction` Response from `getNextCrudTransaction`
+  - `CrudEntry` - Crud entries for `CrudBatch` and `CrudTransaction`
+  - `UpdateType` - Operation type for `CrudEntry`s
+  - `SqlCursor` - Cursor used to map SQLite results to typed result sets
+  - `JsonParam` - JSON parameters used to declare client parameters in the `connect` method
+  - `JsonValue` - Individual JSON field types for `JsonParam`
 
 - Database and transaction/lock level query `execute` methods now have `@discardableResult` annotation.
 

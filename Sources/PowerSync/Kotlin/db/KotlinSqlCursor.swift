@@ -28,7 +28,6 @@ class KotlinSqlCursor: SqlCursor {
     }
     
     func getBoolean(name: String) throws -> Bool {
-        try guardColumnName(name)
         guard let result = try getBooleanOptional(name: name) else {
             throw SqlCursorError.nullValueFound(name)
         }
@@ -52,7 +51,6 @@ class KotlinSqlCursor: SqlCursor {
     }
     
     func getDouble(name: String) throws -> Double {
-        try guardColumnName(name)
         guard let result = try getDoubleOptional(name: name) else {
             throw SqlCursorError.nullValueFound(name)
         }
@@ -76,7 +74,6 @@ class KotlinSqlCursor: SqlCursor {
     }
     
     func getInt(name: String) throws -> Int {
-        try guardColumnName(name)
         guard let result = try getIntOptional(name: name) else {
             throw SqlCursorError.nullValueFound(name)
         }
@@ -100,7 +97,6 @@ class KotlinSqlCursor: SqlCursor {
     }
     
     func getInt64(name: String) throws -> Int64 {
-        try guardColumnName(name)
         guard let result = try getInt64Optional(name: name) else {
             throw SqlCursorError.nullValueFound(name)
         }
@@ -124,7 +120,6 @@ class KotlinSqlCursor: SqlCursor {
     }
     
     func getString(name: String) throws -> String {
-        try guardColumnName(name)
         guard let result = try getStringOptional(name: name) else {
             throw SqlCursorError.nullValueFound(name)
         }
