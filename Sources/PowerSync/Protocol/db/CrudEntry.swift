@@ -1,12 +1,12 @@
 /// Represents the type of CRUD update operation that can be performed on a row.
 public enum UpdateType: String, Codable {
-    /// Insert or replace a row. All non-null columns are included in the data.
+    /// A row has been inserted or replaced
     case put = "PUT"
     
-    /// Update a row if it exists. All updated columns are included in the data.
+    /// A row has been updated
     case patch = "PATCH"
     
-    /// Delete a row if it exists.
+    /// A row has been deleted
     case delete = "DELETE"
     
     /// Errors related to invalid `UpdateType` states.
