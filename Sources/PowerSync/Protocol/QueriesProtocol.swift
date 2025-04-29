@@ -62,12 +62,17 @@ public protocol Queries {
         options: WatchOptions<RowType>
     ) throws -> AsyncThrowingStream<[RowType], Error>
 
-    /// Execute a write transaction with the given callback
+    /// Takes a global lock, without starting a transaction.
+    ///
+    /// In most cases, [writeTransaction] should be used instead.
     func writeLock<R>(
         callback: @escaping (any ConnectionContext) throws -> R
     ) async throws -> R
 
-    /// Execute a read transaction with the given callback
+    /// Takes a read lock, without starting a transaction.
+    ///
+    /// The lock only applies to a single connection, and multiple
+    /// connections may hold read locks at the same time.
     func readLock<R>(
         callback: @escaping (any ConnectionContext) throws -> R
     ) async throws -> R
