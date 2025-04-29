@@ -379,15 +379,18 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
         do {
             let pagesData = try encoder.encode(rootPages)
+
             guard let pagesString = String(data: pagesData, encoding: .utf8) else {
                 throw PowerSyncError.operationFailed(
                     message: "Failed to convert pages data to UTF-8 string"
                 )
             }
+            
             let tableRows = try await getAll(
                 sql: "SELECT tbl_name FROM sqlite_master WHERE rootpage IN (SELECT json_each.value FROM json_each(?))",
                 parameters: [
                     pagesString
+                ]
             ) { try $0.getString(index: 0) }
 
             return Set(tableRows)
