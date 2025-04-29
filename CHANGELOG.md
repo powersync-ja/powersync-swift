@@ -2,8 +2,73 @@
 
 # 1.0.0-Beta.14
 
-- Removed references to the PowerSync Kotlin SDK from all public API protocols.
 - Improved the stability of watched queries. Watched queries were previously susceptible to runtime crashes if an exception was thrown in the update stream. Errors are now gracefully handled.
+
+- Removed references to the PowerSync Kotlin SDK from all public API protocols. Dedicated Swift protocols are now defined. These protocols align better with Swift primitives.
+
+- Database and transaction/lock level query `execute` methods now have `@discardableResult` annotation.
+
+- `AttachmentContext`, `AttachmentQueue`, `AttachmentService` and `SyncingService` are are now explicitly declared as `open` classes, allowing them to be subclassed outside the defining module.
+
+**BREAKING CHANGES**:
+
+- Completing CRUD transactions or CRUD batches, in the `PowerSyncBackendConnector` `uploadData` handler, now has a simpler invocation.
+
+```diff
+- _ = try await transaction.complete.invoke(p1: nil)
++ try await transaction.complete()
+```
+
+- `index` based `SqlCursor` getters now throw if the query result column value is `nil`. This is now consistent with the behaviour of named column getter operations. New `getXxxxxOptional(index: index)` methods are available if the query result value could be `nil`.
+
+```diff
+let results = try transaction.getAll(
+                sql: "SELECT * FROM my_table",
+                parameters: [id]
+            ) { cursor in
+-                 cursor.getString(index: 0)!
++                 cursor.getStringOptional(index: 0)
++                 // OR
++                 // try cursor.getString(index: 0) // if the value should be required
+            }
+```
+
+- `SqlCursor` getters now directly return Swift types. `getLong` has been replaced with `getInt64`.
+
+```diff
+let results = try transaction.getAll(
+                sql: "SELECT * FROM my_table",
+                parameters: [id]
+            ) { cursor in
+-                 cursor.getBoolean(index: 0)?.boolValue,
++                 cursor.getBooleanOptional(index: 0),
+-                 cursor.getLong(index: 0)?.int64Value,
++                 cursor.getInt64Optional(index: 0)
++                 // OR
++                 // try cursor.getInt64(index: 0) // if the value should be required
+            }
+```
+
+- Client parameters now need to be specified with strictly typed `JsonParam` enums.
+
+```diff
+try await database.connect(
+    connector: PowerSyncBackendConnector(),
+    params: [
+-        "foo": "bar"
++        "foo": .string("bar")
+    ]
+)
+```
+
+- `SyncStatus` values now use Swift primitives for status attributes. `lastSyncedAt` now is of `Date` type.
+
+```diff
+- let lastTime: Date? = db.currentStatus.lastSyncedAt?.flatMap {
+-     Date(timeIntervalSince1970: $0.epochSeconds)
+- }
++ let time: Date? = db.currentStatus.lastSyncedAt
+```
 
 # 1.0.0-Beta.13
 
