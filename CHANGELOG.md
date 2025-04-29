@@ -1,5 +1,11 @@
 # Changelog
 
+# 1.0.0-Beta.13
+
+- Update `powersync-kotlin` dependency to version `1.0.0-BETA32`, which includes:
+  - Removed unnecessary `User-Id` header from internal PowerSync service requests.
+  - Fix `getNextCrudTransaction()` only returning a single item.
+
 # 1.0.0-Beta.12
 
 - Added attachment sync helpers
