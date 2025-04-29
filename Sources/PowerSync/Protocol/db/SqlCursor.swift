@@ -125,7 +125,7 @@ public protocol SqlCursor {
 }
 
 /// An error type representing issues encountered while working with a `SqlCursor`.
-enum SqlCursorError: Error {
+public enum SqlCursorError: Error {
     /// An expected column was not found.
     case columnNotFound(_ name: String)
 
@@ -154,7 +154,7 @@ enum SqlCursorError: Error {
     }
 }
 
-extension SqlCursorError: LocalizedError {
+public extension SqlCursorError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .columnNotFound(let name):

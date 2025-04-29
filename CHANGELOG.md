@@ -8,6 +8,8 @@
 
 - Database and transaction/lock level query `execute` methods now have `@discardableResult` annotation.
 
+- Query methods' `parameters` typing has been updated to `[Any?]` from `[Any]`. This makes passing `nil` or optional values to queries easier.
+
 - `AttachmentContext`, `AttachmentQueue`, `AttachmentService` and `SyncingService` are are now explicitly declared as `open` classes, allowing them to be subclassed outside the defining module.
 
 **BREAKING CHANGES**:
@@ -64,8 +66,8 @@ try await database.connect(
 - `SyncStatus` values now use Swift primitives for status attributes. `lastSyncedAt` now is of `Date` type.
 
 ```diff
-- let lastTime: Date? = db.currentStatus.lastSyncedAt?.flatMap {
--     Date(timeIntervalSince1970: $0.epochSeconds)
+- let lastTime: Date? = db.currentStatus.lastSyncedAt.map {
+-     Date(timeIntervalSince1970: TimeInterval($0.epochSeconds))
 - }
 + let time: Date? = db.currentStatus.lastSyncedAt
 ```
