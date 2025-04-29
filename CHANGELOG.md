@@ -63,7 +63,7 @@ let results = try transaction.getAll(
             }
 ```
 
-- Client parameters now need to be specified with strictly typed `JsonParam` enums.
+- Client parameters now need to be specified with strictly typed `JsonValue` enums.
 
 ```diff
 try await database.connect(
