@@ -5,6 +5,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     let logger: any LoggerProtocol
 
     private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
+    private let encoder = JSONEncoder()
     let currentStatus: SyncStatus
 
     init(
@@ -221,43 +222,30 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             // Create an outer task to monitor cancellation
             let task = Task {
                 do {
-                    var mapperError: Error?
-                    // HACK!
-                    // SKIEE doesn't support custom exceptions in Flows
-                    // Exceptions which occur in the Flow itself cause runtime crashes.
-                    // The most probable crash would be the internal EXPLAIN statement.
-                    // This attempts to EXPLAIN the query before passing it to Kotlin
-                    // We could introduce an onChange API in Kotlin which we use to implement watches here.
-                    // This would prevent most issues with exceptions.
-                    // EXPLAIN statement to prevent crashes in SKIEE
-                    _ = try await self.kotlinDatabase.getAll(
-                        sql: "EXPLAIN \(options.sql)",
-                        parameters: mapParameters(options.parameters),
-                        mapper: { _ in "" }
+                    let watchedTables = try await self.getQuerySourceTables(
+                        sql: options.sql,
+                        parameters: options.parameters
                     )
 
                     // Watching for changes in the database
-                    for try await values in try self.kotlinDatabase.watch(
-                        sql: options.sql,
-                        parameters: mapParameters(options.parameters),
+                    for try await _ in try self.kotlinDatabase.onChange(
+                        tables: Set(watchedTables),
                         throttleMs: options.throttleMs,
-                        mapper: { cursor in
-                            do {
-                                return try options.mapper(KotlinSqlCursor(base: cursor))
-                            } catch {
-                                mapperError = error
-                                return ()
-                            }
-                        }
+                        triggerImmediately: true // Allows emitting the first result even if there aren't changes
                     ) {
                         // Check if the outer task is cancelled
-                        try Task.checkCancellation() // This checks if the calling task was cancelled
+                        try Task.checkCancellation()
 
-                        if mapperError != nil {
-                            throw mapperError!
-                        }
-
-                        try continuation.yield(safeCast(values, to: [RowType].self))
+                        try continuation.yield(
+                            safeCast(
+                                await self.getAll(
+                                    sql: options.sql,
+                                    parameters: options.parameters,
+                                    mapper: options.mapper
+                                ),
+                                to: [RowType].self
+                            )
+                        )
                     }
 
                     continuation.finish()
@@ -352,13 +340,66 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             return try await handler()
         } catch {
             // Try and parse errors back from the Kotlin side
-
             if let mapperError = SqlCursorError.fromDescription(error.localizedDescription) {
                 throw mapperError
             }
 
-            // Throw remaining errors as-is
-            throw error
+            throw PowerSyncError.operationFailed(
+                underlyingError: error
+            )
         }
     }
+
+    private func getQuerySourceTables(
+        sql: String,
+        parameters: [Any?]
+    ) async throws -> Set<String> {
+        let rows = try await getAll(
+            sql: "EXPLAIN \(sql)",
+            parameters: parameters,
+            mapper: { cursor in
+                try ExplainQueryResult(
+                    addr: cursor.getString(index: 0),
+                    opcode: cursor.getString(index: 1),
+                    p1: cursor.getInt64(index: 2),
+                    p2: cursor.getInt64(index: 3),
+                    p3: cursor.getInt64(index: 4)
+                )
+            }
+        )
+
+        let rootPages = rows.compactMap { r in
+            if (r.opcode == "OpenRead" || r.opcode == "OpenWrite") &&
+                r.p3 == 0 && r.p2 != 0
+            {
+                return r.p2
+            }
+            return nil
+        }
+
+        do {
+            let pagesData = try encoder.encode(rootPages)
+            let tableRows = try await getAll(
+                sql: "SELECT tbl_name FROM sqlite_master WHERE rootpage IN (SELECT json_each.value FROM json_each(?))",
+                parameters: [
+                    String(data: pagesData, encoding: .utf8)
+                ]
+            ) { try $0.getString(index: 0) }
+
+            return Set(tableRows)
+        } catch {
+            throw PowerSyncError.operationFailed(
+                message: "Could not determine watched query tables",
+                underlyingError: error
+            )
+        }
+    }
+}
+
+private struct ExplainQueryResult {
+    let addr: String
+    let opcode: String
+    let p1: Int64
+    let p2: Int64
+    let p3: Int64
 }

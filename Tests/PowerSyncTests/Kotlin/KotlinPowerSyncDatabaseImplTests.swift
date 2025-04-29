@@ -96,7 +96,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "SELECT name FROM users WHERE id = ?",
             parameters: ["999"]
         ) { cursor in
-            try cursor.getString(name: "")
+            try cursor.getString(name: "name")
         }
 
         XCTAssertNil(nonExistent)

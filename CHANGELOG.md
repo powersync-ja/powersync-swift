@@ -1,5 +1,10 @@
 # Changelog
 
+# 1.0.0-Beta.14
+
+- Removed references to the PowerSync Kotlin SDK from all public API protocols.
+- Improved the stability of watched queries. Watched queries were previously susceptible to runtime crashes if an exception was thrown in the update stream. Errors are now gracefully handled.
+
 # 1.0.0-Beta.13
 
 - Update `powersync-kotlin` dependency to version `1.0.0-BETA32`, which includes:

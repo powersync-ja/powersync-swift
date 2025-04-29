@@ -69,16 +69,25 @@ final class CrudTests: XCTestCase {
         XCTAssert(fullBatch.hasMore == false)
         XCTAssert(fullBatch.crud.count == 100)
         
-        guard let txBatch = try await database.getNextCrudTransaction() else {
+        guard let nextTx = try await database.getNextCrudTransaction() else {
             return XCTFail("Failed to get transaction crud batch")
         }
         
-        XCTAssert(txBatch.crud.count == 100)
+        XCTAssert(nextTx.crud.count == 100)
+        
+        for r in nextTx.crud {
+            print(r)
+        }
         
         // Completing the transaction should clear the items
-        try await txBatch.complete()
+        try await nextTx.complete()
         
         let afterCompleteBatch = try await database.getNextCrudTransaction()
+        
+        for r in afterCompleteBatch?.crud ?? [] {
+            print(r)
+        }
+        
         XCTAssertNil(afterCompleteBatch)
     }
 }
