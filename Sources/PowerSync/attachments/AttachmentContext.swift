@@ -1,7 +1,7 @@
 import Foundation
 
 /// Context which performs actions on the attachment records
-public class AttachmentContext {
+open class AttachmentContext {
     private let db: any PowerSyncDatabaseProtocol
     private let tableName: String
     private let logger: any LoggerProtocol

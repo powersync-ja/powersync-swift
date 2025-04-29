@@ -1,19 +1,27 @@
 import PowerSyncKotlin
 
+/// Implements `SqlCursor` using the Kotlin SDK
 class KotlinSqlCursor: SqlCursor {
     let base: PowerSyncKotlin.SqlCursor
     
     var columnCount: Int
     
-    var columnNames: Dictionary<String, Int>
+    var columnNames: [String: Int]
     
     init(base: PowerSyncKotlin.SqlCursor) {
         self.base = base
         self.columnCount = Int(base.columnCount)
-        self.columnNames = base.columnNames.mapValues{input in input.intValue }
+        self.columnNames = base.columnNames.mapValues { input in input.intValue }
     }
     
-    func getBoolean(index: Int) -> Bool? {
+    func getBoolean(index: Int) throws -> Bool {
+        guard let result = getBooleanOptional(index: index) else {
+            throw SqlCursorError.nullValueFound(String(index))
+        }
+        return result
+    }
+    
+    func getBooleanOptional(index: Int) -> Bool? {
         base.getBoolean(
             index: Int32(index)
         )?.boolValue
@@ -32,7 +40,14 @@ class KotlinSqlCursor: SqlCursor {
         return try base.getBooleanOptional(name: name)?.boolValue
     }
     
-    func getDouble(index: Int) -> Double? {
+    func getDouble(index: Int) throws -> Double {
+        guard let result = getDoubleOptional(index: index) else {
+            throw SqlCursorError.nullValueFound(String(index))
+        }
+        return result
+    }
+    
+    func getDoubleOptional(index: Int) -> Double? {
         base.getDouble(index: Int32(index))?.doubleValue
     }
     
@@ -43,13 +58,20 @@ class KotlinSqlCursor: SqlCursor {
         }
         return result
     }
-    
+
     func getDoubleOptional(name: String) throws -> Double? {
         try guardColumnName(name)
         return try base.getDoubleOptional(name: name)?.doubleValue
     }
     
-    func getInt(index: Int) -> Int? {
+    func getInt(index: Int) throws -> Int {
+        guard let result = getIntOptional(index: index) else {
+            throw SqlCursorError.nullValueFound(String(index))
+        }
+        return result
+    }
+    
+    func getIntOptional(index: Int) -> Int? {
         base.getLong(index: Int32(index))?.intValue
     }
     
@@ -66,7 +88,14 @@ class KotlinSqlCursor: SqlCursor {
         return try base.getLongOptional(name: name)?.intValue
     }
     
-    func getInt64(index: Int) -> Int64? {
+    func getInt64(index: Int) throws -> Int64 {
+        guard let result = getInt64Optional(index: index) else {
+            throw SqlCursorError.nullValueFound(String(index))
+        }
+        return result
+    }
+    
+    func getInt64Optional(index: Int) -> Int64? {
         base.getLong(index: Int32(index))?.int64Value
     }
     
@@ -82,8 +111,15 @@ class KotlinSqlCursor: SqlCursor {
         try guardColumnName(name)
         return try base.getLongOptional(name: name)?.int64Value
     }
+
+    func getString(index: Int) throws -> String {
+        guard let result = getStringOptional(index: index) else {
+            throw SqlCursorError.nullValueFound(String(index))
+        }
+        return result
+    }
     
-    func getString(index: Int) -> String? {
+    func getStringOptional(index: Int) -> String? {
         base.getString(index: Int32(index))
     }
     
@@ -100,11 +136,11 @@ class KotlinSqlCursor: SqlCursor {
         guard let columnIndex = columnNames[name] else {
             throw SqlCursorError.columnNotFound(name)
         }
-        return getString(index: columnIndex)
+        return getStringOptional(index: columnIndex)
     }
-    
+
     @discardableResult
-    private func guardColumnName(_ name: String) throws -> Int  {
+    private func guardColumnName(_ name: String) throws -> Int {
         guard let index = columnNames[name] else {
             throw SqlCursorError.columnNotFound(name)
         }

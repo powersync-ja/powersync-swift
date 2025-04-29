@@ -2,7 +2,7 @@
 ///
 /// Supports all standard JSON types: string, number (integer and double),
 /// boolean, null, arrays, and nested objects.
-public enum JSONValue: Codable {
+public enum JsonValue: Codable {
     /// A JSON string value.
     case string(String)
     
@@ -19,10 +19,10 @@ public enum JSONValue: Codable {
     case null
     
     /// A JSON array containing a list of `JSONValue` elements.
-    case array([JSONValue])
+    case array([JsonValue])
     
     /// A JSON object containing key-value pairs where values are `JSONValue` instances.
-    case object([String: JSONValue])
+    case object([String: JsonValue])
     
     /// Converts the `JSONValue` into a native Swift representation.
     ///
@@ -53,4 +53,4 @@ public enum JSONValue: Codable {
 }
 
 /// A typealias representing a top-level JSON object with string keys and `JSONValue` values.
-public typealias JsonParam = [String: JSONValue]
+public typealias JsonParam = [String: JsonValue]

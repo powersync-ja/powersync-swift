@@ -1,10 +1,14 @@
 import Foundation
 import PowerSyncKotlin
 
+/// Extension of the `ConnectionContext` protocol which allows mixin of common logic required for Kotlin adapters
 protocol KotlinConnectionContextProtocol: ConnectionContext {
+    /// Implementations should provide access to a Kotlin context.
+    /// The protocol extension will use this to provide shared implementation.
     var ctx: PowerSyncKotlin.ConnectionContext { get }
 }
 
+/// Implements most of `ConnectionContext` using the `ctx` provided.
 extension KotlinConnectionContextProtocol {
     func execute(sql: String, parameters: [Any?]?) throws -> Int64 {
         try ctx.execute(
@@ -12,7 +16,7 @@ extension KotlinConnectionContextProtocol {
             parameters: mapParameters(parameters)
         )
     }
-    
+
     func getOptional<RowType>(
         sql: String,
         parameters: [Any?]?,
@@ -30,7 +34,7 @@ extension KotlinConnectionContextProtocol {
             resultType: RowType?.self
         )
     }
-    
+
     func getAll<RowType>(
         sql: String,
         parameters: [Any?]?,
@@ -48,7 +52,7 @@ extension KotlinConnectionContextProtocol {
             resultType: [RowType].self
         )
     }
-    
+
     func get<RowType>(
         sql: String,
         parameters: [Any?]?,
@@ -70,7 +74,7 @@ extension KotlinConnectionContextProtocol {
 
 class KotlinConnectionContext: KotlinConnectionContextProtocol {
     let ctx: PowerSyncKotlin.ConnectionContext
-    
+
     init(ctx: PowerSyncKotlin.ConnectionContext) {
         self.ctx = ctx
     }
@@ -78,14 +82,14 @@ class KotlinConnectionContext: KotlinConnectionContextProtocol {
 
 class KotlinTransactionContext: Transaction, KotlinConnectionContextProtocol {
     let ctx: PowerSyncKotlin.ConnectionContext
-    
+
     init(ctx: PowerSyncKotlin.PowerSyncTransaction) {
         self.ctx = ctx
     }
 }
 
 // Allows nil values to be passed to the Kotlin [Any] params
-internal func mapParameters(_ parameters: [Any?]?) -> [Any] {
+func mapParameters(_ parameters: [Any?]?) -> [Any] {
     parameters?.map { item in
         item ?? NSNull()
     } ?? []

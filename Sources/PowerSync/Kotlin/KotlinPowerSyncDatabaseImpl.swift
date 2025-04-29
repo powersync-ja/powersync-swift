@@ -43,21 +43,20 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func connect(
         connector: PowerSyncBackendConnector,
-        crudThrottleMs: Int64 = 1000,
-        retryDelayMs: Int64 = 5000,
-        params: JsonParam = [:]
+        options: ConnectOptions?
     ) async throws {
         let connectorAdapter = PowerSyncBackendConnectorAdapter(
             swiftBackendConnector: connector,
             db: self
         )
 
+        let resolvedOptions = options ?? ConnectOptions()
+
         try await kotlinDatabase.connect(
             connector: connectorAdapter,
-            crudThrottleMs: crudThrottleMs,
-            retryDelayMs: retryDelayMs,
-            // We map to basic values and use NSNull to avoid SKIEE thinking the values must be of Any type
-            params: params.mapValues { $0.toValue() ?? NSNull() }
+            crudThrottleMs: resolvedOptions.crudThrottleMs,
+            retryDelayMs: resolvedOptions.retryDelayMs,
+            params: resolvedOptions.params.mapValues { $0.toKotlinMap() }
         )
     }
 
@@ -93,6 +92,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         )
     }
 
+    @discardableResult
     func execute(sql: String, parameters: [Any?]?) async throws -> Int64 {
         try await writeTransaction { ctx in
             try ctx.execute(
@@ -280,27 +280,31 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     func writeLock<R>(
         callback: @escaping (any ConnectionContext) throws -> R
     ) async throws -> R {
-        return try safeCast(
-            await kotlinDatabase.writeLock(
-                callback: LockCallback(
-                    callback: callback
-                )
-            ),
-            to: R.self
-        )
+        return try await wrapPowerSyncException {
+            try safeCast(
+                await kotlinDatabase.writeLock(
+                    callback: LockCallback(
+                        callback: callback
+                    )
+                ),
+                to: R.self
+            )
+        }
     }
 
     func writeTransaction<R>(
         callback: @escaping (any Transaction) throws -> R
     ) async throws -> R {
-        return try safeCast(
-            await kotlinDatabase.writeTransaction(
-                callback: TransactionCallback(
-                    callback: callback
-                )
-            ),
-            to: R.self
-        )
+        return try await wrapPowerSyncException {
+            try safeCast(
+                await kotlinDatabase.writeTransaction(
+                    callback: TransactionCallback(
+                        callback: callback
+                    )
+                ),
+                to: R.self
+            )
+        }
     }
 
     func readLock<R>(
@@ -308,30 +312,53 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     )
         async throws -> R
     {
-        return try safeCast(
-            await kotlinDatabase.readLock(
-                callback: LockCallback(
-                    callback: callback
-                )
-            ),
-            to: R.self
-        )
+        return try await wrapPowerSyncException {
+            try safeCast(
+                await kotlinDatabase.readLock(
+                    callback: LockCallback(
+                        callback: callback
+                    )
+                ),
+                to: R.self
+            )
+        }
     }
 
     func readTransaction<R>(
         callback: @escaping (any Transaction) throws -> R
     ) async throws -> R {
-        return try safeCast(
-            await kotlinDatabase.readTransaction(
-                callback: TransactionCallback(
-                    callback: callback
-                )
-            ),
-            to: R.self
-        )
+        return try await wrapPowerSyncException {
+            try safeCast(
+                await kotlinDatabase.readTransaction(
+                    callback: TransactionCallback(
+                        callback: callback
+                    )
+                ),
+                to: R.self
+            )
+        }
     }
 
     func close() async throws {
         try await kotlinDatabase.close()
+    }
+
+    /// Tries to convert Kotlin PowerSyncExceptions to Swift Exceptions
+    private func wrapPowerSyncException<R>(
+        handler: () async throws -> R)
+        async throws -> R
+    {
+        do {
+            return try await handler()
+        } catch {
+            // Try and parse errors back from the Kotlin side
+
+            if let mapperError = SqlCursorError.fromDescription(error.localizedDescription) {
+                throw mapperError
+            }
+
+            // Throw remaining errors as-is
+            throw error
+        }
     }
 }

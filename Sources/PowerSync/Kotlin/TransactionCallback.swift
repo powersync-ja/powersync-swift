@@ -1,5 +1,6 @@
 import PowerSyncKotlin
 
+/// Internal Wrapper for Kotlin lock context lambdas
 class LockCallback<R>: PowerSyncKotlin.ThrowableLockCallback {
     let callback: (ConnectionContext) throws -> R
 
@@ -31,12 +32,15 @@ class LockCallback<R>: PowerSyncKotlin.ThrowableLockCallback {
         } catch {
             return PowerSyncKotlin.PowerSyncException(
                 message: error.localizedDescription,
-                cause: PowerSyncKotlin.KotlinThrowable(message: error.localizedDescription)
+                cause: PowerSyncKotlin.KotlinThrowable(
+                    message: error.localizedDescription
+                )
             )
         }
     }
 }
 
+/// Internal Wrapper for Kotlin transaction context lambdas
 class TransactionCallback<R>: PowerSyncKotlin.ThrowableTransactionCallback {
     let callback: (Transaction) throws -> R
 
@@ -54,7 +58,9 @@ class TransactionCallback<R>: PowerSyncKotlin.ThrowableTransactionCallback {
         } catch {
             return PowerSyncKotlin.PowerSyncException(
                 message: error.localizedDescription,
-                cause: PowerSyncKotlin.KotlinThrowable(message: error.localizedDescription)
+                cause: PowerSyncKotlin.KotlinThrowable(
+                    message: error.localizedDescription
+                )
             )
         }
     }

@@ -4,17 +4,17 @@ import PowerSyncKotlin
 
 class KotlinSyncStatus: KotlinSyncStatusDataProtocol, SyncStatus {
     private let baseStatus: PowerSyncKotlin.SyncStatus
-    
+
     var base: any PowerSyncKotlin.SyncStatusData {
         baseStatus
     }
-    
+
     init(baseStatus: PowerSyncKotlin.SyncStatus) {
         self.baseStatus = baseStatus
     }
 
     func asFlow() -> AsyncStream<any SyncStatusData> {
-        AsyncStream<any SyncStatusData>(bufferingPolicy: .bufferingNewest(1)){ continuation in
+        AsyncStream<any SyncStatusData>(bufferingPolicy: .bufferingNewest(1)) { continuation in
             // Create an outer task to monitor cancellation
             let task = Task {
                 do {
@@ -23,7 +23,7 @@ class KotlinSyncStatus: KotlinSyncStatusDataProtocol, SyncStatus {
                         // Check if the outer task is cancelled
                         try Task.checkCancellation() // This checks if the calling task was cancelled
 
-                         continuation.yield(
+                        continuation.yield(
                             KotlinSyncStatusData(base: value)
                         )
                     }
@@ -40,5 +40,4 @@ class KotlinSyncStatus: KotlinSyncStatusDataProtocol, SyncStatus {
             }
         }
     }
-
 }

@@ -3,7 +3,7 @@ import Foundation
 
 /// Class used to implement the attachment queue
 /// Requires a PowerSyncDatabase, a RemoteStorageAdapter implementation, and a directory name for attachments.
-public class AttachmentQueue {
+open class AttachmentQueue {
     /// Default name of the attachments table
     public static let defaultTableName = "attachments"
 

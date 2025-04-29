@@ -1,5 +1,6 @@
 import PowerSyncKotlin
 
+/// Implements `CrudTransaction` using the Kotlin SDK
 struct KotlinCrudTransaction: CrudTransaction {
     let transaction: PowerSyncKotlin.CrudTransaction
     let crud: [CrudEntry]

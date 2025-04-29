@@ -1,4 +1,4 @@
-/// Represents the type of update operation that can be performed on a row.
+/// Represents the type of CRUD update operation that can be performed on a row.
 public enum UpdateType: String, Codable {
     /// Insert or replace a row. All non-null columns are included in the data.
     case put = "PUT"

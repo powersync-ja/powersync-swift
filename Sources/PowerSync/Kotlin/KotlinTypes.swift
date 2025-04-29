@@ -3,4 +3,3 @@ import PowerSyncKotlin
 typealias KotlinPowerSyncBackendConnector = PowerSyncKotlin.PowerSyncBackendConnector
 typealias KotlinPowerSyncCredentials = PowerSyncKotlin.PowerSyncCredentials
 typealias KotlinPowerSyncDatabase = PowerSyncKotlin.PowerSyncDatabase
-

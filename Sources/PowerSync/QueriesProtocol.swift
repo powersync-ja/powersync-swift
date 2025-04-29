@@ -33,24 +33,8 @@ public protocol Queries {
     func get<RowType>(
         sql: String,
         parameters: [Any?]?,
-        mapper: @escaping (SqlCursor) -> RowType
-    ) async throws -> RowType
-
-    /// Execute a read-only (SELECT) query and return a single result.
-    /// If there is no result, throws an IllegalArgumentException.
-    /// See `getOptional` for queries where the result might be empty.
-    func get<RowType>(
-        sql: String,
-        parameters: [Any?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType
-
-    /// Execute a read-only (SELECT) query and return the results.
-    func getAll<RowType>(
-        sql: String,
-        parameters: [Any?]?,
-        mapper: @escaping (SqlCursor) -> RowType
-    ) async throws -> [RowType]
 
     /// Execute a read-only (SELECT) query and return the results.
     func getAll<RowType>(
@@ -63,23 +47,8 @@ public protocol Queries {
     func getOptional<RowType>(
         sql: String,
         parameters: [Any?]?,
-        mapper: @escaping (SqlCursor) -> RowType
-    ) async throws -> RowType?
-
-    /// Execute a read-only (SELECT) query and return a single optional result.
-    func getOptional<RowType>(
-        sql: String,
-        parameters: [Any?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType?
-
-    /// Execute a read-only (SELECT) query every time the source tables are modified
-    /// and return the results as an array in a Publisher.
-    func watch<RowType>(
-        sql: String,
-        parameters: [Any?]?,
-        mapper: @escaping (SqlCursor) -> RowType
-    ) throws -> AsyncThrowingStream<[RowType], Error>
 
     /// Execute a read-only (SELECT) query every time the source tables are modified
     /// and return the results as an array in a Publisher.
@@ -102,7 +71,7 @@ public protocol Queries {
     func readLock<R>(
         callback: @escaping (any ConnectionContext) throws -> R
     ) async throws -> R
-    
+
     /// Execute a write transaction with the given callback
     func writeTransaction<R>(
         callback: @escaping (any Transaction) throws -> R
@@ -122,28 +91,28 @@ public extension Queries {
 
     func get<RowType>(
         _ sql: String,
-        mapper: @escaping (SqlCursor) -> RowType
+        mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType {
         return try await get(sql: sql, parameters: [], mapper: mapper)
     }
 
     func getAll<RowType>(
         _ sql: String,
-        mapper: @escaping (SqlCursor) -> RowType
+        mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> [RowType] {
         return try await getAll(sql: sql, parameters: [], mapper: mapper)
     }
 
     func getOptional<RowType>(
         _ sql: String,
-        mapper: @escaping (SqlCursor) -> RowType
+        mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType? {
         return try await getOptional(sql: sql, parameters: [], mapper: mapper)
     }
 
     func watch<RowType>(
         _ sql: String,
-        mapper: @escaping (SqlCursor) -> RowType
+        mapper: @escaping (SqlCursor) throws -> RowType
     ) throws -> AsyncThrowingStream<[RowType], Error> {
         return try watch(sql: sql, parameters: [Any?](), mapper: mapper)
     }

@@ -1,5 +1,52 @@
 import Foundation
 
+/// Options for configuring a PowerSync connection.
+///
+/// Provides optional parameters to customize sync behavior such as throttling and retry policies.
+public struct ConnectOptions {
+    /// Time in milliseconds between CRUD (Create, Read, Update, Delete) operations.
+    ///
+    /// Default is `1000` ms (1 second).
+    /// Increase this value to reduce load on the backend server.
+    public var crudThrottleMs: Int64
+
+    /// Delay in milliseconds before retrying after a connection failure.
+    ///
+    /// Default is `5000` ms (5 seconds).
+    /// Increase this value to wait longer before retrying connections in case of persistent failures.
+    public var retryDelayMs: Int64
+
+    /// Additional sync parameters passed to the server during connection.
+    ///
+    /// This can be used to send custom values such as user identifiers, feature flags, etc.
+    ///
+    /// Example:
+    /// ```swift
+    /// [
+    ///     "userId": .string("abc123"),
+    ///     "debugMode": .boolean(true)
+    /// ]
+    /// ```
+    public var params: JsonParam
+
+    /// Initializes a `ConnectOptions` instance with optional values.
+    ///
+    /// - Parameters:
+    ///   - crudThrottleMs: Time between CRUD operations in milliseconds. Defaults to `1000`.
+    ///   - retryDelayMs: Delay between retry attempts in milliseconds. Defaults to `5000`.
+    ///   - params: Custom sync parameters to send to the server. Defaults to an empty dictionary.
+    public init(
+        crudThrottleMs: Int64 = 1000,
+        retryDelayMs: Int64 = 5000,
+        params: JsonParam = [:]
+    ) {
+        self.crudThrottleMs = crudThrottleMs
+        self.retryDelayMs = retryDelayMs
+        self.params = params
+    }
+}
+
+
 /// A PowerSync managed database.
 ///
 /// Use one instance per database file.
@@ -27,36 +74,40 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     /// Wait for the first (possibly partial) sync to occur that contains all buckets in the given priority.
     func waitForFirstSync(priority: Int32) async throws
     
-    /// Connect to the PowerSync service, and keep the databases in sync.
+    /// Connects to the PowerSync service and keeps the local database in sync with the remote database.
     ///
     /// The connection is automatically re-opened if it fails for any reason.
+    /// You can customize connection behavior using the `ConnectOptions` parameter.
     ///
     /// - Parameters:
-    ///   - connector: The PowerSyncBackendConnector to use
-    ///   - crudThrottleMs: Time between CRUD operations. Defaults to 1000ms.
-    ///   - retryDelayMs: Delay between retries after failure. Defaults to 5000ms.
-    ///   - params: Sync parameters from the client
+    ///   - connector: The `PowerSyncBackendConnector` used to manage the backend connection.
+    ///   - options: Optional `ConnectOptions` to customize CRUD throttling, retry delays, and sync parameters.
+    ///     If `nil`, default options are used (1000ms CRUD throttle, 5000ms retry delay, empty parameters).
     ///
     /// Example usage:
     /// ```swift
-    /// let params: [String: JsonParam] = [
-    ///     "name": .string("John Doe"),
-    ///     "age": .number(30),
-    ///     "isStudent": .boolean(false)
-    /// ]
-    ///
-    /// try await connect(
+    /// try await database.connect(
     ///     connector: connector,
-    ///     crudThrottleMs: 2000,
-    ///     retryDelayMs: 10000,
-    ///     params: params
+    ///     options: ConnectOptions(
+    ///         crudThrottleMs: 2000,
+    ///         retryDelayMs: 10000,
+    ///         params: [
+    ///             "deviceId": .string("abc123"),
+    ///             "platform": .string("iOS")
+    ///         ]
+    ///     )
     /// )
     /// ```
+    ///
+    /// You can also omit the `options` parameter to use the default connection behavior:
+    /// ```swift
+    /// try await database.connect(connector: connector)
+    /// ```
+    ///
+    /// - Throws: An error if the connection fails or if the database is not properly configured.
     func connect(
         connector: PowerSyncBackendConnector,
-        crudThrottleMs: Int64,
-        retryDelayMs: Int64,
-        params: [String: JsonParam?]
+        options: ConnectOptions?
     ) async throws
     
     /// Get a batch of crud data to upload.
@@ -112,25 +163,52 @@ public protocol PowerSyncDatabaseProtocol: Queries {
 }
 
 public extension PowerSyncDatabaseProtocol {
+    ///
+    /// The connection is automatically re-opened if it fails for any reason.
+    ///
+    /// - Parameters:
+    ///   - connector: The PowerSyncBackendConnector to use
+    ///   - crudThrottleMs: Time between CRUD operations. Defaults to 1000ms.
+    ///   - retryDelayMs: Delay between retries after failure. Defaults to 5000ms.
+    ///   - params: Sync parameters from the client
+    ///
+    /// Example usage:
+    /// ```swift
+    /// let params: JsonParam = [
+    ///     "name": .string("John Doe"),
+    ///     "age": .number(30),
+    ///     "isStudent": .boolean(false)
+    /// ]
+    ///
+    /// try await connect(
+    ///     connector: connector,
+    ///     crudThrottleMs: 2000,
+    ///     retryDelayMs: 10000,
+    ///     params: params
+    /// )
     func connect(
         connector: PowerSyncBackendConnector,
         crudThrottleMs: Int64 = 1000,
         retryDelayMs: Int64 = 5000,
-        params: [String: JsonParam?] = [:]
+        params: JsonParam = [:]
     ) async throws {
         try await connect(
             connector: connector,
-            crudThrottleMs: crudThrottleMs,
-            retryDelayMs: retryDelayMs,
-            params: params
+            options: ConnectOptions(
+                crudThrottleMs: crudThrottleMs,
+                retryDelayMs: retryDelayMs,
+                params: params
+            )
         )
     }
     
     func disconnectAndClear(clearLocal: Bool = true) async throws {
-        try await disconnectAndClear(clearLocal: clearLocal)
+        try await self.disconnectAndClear(clearLocal: clearLocal)
     }
     
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
-        try await getCrudBatch(limit: 100)
+        try await getCrudBatch(
+            limit: limit
+        )
     }
 }

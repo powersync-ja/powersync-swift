@@ -1,10 +1,13 @@
 import PowerSyncKotlin
 
+/// Implements `CrudEntry` using the KotlinSDK
 struct KotlinCrudEntry : CrudEntry {
     let entry: PowerSyncKotlin.CrudEntry
     let op: UpdateType
     
-    init (entry: PowerSyncKotlin.CrudEntry) throws {
+    init (
+        entry: PowerSyncKotlin.CrudEntry
+    ) throws {
         self.entry = entry
         self.op = try UpdateType.fromString(entry.op.name)
     }

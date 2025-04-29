@@ -171,11 +171,12 @@ final class AttachmentTests: XCTestCase {
     }
 }
 
-enum WaitForMatchError: Error {
-    case timeout
+public enum WaitForMatchError: Error {
+    case timeout(lastError: Error? = nil)
+    case predicateFail(message: String)
 }
 
-func waitForMatch<T, E: Error>(
+public func waitForMatch<T, E: Error>(
     iterator: AsyncThrowingStream<T, E>.Iterator,
     where predicate: @escaping (T) -> Bool,
     timeout: TimeInterval
@@ -191,13 +192,13 @@ func waitForMatch<T, E: Error>(
                     return value
                 }
             }
-            throw WaitForMatchError.timeout // stream ended before match
+            throw WaitForMatchError.timeout() // stream ended before match
         }
 
         // Task to enforce timeout
         group.addTask {
             try await Task.sleep(nanoseconds: timeoutNanoseconds)
-            throw WaitForMatchError.timeout
+            throw WaitForMatchError.timeout()
         }
 
         // First one to succeed or fail
@@ -205,4 +206,32 @@ func waitForMatch<T, E: Error>(
         group.cancelAll()
         return result!
     }
+}
+
+internal func waitFor(
+    timeout: TimeInterval = 0.5,
+    interval: TimeInterval = 0.1,
+    predicate: () async throws -> Void,
+) async throws {
+    let intervalNanoseconds = UInt64(interval * 1_000_000_000)
+    
+    let timeoutDate = Date(
+        timeIntervalSinceNow: timeout
+    )
+    
+    var lastError: Error?
+    
+   while (Date() < timeoutDate) {
+       do {
+           try await predicate()
+           return
+       } catch {
+            lastError = error
+       }
+       try await Task.sleep(nanoseconds: intervalNanoseconds)
+    }
+    
+    throw WaitForMatchError.timeout(
+        lastError: lastError
+    )
 }
