@@ -16,11 +16,19 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build Docs
         run: |
-          xcodebuild docbuild -scheme PowerSync -destination 'platform=macOS' -derivedDataPath ./DerivedData -configuration Release
+          xcodebuild docbuild \
+           -scheme PowerSync \
+           -destination 'platform=macOS' \
+           -derivedDataPath ./DerivedData \
+           -configuration Release
 
       - name: Process Docs
         run: |
-          xcrun docc process-archive transform-for-static-hosting ./DerivedData/Build/Products/Release/PowerSync.doccarchive/ --output-path ./docs-site --hosting-base-path /powersync-swift
+          xcrun docc process-archive \
+            transform-for-static-hosting \
+            ./DerivedData/Build/Products/Release/PowerSync.doccarchive/ \
+            --output-path ./docs-site \
+            --hosting-base-path /powersync-swift
 
       #  The Docs are available at the path mentioned below. We can override the index.html to automatically redirect to the documentation page.
       - name: Prepare static files
