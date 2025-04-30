@@ -60,3 +60,26 @@ func wrapQueryCursorTyped<RowType, ReturnType>(
         resultType
     )
 }
+
+
+/// Throws a `PowerSyncException` using a helper provided by the Kotlin SDK.
+/// We can't directly throw Kotlin `PowerSyncException`s from Swift, but we can delegate the throwing
+/// to the Kotlin implementation.
+/// Our Kotlin SDK methods handle thrown Kotlin `PowerSyncException` correctly.
+/// The flow of events is as follows
+///     Swift code calls `throwKotlinPowerSyncError`
+///          This method calls the Kotlin helper `throwPowerSyncException` which is annotated as being able to throw `PowerSyncException`
+///             The Kotlin helper throws the provided `PowerSyncException`. Since the method is annotated the exception propagates back to Swift, but in a form which can propagate back
+///             to any calling Kotlin stack.
+/// This only works for SKIEE methods which have an associated completion handler which handles annotated errors.
+/// This seems to only apply for Kotlin suspending function bindings.
+func throwKotlinPowerSyncError (message: String, cause: String? = nil) throws {
+    try throwPowerSyncException(
+        exception: PowerSyncKotlin.PowerSyncException(
+            message: message,
+            cause: PowerSyncKotlin.KotlinThrowable(
+                message: cause ?? message
+            )
+        )
+    )
+}
