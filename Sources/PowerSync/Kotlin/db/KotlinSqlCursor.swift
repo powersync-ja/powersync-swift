@@ -35,8 +35,7 @@ class KotlinSqlCursor: SqlCursor {
     }
     
     func getBooleanOptional(name: String) throws -> Bool? {
-        try guardColumnName(name)
-        return try base.getBooleanOptional(name: name)?.boolValue
+        return getBooleanOptional(index: try guardColumnName(name))
     }
     
     func getDouble(index: Int) throws -> Double {
@@ -58,8 +57,7 @@ class KotlinSqlCursor: SqlCursor {
     }
 
     func getDoubleOptional(name: String) throws -> Double? {
-        try guardColumnName(name)
-        return try base.getDoubleOptional(name: name)?.doubleValue
+        return getDoubleOptional(index: try guardColumnName(name))
     }
     
     func getInt(index: Int) throws -> Int {
@@ -81,8 +79,7 @@ class KotlinSqlCursor: SqlCursor {
     }
     
     func getIntOptional(name: String) throws -> Int? {
-        try guardColumnName(name)
-        return try base.getLongOptional(name: name)?.intValue
+        return getIntOptional(index: try guardColumnName(name))
     }
     
     func getInt64(index: Int) throws -> Int64 {
@@ -104,8 +101,7 @@ class KotlinSqlCursor: SqlCursor {
     }
     
     func getInt64Optional(name: String) throws -> Int64? {
-        try guardColumnName(name)
-        return try base.getLongOptional(name: name)?.int64Value
+        return getInt64Optional(index: try guardColumnName(name))
     }
 
     func getString(index: Int) throws -> String {
@@ -127,11 +123,7 @@ class KotlinSqlCursor: SqlCursor {
     }
     
     func getStringOptional(name: String) throws -> String? {
-        /// For some reason this method is not exposed from the Kotlin side
-        guard let columnIndex = columnNames[name] else {
-            throw SqlCursorError.columnNotFound(name)
-        }
-        return getStringOptional(index: columnIndex)
+        return getStringOptional(index: try guardColumnName(name))
     }
 
     @discardableResult
