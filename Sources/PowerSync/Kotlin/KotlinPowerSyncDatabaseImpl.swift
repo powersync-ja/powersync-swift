@@ -55,8 +55,8 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
         try await kotlinDatabase.connect(
             connector: connectorAdapter,
-            crudThrottleMs: resolvedOptions.crudThrottleMs,
-            retryDelayMs: resolvedOptions.retryDelayMs,
+            crudThrottleMs: Int64(resolvedOptions.crudThrottle * 1000),
+            retryDelayMs: Int64(resolvedOptions.retryDelay * 1000),
             params: resolvedOptions.params.mapValues { $0.toKotlinMap() }
         )
     }
@@ -230,7 +230,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
                     // Watching for changes in the database
                     for try await _ in try self.kotlinDatabase.onChange(
                         tables: Set(watchedTables),
-                        throttleMs: options.throttleMs,
+                        throttleMs: Int64(options.throttle * 1000),
                         triggerImmediately: true // Allows emitting the first result even if there aren't changes
                     ) {
                         // Check if the outer task is cancelled

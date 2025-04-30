@@ -1,22 +1,22 @@
 import Combine
 import Foundation
 
-public let DEFAULT_WATCH_THROTTLE_MS = Int64(30)
+public let DEFAULT_WATCH_THROTTLE: TimeInterval = 0.03 // 30ms
 
 public struct WatchOptions<RowType> {
     public var sql: String
     public var parameters: [Any?]
-    public var throttleMs: Int64
+    public var throttle: TimeInterval
     public var mapper: (SqlCursor) throws -> RowType
 
     public init(
         sql: String, parameters: [Any?]? = [],
-        throttleMs: Int64? = DEFAULT_WATCH_THROTTLE_MS,
+        throttle: TimeInterval? = DEFAULT_WATCH_THROTTLE,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) {
         self.sql = sql
-        self.parameters = parameters ?? [] // Default to empty array if nil
-        self.throttleMs = throttleMs ?? DEFAULT_WATCH_THROTTLE_MS // Default to the constant if nil
+        self.parameters = parameters ?? []
+        self.throttle = throttle ?? DEFAULT_WATCH_THROTTLE
         self.mapper = mapper
     }
 }

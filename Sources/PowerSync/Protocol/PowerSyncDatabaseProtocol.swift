@@ -4,17 +4,23 @@ import Foundation
 ///
 /// Provides optional parameters to customize sync behavior such as throttling and retry policies.
 public struct ConnectOptions {
-    /// Time in milliseconds between CRUD (Create, Read, Update, Delete) operations.
+    /// Defaults to 1 second
+    public static let DefaultCrudThrottle: TimeInterval = 1
+    
+    /// Defaults to 5 seconds
+    public static let DefaultRetryDelay: TimeInterval = 5
+    
+    /// TimeInterval (in seconds) between CRUD (Create, Read, Update, Delete) operations.
     ///
-    /// Default is `1000` ms (1 second).
+    /// Default is ``ConnectOptions/DefaultCrudThrottle``.
     /// Increase this value to reduce load on the backend server.
-    public var crudThrottleMs: Int64
+    public var crudThrottle: TimeInterval
 
-    /// Delay in milliseconds before retrying after a connection failure.
+    /// Delay TimeInterval (in seconds) before retrying after a connection failure.
     ///
-    /// Default is `5000` ms (5 seconds).
+    /// Default is ``ConnectOptions/DefaultRetryDelay``.
     /// Increase this value to wait longer before retrying connections in case of persistent failures.
-    public var retryDelayMs: Int64
+    public var retryDelay: TimeInterval
 
     /// Additional sync parameters passed to the server during connection.
     ///
@@ -32,16 +38,16 @@ public struct ConnectOptions {
     /// Initializes a `ConnectOptions` instance with optional values.
     ///
     /// - Parameters:
-    ///   - crudThrottleMs: Time between CRUD operations in milliseconds. Defaults to `1000`.
-    ///   - retryDelayMs: Delay between retry attempts in milliseconds. Defaults to `5000`.
+    ///   - crudThrottle: TimeInterval between CRUD operations in milliseconds. Defaults to `1` second.
+    ///   - retryDelay: Delay TimeInterval between retry attempts in milliseconds. Defaults to `5` seconds.
     ///   - params: Custom sync parameters to send to the server. Defaults to an empty dictionary.
     public init(
-        crudThrottleMs: Int64 = 1000,
-        retryDelayMs: Int64 = 5000,
+        crudThrottle: TimeInterval = 1,
+        retryDelay: TimeInterval = 5,
         params: JsonParam = [:]
     ) {
-        self.crudThrottleMs = crudThrottleMs
-        self.retryDelayMs = retryDelayMs
+        self.crudThrottle = crudThrottle
+        self.retryDelay = retryDelay
         self.params = params
     }
 }
@@ -168,8 +174,8 @@ public extension PowerSyncDatabaseProtocol {
     ///
     /// - Parameters:
     ///   - connector: The PowerSyncBackendConnector to use
-    ///   - crudThrottleMs: Time between CRUD operations. Defaults to 1000ms.
-    ///   - retryDelayMs: Delay between retries after failure. Defaults to 5000ms.
+    ///   - crudThrottle: TimeInterval between CRUD operations. Defaults to ``ConnectOptions/DefaultCrudThrottle``.
+    ///   - retryDelay: Delay TimeInterval between retries after failure. Defaults to ``ConnectOptions/DefaultRetryDelay``.
     ///   - params: Sync parameters from the client
     ///
     /// Example usage:
@@ -188,15 +194,15 @@ public extension PowerSyncDatabaseProtocol {
     /// )
     func connect(
         connector: PowerSyncBackendConnector,
-        crudThrottleMs: Int64 = 1000,
-        retryDelayMs: Int64 = 5000,
+        crudThrottle: TimeInterval = 1,
+        retryDelay: TimeInterval = 5,
         params: JsonParam = [:]
     ) async throws {
         try await connect(
             connector: connector,
             options: ConnectOptions(
-                crudThrottleMs: crudThrottleMs,
-                retryDelayMs: retryDelayMs,
+                crudThrottle: crudThrottle,
+                retryDelay: retryDelay,
                 params: params
             )
         )

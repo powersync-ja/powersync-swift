@@ -1,6 +1,6 @@
 # Changelog
 
-# 1.0.0-Beta.14
+# 1.0.0
 
 - Improved the stability of watched queries. Watched queries were previously susceptible to runtime crashes if an exception was thrown in the update stream. Errors are now gracefully handled.
 
@@ -84,6 +84,35 @@ try await database.connect(
 -     Date(timeIntervalSince1970: TimeInterval($0.epochSeconds))
 - }
 + let time: Date? = db.currentStatus.lastSyncedAt
+```
+
+- `crudThrottleMs` and `retryDelayMs` in the `connect` method have been updated to `crudThrottle` and `retryDelay` which are now of type `TimeInterval`. Previously the parameters were specified in milliseconds, the `TimeInterval` typing now requires values to be specified in seconds.
+
+```diff
+try await database.connect(
+            connector: PowerSyncBackendConnector(),
+-           crudThrottleMs: 1000,
+-           retryDelayMs: 5000,
++           crudThrottle: 1,
++           retryDelay: 5,
+            params: [
+                "foo": .string("bar"),
+            ]
+        )
+```
+
+- `throttleMs` in the watched query `WatchOptions` has been updated to `throttle` which is now of type `TimeInterval`. Previously the parameters were specified in milliseconds, the `TimeInterval` typing now requires values to be specified in seconds.
+
+```diff
+let stream = try database.watch(
+            options: WatchOptions(
+                sql: "SELECT name FROM users ORDER BY id",
+-               throttleMs: 1000,
++               throttle: 1,
+                mapper: { cursor in
+                    try cursor.getString(index: 0)
+                }
+            ))
 ```
 
 # 1.0.0-Beta.13
