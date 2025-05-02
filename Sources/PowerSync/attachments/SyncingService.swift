@@ -6,7 +6,7 @@ import Foundation
 /// This watches for changes to active attachments and performs queued
 /// download, upload, and delete operations. Syncs can be triggered manually,
 /// periodically, or based on database changes.
-public class SyncingService {
+open class SyncingService {
     private let remoteStorage: RemoteStorageAdapter
     private let localStorage: LocalStorageAdapter
     private let attachmentsService: AttachmentService

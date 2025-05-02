@@ -1,7 +1,7 @@
 import Foundation
 
 /// Service which manages attachment records.
-public class AttachmentService {
+open class AttachmentService {
     private let db: any PowerSyncDatabaseProtocol
     private let tableName: String
     private let logger: any LoggerProtocol

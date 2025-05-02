@@ -1,7 +1,6 @@
 import PowerSyncKotlin
 
-
-internal struct KotlinAdapter {
+enum KotlinAdapter {
     struct Index {
         static func toKotlin(_ index: IndexProtocol) -> PowerSyncKotlin.Index {
             PowerSyncKotlin.Index(
@@ -26,7 +25,7 @@ internal struct KotlinAdapter {
         static func toKotlin(_ table: TableProtocol) -> PowerSyncKotlin.Table {
             PowerSyncKotlin.Table(
                 name: table.name,
-                columns: table.columns.map {Column.toKotlin($0)},
+                columns: table.columns.map { Column.toKotlin($0) },
                 indexes: table.indexes.map { Index.toKotlin($0) },
                 localOnly: table.localOnly,
                 insertOnly: table.insertOnly,

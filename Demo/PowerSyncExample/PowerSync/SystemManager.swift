@@ -127,9 +127,8 @@ class SystemManager {
                 sql: "SELECT photo_id FROM \(TODOS_TABLE) WHERE list_id = ? AND photo_id IS NOT NULL",
                 parameters: [id]
             ) { cursor in
-                // FIXME Transactions should allow throwing in the mapper and should use generics correctly
-                cursor.getString(index: 0) ?? "invalid" // :(
-            } as? [String] // :(
+                try cursor.getString(index: 0)
+            }
 
             _ = try transaction.execute(
                 sql: "DELETE FROM \(LISTS_TABLE) WHERE id = ?",
@@ -141,7 +140,7 @@ class SystemManager {
                 parameters: [id]
             )
 
-            return attachmentIDs ?? [] // :(
+            return attachmentIDs
         })
 
         if let attachments {

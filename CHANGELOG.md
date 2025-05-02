@@ -1,5 +1,120 @@
 # Changelog
 
+# 1.0.0
+
+- Improved the stability of watched queries. Watched queries were previously susceptible to runtime crashes if an exception was thrown in the update stream. Errors are now gracefully handled.
+
+- Deprecated `PowerSyncCredentials` `userId` field. This value is not used by the PowerSync service.
+
+- Added `readLock` and `writeLock` APIs. These methods allow obtaining a SQLite connection context without starting a transaction.
+
+- Removed references to the PowerSync Kotlin SDK from all public API protocols. Dedicated Swift protocols are now defined. These protocols align better with Swift primitives. See the `BRAKING CHANGES` section for more details. Updated protocols include:
+
+  - `ConnectionContext` - The context provided by `readLock` and `writeLock`
+  - `Transaction` - The context provided by `readTransaction` and `writeTransaction`
+  - `CrudBatch` - Response from `getCrudBatch`
+  - `CrudTransaction` Response from `getNextCrudTransaction`
+  - `CrudEntry` - Crud entries for `CrudBatch` and `CrudTransaction`
+  - `UpdateType` - Operation type for `CrudEntry`s
+  - `SqlCursor` - Cursor used to map SQLite results to typed result sets
+  - `JsonParam` - JSON parameters used to declare client parameters in the `connect` method
+  - `JsonValue` - Individual JSON field types for `JsonParam`
+
+- Database and transaction/lock level query `execute` methods now have `@discardableResult` annotation.
+
+- Query methods' `parameters` typing has been updated to `[Any?]` from `[Any]`. This makes passing `nil` or optional values to queries easier.
+
+- `AttachmentContext`, `AttachmentQueue`, `AttachmentService` and `SyncingService` are are now explicitly declared as `open` classes, allowing them to be subclassed outside the defining module.
+
+**BREAKING CHANGES**:
+
+- Completing CRUD transactions or CRUD batches, in the `PowerSyncBackendConnector` `uploadData` handler, now has a simpler invocation.
+
+```diff
+- _ = try await transaction.complete.invoke(p1: nil)
++ try await transaction.complete()
+```
+
+- `index` based `SqlCursor` getters now throw if the query result column value is `nil`. This is now consistent with the behaviour of named column getter operations. New `getXxxxxOptional(index: index)` methods are available if the query result value could be `nil`.
+
+```diff
+let results = try transaction.getAll(
+                sql: "SELECT * FROM my_table",
+                parameters: [id]
+            ) { cursor in
+-                 cursor.getString(index: 0)!
++                 cursor.getStringOptional(index: 0)
++                 // OR
++                 // try cursor.getString(index: 0) // if the value should be required
+            }
+```
+
+- `SqlCursor` getters now directly return Swift types. `getLong` has been replaced with `getInt64`.
+
+```diff
+let results = try transaction.getAll(
+                sql: "SELECT * FROM my_table",
+                parameters: [id]
+            ) { cursor in
+-                 cursor.getBoolean(index: 0)?.boolValue,
++                 cursor.getBooleanOptional(index: 0),
+-                 cursor.getLong(index: 0)?.int64Value,
++                 cursor.getInt64Optional(index: 0)
++                 // OR
++                 // try cursor.getInt64(index: 0) // if the value should be required
+            }
+```
+
+- Client parameters now need to be specified with strictly typed `JsonValue` enums.
+
+```diff
+try await database.connect(
+    connector: PowerSyncBackendConnector(),
+    params: [
+-        "foo": "bar"
++        "foo": .string("bar")
+    ]
+)
+```
+
+- `SyncStatus` values now use Swift primitives for status attributes. `lastSyncedAt` now is of `Date` type.
+
+```diff
+- let lastTime: Date? = db.currentStatus.lastSyncedAt.map {
+-     Date(timeIntervalSince1970: TimeInterval($0.epochSeconds))
+- }
++ let time: Date? = db.currentStatus.lastSyncedAt
+```
+
+- `crudThrottleMs` and `retryDelayMs` in the `connect` method have been updated to `crudThrottle` and `retryDelay` which are now of type `TimeInterval`. Previously the parameters were specified in milliseconds, the `TimeInterval` typing now requires values to be specified in seconds.
+
+```diff
+try await database.connect(
+            connector: PowerSyncBackendConnector(),
+-           crudThrottleMs: 1000,
+-           retryDelayMs: 5000,
++           crudThrottle: 1,
++           retryDelay: 5,
+            params: [
+                "foo": .string("bar"),
+            ]
+        )
+```
+
+- `throttleMs` in the watched query `WatchOptions` has been updated to `throttle` which is now of type `TimeInterval`. Previously the parameters were specified in milliseconds, the `TimeInterval` typing now requires values to be specified in seconds.
+
+```diff
+let stream = try database.watch(
+            options: WatchOptions(
+                sql: "SELECT name FROM users ORDER BY id",
+-               throttleMs: 1000,
++               throttle: 1,
+                mapper: { cursor in
+                    try cursor.getString(index: 0)
+                }
+            ))
+```
+
 # 1.0.0-Beta.13
 
 - Update `powersync-kotlin` dependency to version `1.0.0-BETA32`, which includes:

@@ -17,7 +17,7 @@ let package = Package(
             targets: ["PowerSync"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/powersync-ja/powersync-kotlin.git", exact: "1.0.0-BETA32.0"),
+        .package(url: "https://github.com/powersync-ja/powersync-kotlin.git", "1.0.1+SWIFT.0"..<"1.1.0+SWIFT.0"),
         .package(url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git", "0.3.14"..<"0.4.0")
     ],
     targets: [

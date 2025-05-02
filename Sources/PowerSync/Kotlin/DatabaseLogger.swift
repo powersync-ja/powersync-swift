@@ -44,7 +44,7 @@ private class KermitLogWriterAdapter: Kermit_coreLogWriter {
 ///
 /// This class bridges Swift log writers with the Kotlin logging system and supports
 /// runtime configuration of severity levels and writer lists.
-internal class DatabaseLogger: LoggerProtocol {
+class DatabaseLogger: LoggerProtocol {
     /// The underlying Kermit logger instance provided by the PowerSyncKotlin SDK.
     public let kLogger = PowerSyncKotlin.generateLogger(logger: nil)
     public let logger: any LoggerProtocol

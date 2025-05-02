@@ -1,9 +1,10 @@
 import PowerSyncKotlin
 
-class TransactionCallback<R>: PowerSyncKotlin.ThrowableTransactionCallback {
-    let callback: (PowerSyncTransaction) throws -> R
+/// Internal Wrapper for Kotlin lock context lambdas
+class LockCallback<R>: PowerSyncKotlin.ThrowableLockCallback {
+    let callback: (ConnectionContext) throws -> R
 
-    init(callback: @escaping (PowerSyncTransaction) throws -> R) {
+    init(callback: @escaping (ConnectionContext) throws -> R) {
         self.callback = callback
     }
 
@@ -21,15 +22,46 @@ class TransactionCallback<R>: PowerSyncKotlin.ThrowableTransactionCallback {
     // from a "core" package in Kotlin that provides better control over exception handling
     // and other functionality—without modifying the public `PowerSyncDatabase` API to include
     // Swift-specific logic.
-    func execute(transaction: PowerSyncKotlin.PowerSyncTransaction) throws -> Any {
+    func execute(context: PowerSyncKotlin.ConnectionContext) throws -> Any {
         do {
-            return try callback(transaction)
+            return try callback(
+                KotlinConnectionContext(
+                    ctx: context
+                )
+            )
         } catch {
             return PowerSyncKotlin.PowerSyncException(
                 message: error.localizedDescription,
-                cause: PowerSyncKotlin.KotlinThrowable(message: error.localizedDescription)
+                cause: PowerSyncKotlin.KotlinThrowable(
+                    message: error.localizedDescription
+                )
             )
         }
     }
 }
 
+/// Internal Wrapper for Kotlin transaction context lambdas
+class TransactionCallback<R>: PowerSyncKotlin.ThrowableTransactionCallback {
+    let callback: (Transaction) throws -> R
+
+    init(callback: @escaping (Transaction) throws -> R) {
+        self.callback = callback
+    }
+
+    func execute(transaction: PowerSyncKotlin.PowerSyncTransaction) throws -> Any {
+        do {
+            return try callback(
+                KotlinTransactionContext(
+                    ctx: transaction
+                )
+            )
+        } catch {
+            return PowerSyncKotlin.PowerSyncException(
+                message: error.localizedDescription,
+                cause: PowerSyncKotlin.KotlinThrowable(
+                    message: error.localizedDescription
+                )
+            )
+        }
+    }
+}

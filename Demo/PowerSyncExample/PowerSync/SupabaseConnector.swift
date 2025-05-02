@@ -101,19 +101,18 @@ class SupabaseConnector: PowerSyncBackendConnector {
 
                 switch entry.op {
                 case .put:
-                    var data: [String: AnyCodable] = entry.opData?.mapValues { AnyCodable($0) } ?? [:]
-                    data["id"] = AnyCodable(entry.id)
+                    var data = entry.opData ?? [:]
+                    data["id"] = entry.id
                     try await table.upsert(data).execute()
                 case .patch:
                     guard let opData = entry.opData else { continue }
-                    let encodableData = opData.mapValues { AnyCodable($0) }
-                    try await table.update(encodableData).eq("id", value: entry.id).execute()
+                    try await table.update(opData).eq("id", value: entry.id).execute()
                 case .delete:
                     try await table.delete().eq("id", value: entry.id).execute()
                 }
             }
 
-            _ = try await transaction.complete.invoke(p1: nil)
+            try await transaction.complete()
 
         } catch {
             if let errorCode = PostgresFatalCodes.extractErrorCode(from: error),
@@ -127,7 +126,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
                 /// elsewhere instead of discarding, and/or notify the user.
                 print("Data upload error: \(error)")
                 print("Discarding entry: \(lastEntry!)")
-                _ = try await transaction.complete.invoke(p1: nil)
+                try await transaction.complete()
                 return
             }
 

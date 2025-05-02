@@ -1,7 +1,7 @@
 import Foundation
 
 /// Context which performs actions on the attachment records
-public class AttachmentContext {
+open class AttachmentContext {
     private let db: any PowerSyncDatabaseProtocol
     private let tableName: String
     private let logger: any LoggerProtocol
@@ -206,12 +206,12 @@ public class AttachmentContext {
                 updatedRecord.id,
                 updatedRecord.timestamp,
                 updatedRecord.filename,
-                updatedRecord.localUri ?? NSNull(),
-                updatedRecord.mediaType ?? NSNull(),
-                updatedRecord.size ?? NSNull(),
+                updatedRecord.localUri,
+                updatedRecord.mediaType,
+                updatedRecord.size,
                 updatedRecord.state.rawValue,
                 updatedRecord.hasSynced ?? 0,
-                updatedRecord.metaData ?? NSNull()
+                updatedRecord.metaData
             ]
         )
 
