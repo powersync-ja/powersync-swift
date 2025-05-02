@@ -20,15 +20,19 @@ struct SignUpScreen: View {
         Form {
             Section {
                 TextField("Email", text: $email)
-                    .keyboardType(.emailAddress)
                     .textContentType(.emailAddress)
                     .autocorrectionDisabled()
+#if os(ios)
+                    .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
+#endif
 
                 SecureField("Password", text: $password)
                     .textContentType(.password)
                     .autocorrectionDisabled()
+#if os(ios)
                     .textInputAutocapitalization(.never)
+#endif
             }
 
             Section {

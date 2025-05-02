@@ -8,11 +8,14 @@ struct TodoListRow: View {
     let capturePhotoTapped: () -> Void
     let selectPhotoTapped: () -> Void
 
+#if os(iOS)
     @State private var image: UIImage? = nil
+#endif
 
     var body: some View {
         HStack {
             Text(todo.description)
+#if os(iOS)
             Group {
                 if let image = image {
                     Image(uiImage: image)
@@ -34,6 +37,7 @@ struct TodoListRow: View {
                     EmptyView()
                 }
             }
+#endif
             Spacer()
             VStack {
                 if todo.photoId == nil {
@@ -69,14 +73,17 @@ struct TodoListRow: View {
                 }
                 .buttonStyle(.plain)
             }.onChange(of: todo.photoId) { _, newPhotoId in
+#if os(iOS)
                 if newPhotoId == nil {
                     // Clear the image when photoId becomes nil
                     image = nil
                 }
+#endif
             }
         }
     }
 
+#if os(iOS)
     private func loadImage() async {
         guard let urlString = todo.photoUri else { return }
         let url = URL(fileURLWithPath: urlString)
@@ -92,6 +99,7 @@ struct TodoListRow: View {
             print("Error loading image from disk:", error)
         }
     }
+#endif
 }
 
 #Preview {
