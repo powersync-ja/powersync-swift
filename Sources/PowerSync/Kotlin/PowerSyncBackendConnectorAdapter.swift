@@ -1,10 +1,10 @@
 import OSLog
 
-internal class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector {
+class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector {
     let swiftBackendConnector: PowerSyncBackendConnector
     let db: any PowerSyncDatabaseProtocol
     let logTag = "PowerSyncBackendConnector"
-    
+
     init(
         swiftBackendConnector: PowerSyncBackendConnector,
         db: any PowerSyncDatabaseProtocol
@@ -12,14 +12,14 @@ internal class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector
         self.swiftBackendConnector = swiftBackendConnector
         self.db = db
     }
-    
+
     override func __fetchCredentials() async throws -> KotlinPowerSyncCredentials? {
         do {
             let result = try await swiftBackendConnector.fetchCredentials()
             return result?.kotlinCredentials
         } catch {
             db.logger.error("Error while fetching credentials", tag: logTag)
-            /// We can't use throwKotlinPowerSyncError here since the Kotlin connector 
+            /// We can't use throwKotlinPowerSyncError here since the Kotlin connector
             /// runs this in a Job - this seems to break the SKIEE error propagation.
             /// returning nil here should still cause a retry
             return nil
@@ -35,7 +35,7 @@ internal class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector
             // Relay the error to the Kotlin SDK
             try throwKotlinPowerSyncError(
                 message: "Connector errored while uploading data: \(error.localizedDescription)",
-                cause: error.localizedDescription,
+                cause: error.localizedDescription
             )
         }
     }

@@ -208,10 +208,10 @@ public func waitForMatch<T, E: Error>(
     }
 }
 
-internal func waitFor(
+func waitFor(
     timeout: TimeInterval = 0.5,
     interval: TimeInterval = 0.1,
-    predicate: () async throws -> Void,
+    predicate: () async throws -> Void
 ) async throws {
     let intervalNanoseconds = UInt64(interval * 1_000_000_000)
     
@@ -221,14 +221,14 @@ internal func waitFor(
     
     var lastError: Error?
     
-   while (Date() < timeoutDate) {
-       do {
-           try await predicate()
-           return
-       } catch {
+    while Date() < timeoutDate {
+        do {
+            try await predicate()
+            return
+        } catch {
             lastError = error
-       }
-       try await Task.sleep(nanoseconds: intervalNanoseconds)
+        }
+        try await Task.sleep(nanoseconds: intervalNanoseconds)
     }
     
     throw WaitForMatchError.timeout(
