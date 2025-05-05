@@ -11,6 +11,12 @@ public protocol SyncStatusData {
     /// Indicates whether the system is actively downloading changes.
     var downloading: Bool { get }
 
+    /// Realtime progress information about downloaded operations during an active sync.
+    /// 
+    /// For more information on what progress is reported, see ``SyncDownloadProgress``.
+    /// This value will be non-null only if ``downloading`` is `true`.
+    var downloadProgress: SyncDownloadProgress? { get }
+
     /// Indicates whether the system is actively uploading changes.
     var uploading: Bool { get }
 

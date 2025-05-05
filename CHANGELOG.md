@@ -1,5 +1,9 @@
 # Changelog
 
+## unreleased
+
+- Add sync progress information through `SyncStatusData.downloadProgress`.
+
 # 1.0.0
 
 - Improved the stability of watched queries. Watched queries were previously susceptible to runtime crashes if an exception was thrown in the update stream. Errors are now gracefully handled.
