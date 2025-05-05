@@ -35,7 +35,7 @@ struct ListView: View {
                 }
             }
         }
-                
+
         List {
             if let error {
                 ErrorText(error)
