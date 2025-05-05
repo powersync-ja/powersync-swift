@@ -2,8 +2,6 @@ name: Deploy Docs
 
 on:
   push:
-    branches:
-      - main
 
 permissions:
   contents: read
@@ -47,6 +45,7 @@ jobs:
 
   # Deployment job
   deploy:
+    if: ${{ github.ref == 'refs/heads/main' }}
     environment:
       name: github-pages
       url: ${{ needs.build.outputs.page_url }}
