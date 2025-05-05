@@ -37,6 +37,11 @@ extension KotlinSyncStatusDataProtocol {
         )
     }
     
+    var downloadProgress: (any SyncDownloadProgress)? {
+        guard let kotlinProgress = base.downloadProgress else { return nil }
+        return KotlinSyncDownloadProgress(progress: kotlinProgress)
+    }
+    
     var hasSynced: Bool? {
         base.hasSynced?.boolValue
     }
@@ -78,5 +83,35 @@ extension KotlinSyncStatusDataProtocol {
             lastSyncedAt: lastSyncedAt,
             hasSynced: status.hasSynced?.boolValue
         )
+    }
+}
+
+protocol KotlinProgressWithOperationsProtocol: ProgressWithOperations {
+    var base: any PowerSyncKotlin.ProgressWithOperations { get }
+}
+
+extension KotlinProgressWithOperationsProtocol {
+    var totalOperations: Int32 {
+        return base.totalOperations
+    }
+    
+    var downloadedOperations: Int32 {
+        return base.downloadedOperations
+    }
+}
+
+struct KotlinProgressWithOperations: KotlinProgressWithOperationsProtocol {
+    let base: PowerSyncKotlin.ProgressWithOperations
+}
+
+struct KotlinSyncDownloadProgress: KotlinProgressWithOperationsProtocol, SyncDownloadProgress {
+    let progress: PowerSyncKotlin.SyncDownloadProgress
+    
+    var base: any PowerSyncKotlin.ProgressWithOperations {
+        progress
+    }
+    
+    func untilPriority(priority: BucketPriority) -> any ProgressWithOperations {
+        return KotlinProgressWithOperations(base: progress.untilPriority(priority: priority.priorityCode))
     }
 }
