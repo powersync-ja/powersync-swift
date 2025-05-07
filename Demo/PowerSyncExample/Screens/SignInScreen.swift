@@ -19,15 +19,19 @@ struct SignInScreen: View {
         Form {
             Section {
                 TextField("Email", text: $email)
-                    .keyboardType(.emailAddress)
                     .textContentType(.emailAddress)
                     .autocorrectionDisabled()
+#if os(iOS)
+                    .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
-
+#endif
+                
                 SecureField("Password", text: $password)
                     .textContentType(.password)
                     .autocorrectionDisabled()
+#if os(iOS)
                     .textInputAutocapitalization(.never)
+#endif
             }
 
             Section {

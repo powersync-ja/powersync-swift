@@ -1,6 +1,6 @@
 # Changelog
 
-## unreleased
+## 1.1.0
 
 * Add sync progress information through `SyncStatusData.downloadProgress`.
 * Add `trackPreviousValues` option on `Table` which sets `CrudEntry.previousValues` to previous values on updates.

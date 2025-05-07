@@ -12,11 +12,13 @@ struct TodoListView: View {
     @State private var newTodo: NewTodo?
     @State private var editing: Bool = false
 
+#if os(iOS)
     // Called when a photo has been captured. Individual widgets should register the listener
     @State private var onMediaSelect: ((_: Data) async throws -> Void)?
     @State private var pickMediaType: UIImagePickerController.SourceType = .camera
     @State private var showMediaPicker = false
     @State private var isCameraAvailable: Bool = false
+#endif
 
     var body: some View {
         List {
@@ -33,6 +35,7 @@ struct TodoListView: View {
             }
 
             ForEach(todos) { todo in
+#if os(iOS)
                 TodoListRow(
                     todo: todo,
                     isCameraAvailable: isCameraAvailable,
@@ -68,6 +71,20 @@ struct TodoListView: View {
                     pickMediaType = .photoLibrary
                     showMediaPicker = true
                 }
+#else
+                TodoListRow(
+                    todo: todo,
+                    isCameraAvailable: false,
+                    completeTapped: {
+                        Task {
+                            await toggleCompletion(of: todo)
+                        }
+                    },
+                    deletePhotoTapped: {},
+                    capturePhotoTapped: {},
+                    selectPhotoTapped: {},
+                )
+#endif
             }
             .onDelete { indexSet in
                 Task {
@@ -80,12 +97,14 @@ struct TodoListView: View {
                 }
             }
         }
+#if os(iOS)
         .sheet(isPresented: $showMediaPicker) {
             CameraView(
                 onMediaSelect: $onMediaSelect,
                 mediaType: $pickMediaType
             )
         }
+#endif
         .animation(.default, value: todos)
         .navigationTitle("Todos")
         .toolbar {
@@ -111,9 +130,11 @@ struct TodoListView: View {
                 }
             }
         }
+#if os(iOS)
         .onAppear {
             checkCameraAvailability()
         }
+#endif
         .task {
             await system.watchTodos(listId) { tds in
                 withAnimation {
@@ -144,6 +165,7 @@ struct TodoListView: View {
         }
     }
 
+#if os(iOS)
     ///  Registers a callback which saves a photo for the specified Todo item if media is sucessfully loaded.
     func registerMediaCallback(todo: Todo) {
         // Register a callback for successful image capture
@@ -181,6 +203,7 @@ struct TodoListView: View {
         isCameraAvailable = UIImagePickerController.isSourceTypeAvailable(.camera)
 #endif
     }
+#endif
 }
 
 #Preview {
@@ -191,6 +214,7 @@ struct TodoListView: View {
     }
 }
 
+#if os(iOS)
 struct CameraView: UIViewControllerRepresentable {
     @Binding var onMediaSelect: ((_: Data) async throws -> Void)?
     @Binding var mediaType: UIImagePickerController.SourceType
@@ -244,3 +268,4 @@ struct CameraView: UIViewControllerRepresentable {
         }
     }
 }
+#endif
