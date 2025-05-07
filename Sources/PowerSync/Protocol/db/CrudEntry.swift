@@ -44,6 +44,20 @@ public protocol CrudEntry {
     /// The transaction ID associated with the entry, if any.
     var transactionId: Int64? { get }
     
+    /// User-defined metadata that can be attached to writes.
+    ///
+    /// This is the value the `_metadata` column had when the write to the database was made,
+    /// allowing backend connectors to e.g. identify a write and tear it specially.
+    ///
+    /// Note that the `_metadata` column and this field are only available when ``Table/trackMetadata``
+    /// is enabled.
+    var metadata: String? { get }
+    
     /// The operation data associated with the entry, represented as a dictionary of column names to their values.
     var opData: [String: String?]? { get }
+
+    /// Previous values before this change.
+    ///
+    /// These values can be tracked for `UPDATE` statements when ``Table/trackPreviousValues`` is enabled.
+    var previousValues: [String: String?]? { get }
 }

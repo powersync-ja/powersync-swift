@@ -26,6 +26,46 @@ public protocol TableProtocol {
     ///
     var viewNameOverride: String? { get }
     var viewName: String { get }
+    
+    /// Whether to add a hidden `_metadata` column that will ne abled for updates to
+    /// attach custom information about writes.
+    ///
+    /// When the `_metadata` column is written to for inserts or updates, its value will not be
+    /// part of ``CrudEntry/opData``. Instead, it is reported as ``CrudEntry/metadata``,
+    /// allowing ``PowerSyncBackendConnector``s to handle these updates specially.
+    var trackMetadata: Bool { get }
+    
+    /// When set to a non-`nil` value, track old values of columns for ``CrudEntry/previousValues``.
+    ///
+    /// See ``TrackPreviousValuesOptions`` for details
+    var trackPreviousValues: TrackPreviousValuesOptions? { get }
+    
+    /// Whether an `UPDATE` statement that doesn't change any values should be ignored entirely when
+    /// creating CRUD entries.
+    ///
+    /// This is disabled by default, meaning that an `UPDATE` on a row that doesn't change values would
+    /// create a ``CrudEntry`` with an empty ``CrudEntry/opData`` and ``UpdateType/patch``.
+    var ignoreEmptyUpdates: Bool { get }
+}
+
+/// Options to include old values in ``CrudEntry/previousValues`` for update statements.
+///
+/// These options are enabled by passing them to a non-local ``Table`` constructor.
+public struct TrackPreviousValuesOptions {
+    /// A filter of column names for which updates should be tracked.
+    ///
+    /// When set to a non-`nil` value, columns not included in this list will not appear in
+    /// ``CrudEntry/previousValues``. By default, all columns are included.
+    public let columnFilter: [String]?;
+    
+    /// Whether to only include old values when they were changed by an update, instead of always including
+    /// all old values.
+    public let onlyWhenChanged: Bool;
+    
+    public init(columnFilter: [String]? = nil, onlyWhenChanged: Bool = false) {
+        self.columnFilter = columnFilter
+        self.onlyWhenChanged = onlyWhenChanged
+    }
 }
 
 private let MAX_AMOUNT_OF_COLUMNS = 63
@@ -40,6 +80,9 @@ public struct Table: TableProtocol {
     public let localOnly: Bool
     public let insertOnly: Bool
     public let viewNameOverride: String?
+    public let trackMetadata: Bool
+    public let trackPreviousValues: TrackPreviousValuesOptions?
+    public let ignoreEmptyUpdates: Bool
 
     public var viewName: String {
         viewNameOverride ?? name
@@ -60,7 +103,10 @@ public struct Table: TableProtocol {
         indexes: [Index] = [],
         localOnly: Bool = false,
         insertOnly: Bool = false,
-        viewNameOverride: String? = nil
+        viewNameOverride: String? = nil,
+        trackMetadata: Bool = false,
+        trackPreviousValues: TrackPreviousValuesOptions? = nil,
+        ignoreEmptyUpdates: Bool = false
     ) {
         self.name = name
         self.columns = columns
@@ -68,6 +114,9 @@ public struct Table: TableProtocol {
         self.localOnly = localOnly
         self.insertOnly = insertOnly
         self.viewNameOverride = viewNameOverride
+        self.trackMetadata = trackMetadata
+        self.trackPreviousValues = trackPreviousValues
+        self.ignoreEmptyUpdates = ignoreEmptyUpdates
     }
 
     private func hasInvalidSqliteCharacters(_ string: String) -> Bool {
@@ -82,10 +131,19 @@ public struct Table: TableProtocol {
         if columns.count > MAX_AMOUNT_OF_COLUMNS {
             throw TableError.tooManyColumns(tableName: name, count: columns.count)
         }
-
+        
         if let viewNameOverride = viewNameOverride,
            hasInvalidSqliteCharacters(viewNameOverride) {
             throw TableError.invalidViewName(viewName: viewNameOverride)
+        }
+        
+        if localOnly {
+            if trackPreviousValues != nil {
+                throw TableError.trackPreviousForLocalTable(tableName: name)
+            }
+            if trackMetadata {
+                throw TableError.metadataForLocalTable(tableName: name)
+            }
         }
 
         var columnNames = Set<String>(["id"])
@@ -156,4 +214,8 @@ public enum TableError: Error {
     case duplicateIndex(tableName: String, indexName: String)
     case invalidIndexName(tableName: String, indexName: String)
     case columnNotFound(tableName: String, columnName: String, indexName: String)
+    /// Local-only tables can't enable ``Table/trackMetadata`` because no updates are tracked for those tables at all.
+    case metadataForLocalTable(tableName: String)
+    /// Local-only tables can't enable ``Table/trackPreviousValues`` because no updates are tracked for those tables at all.
+    case trackPreviousForLocalTable(tableName: String)
 }

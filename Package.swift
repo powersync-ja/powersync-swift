@@ -17,7 +17,6 @@ let package = Package(
             targets: ["PowerSync"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/powersync-ja/powersync-kotlin.git", "1.0.1+SWIFT.0"..<"1.1.0+SWIFT.0"),
         .package(url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git", "0.3.14"..<"0.4.0")
     ],
     targets: [
@@ -26,12 +25,24 @@ let package = Package(
         .target(
             name: packageName,
             dependencies: [
-                .product(name: "PowerSyncKotlin", package: "powersync-kotlin"),
+                .target(name: "PowerSyncKotlin"),
                 .product(name: "PowerSyncSQLiteCore", package: "powersync-sqlite-core-swift")
             ]),
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]
         ),
+        // If you want to use a local build, comment out this reference and update the other.
+        // See docs/LocalBuild.md
+        .binaryTarget(
+            name: "PowerSyncKotlin",
+            // TODO: Use GitHub release once https://github.com/powersync-ja/powersync-kotlin/releases/tag/untagged-fde4386dec502ec27067 is published
+            url: "https://fsn1.your-objectstorage.com/simon-public/powersync.zip",
+            checksum: "b6770dc22ae31315adc599e653fea99614226312fe861dbd8764e922a5a83b09"
+        ),
+        // .binaryTarget(
+        //     name: "PowerSyncKotlin",
+        //     path: "/path/to/powersync-kotlin/PowerSyncKotlin/build/XCFrameworks/debug/PowerSyncKotlin.xcframework"
+        // )
     ]
 )

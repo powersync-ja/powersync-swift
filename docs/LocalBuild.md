@@ -1,12 +1,23 @@
 # PowerSync Swift SDK
 
-## Run against a local kotlin build
+## Run against a local Kotlin build
 
-* To run using the local kotlin build you need to apply the following change in the `Package.swift` file:
+Especially when working on the Kotlin SDK, it may be helpful to test your local changes
+with the Swift SDK too.
+To do this, first create an XCFramework from your Kotlin checkout:
 
-  ```swift
-      dependencies: [
-          .package(url: "https://github.com/powersync-ja/powersync-kotlin.git", exact: "x.y.z"), <-- Comment this
-  //        .package(path: "../powersync-kotlin"), <-- Include this line and put in the path to you powersync-kotlin repo
-  ```
-* To quickly make a local build to apply changes you made in `powersync-kotlin` for local development in the Swift SDK run the gradle task `spmDevBuild` in `PowerSyncKotlin` in the `powersync-kotlin` repo. This will update the files and the changes will be reflected in the Swift SDK.
+```bash
+./gradlew PowerSyncKotlin:assemblePowerSyncKotlinDebugXCFramework
+```
+
+Then, point the `binaryTarget` dependency in `Package.swift` towards the path of your generated
+XCFramework:
+
+```Swift
+.binaryTarget(
+    name: "PowerSyncKotlin",
+    path: "/path/to/powersync-kotlin/PowerSyncKotlin/build/XCFrameworks/debug/PowerSyncKotlin.xcframework"
+)
+```
+
+Subsequent Kotlin changes should get picked up after re-assembling the Kotlin XCFramework.

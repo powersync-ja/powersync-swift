@@ -33,6 +33,95 @@ final class CrudTests: XCTestCase {
         database = nil
         try await super.tearDown()
     }
+    
+    func testTrackMetadata() async throws {
+        try await database.updateSchema(schema: Schema(tables: [
+            Table(name: "lists", columns: [.text("name")], trackMetadata: true)
+        ]))
+
+        try await database.execute("INSERT INTO lists (id, name, _metadata) VALUES (uuid(), 'test', 'so meta')")
+        guard let batch = try await database.getNextCrudTransaction() else {
+            return XCTFail("Should have batch after insert")
+        }
+        
+        XCTAssertEqual(batch.crud[0].metadata, "so meta")
+    }
+    
+    func testTrackPreviousValues() async throws {
+        try await database.updateSchema(schema: Schema(tables: [
+            Table(
+                name: "lists",
+                columns: [.text("name"), .text("content")],
+                trackPreviousValues: TrackPreviousValuesOptions()
+            )
+        ]))
+        
+        try await database.execute("INSERT INTO lists (id, name, content) VALUES (uuid(), 'entry', 'content')")
+        try await database.execute("DELETE FROM ps_crud")
+        try await database.execute("UPDATE lists SET name = 'new name'")
+        
+        guard let batch = try await database.getNextCrudTransaction() else {
+            return XCTFail("Should have batch after update")
+        }
+        
+        XCTAssertEqual(batch.crud[0].previousValues, ["name": "entry", "content": "content"])
+    }
+    
+    func testTrackPreviousValuesWithFilter() async throws {
+        try await database.updateSchema(schema: Schema(tables: [
+            Table(
+                name: "lists",
+                columns: [.text("name"), .text("content")],
+                trackPreviousValues: TrackPreviousValuesOptions(
+                    columnFilter: ["name"]
+                )
+            )
+        ]))
+        
+        try await database.execute("INSERT INTO lists (id, name, content) VALUES (uuid(), 'entry', 'content')")
+        try await database.execute("DELETE FROM ps_crud")
+        try await database.execute("UPDATE lists SET name = 'new name'")
+        
+        guard let batch = try await database.getNextCrudTransaction() else {
+            return XCTFail("Should have batch after update")
+        }
+        
+        XCTAssertEqual(batch.crud[0].previousValues, ["name": "entry"])
+    }
+    
+    func testTrackPreviousValuesOnlyWhenChanged() async throws {
+        try await database.updateSchema(schema: Schema(tables: [
+            Table(
+                name: "lists",
+                columns: [.text("name"), .text("content")],
+                trackPreviousValues: TrackPreviousValuesOptions(
+                    onlyWhenChanged: true
+                )
+            )
+        ]))
+        
+        try await database.execute("INSERT INTO lists (id, name, content) VALUES (uuid(), 'entry', 'content')")
+        try await database.execute("DELETE FROM ps_crud")
+        try await database.execute("UPDATE lists SET name = 'new name'")
+        
+        guard let batch = try await database.getNextCrudTransaction() else {
+            return XCTFail("Should have batch after update")
+        }
+        
+        XCTAssertEqual(batch.crud[0].previousValues, ["name": "entry"])
+    }
+    
+    func testIgnoreEmptyUpdate() async throws {
+        try await database.updateSchema(schema: Schema(tables: [
+            Table(name: "lists", columns: [.text("name")], ignoreEmptyUpdates: true)
+        ]))
+        try await database.execute("INSERT INTO lists (id, name) VALUES (uuid(), 'test')")
+        try await database.execute("DELETE FROM ps_crud")
+        try await database.execute("UPDATE lists SET name = 'test'") // Same value!
+        
+        let batch = try await database.getNextCrudTransaction()
+        XCTAssertNil(batch)
+    }
 
     func testCrudBatch() async throws {
         // Create some items
