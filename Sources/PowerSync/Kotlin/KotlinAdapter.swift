@@ -41,7 +41,7 @@ enum KotlinAdapter {
                 viewNameOverride: table.viewNameOverride,
                 trackMetadata: table.trackMetadata,
                 trackPreviousValues: trackPreviousKotlin,
-                ignoreEmptyUpdates: table.ignoreEmptyUpdates,
+                ignoreEmptyUpdates: table.ignoreEmptyUpdates
             )
         }
     }
