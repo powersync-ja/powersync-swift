@@ -23,13 +23,25 @@ enum KotlinAdapter {
 
     struct Table {
         static func toKotlin(_ table: TableProtocol) -> PowerSyncKotlin.Table {
-            PowerSyncKotlin.Table(
+            let trackPreviousKotlin: PowerSyncKotlin.TrackPreviousValuesOptions? = if let track = table.trackPreviousValues {
+                PowerSyncKotlin.TrackPreviousValuesOptions(
+                    columnFilter: track.columnFilter,
+                    onlyWhenChanged: track.onlyWhenChanged
+                )
+            } else {
+                nil
+            }
+            
+            return PowerSyncKotlin.Table(
                 name: table.name,
                 columns: table.columns.map { Column.toKotlin($0) },
                 indexes: table.indexes.map { Index.toKotlin($0) },
                 localOnly: table.localOnly,
                 insertOnly: table.insertOnly,
-                viewNameOverride: table.viewNameOverride
+                viewNameOverride: table.viewNameOverride,
+                trackMetadata: table.trackMetadata,
+                trackPreviousValues: trackPreviousKotlin,
+                ignoreEmptyUpdates: table.ignoreEmptyUpdates
             )
         }
     }

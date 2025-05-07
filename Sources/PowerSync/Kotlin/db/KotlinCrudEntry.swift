@@ -28,9 +28,17 @@ struct KotlinCrudEntry : CrudEntry {
         entry.transactionId?.int64Value
     }
     
+    var metadata: String? {
+        entry.metadata
+    }
+    
     var opData: [String : String?]? {
         /// Kotlin represents this as Map<String, String?>, but this is
         /// converted to [String: Any] by SKIEE
         entry.opData?.mapValues { $0 as? String }
+    }
+    
+    var previousValues: [String : String?]? {
+        entry.previousValues?.mapValues { $0 as? String }
     }
 }
