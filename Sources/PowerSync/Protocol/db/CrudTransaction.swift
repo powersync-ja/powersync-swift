@@ -18,11 +18,9 @@ public protocol CrudTransaction {
 
 public extension CrudTransaction {
     /// Call to remove the changes from the local queue, once successfully uploaded.
-    ///
-    /// `writeCheckpoint` is optional.
-    func complete(writeCheckpoint: String? = nil) async throws {
+    func complete() async throws {
         try await self.complete(
-            writeCheckpoint: writeCheckpoint
+            writeCheckpoint: nil
         )
     }
 }
