@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.1 (unreleased)
+
+* Added default `nil` value for `writeCheckpoint` parameter when calling `CrudBatch.complete()`. Developers no longer need to specify `nil` as an argument
+``` diff
+guard let finalBatch = try await powersync.getCrudBatch(limit: 100) else {
+  return nil
+}
+- try await batch.complete(writeCheckpoint: nil)
++ try await batch.complete()
+```
+
 ## 1.1.0
 
 * Add sync progress information through `SyncStatusData.downloadProgress`.

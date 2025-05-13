@@ -13,3 +13,14 @@ public protocol CrudBatch {
     /// `writeCheckpoint` is optional.
     func complete(writeCheckpoint: String?) async throws
 }
+
+public extension CrudBatch {
+    /// Call to remove the changes from the local queue, once successfully uploaded.
+    ///
+    /// `writeCheckpoint` is optional.
+    func complete(writeCheckpoint: String? = nil) async throws {
+        try await self.complete(
+            writeCheckpoint: writeCheckpoint
+        )
+    }
+}
