@@ -178,5 +178,25 @@ final class CrudTests: XCTestCase {
         }
         
         XCTAssertNil(afterCompleteBatch)
+        
+        try await database.writeTransaction { tx in
+            for i in 0 ..< 100 {
+                try tx.execute(
+                    sql: "INSERT INTO users (id, name, email, favorite_number) VALUES (uuid(), 'a', 'a@example.com', ?)",
+                    parameters: [i]
+                )
+            }
+        }
+        
+        guard let finalBatch = try await database.getCrudBatch(limit: 100) else {
+            return XCTFail("Failed to get crud batch")
+        }
+        XCTAssert(finalBatch.crud.count == 100)
+        XCTAssert(finalBatch.hasMore == false)
+        // Calling complete without a writeCheckpoint param should be possible
+        try await finalBatch.complete()
+        
+        let finalValidationBatch = try await database.getCrudBatch(limit: 100)
+        XCTAssertNil(finalValidationBatch)
     }
 }
