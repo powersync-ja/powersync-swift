@@ -2,7 +2,7 @@
 
 ## 1.1.1 (unreleased)
 
-* Added default `nil` value for `writeCheckpoint` parameter when calling `CrudBatch.complete()`. Developers no longer need to specify `nil` as an argument
+* Improved `CrudBatch` and `CrudTransaction` `complete` function extensions. Developers no longer need to specify `nil` as an argument for `writeCheckpoint` when calling `CrudBatch.complete`. The base `complete` functions still accepts an optional `writeCheckpoint` argument if developers use custom write checkpoints. 
 ``` diff
 guard let finalBatch = try await powersync.getCrudBatch(limit: 100) else {
   return nil
