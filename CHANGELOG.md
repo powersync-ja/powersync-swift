@@ -10,6 +10,7 @@ guard let finalBatch = try await powersync.getCrudBatch(limit: 100) else {
 - try await batch.complete(writeCheckpoint: nil)
 + try await batch.complete()
 ```
+* Fix reported progress around compactions / defrags on the sync service.
 
 ## 1.1.0
 
