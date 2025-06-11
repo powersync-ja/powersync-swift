@@ -45,7 +45,7 @@ let package = Package(
             targets: ["PowerSync"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git", "0.3.14"..<"0.5.0")
+        .package(url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git", exact: "0.4.0")
     ] + conditionalDependencies,
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.

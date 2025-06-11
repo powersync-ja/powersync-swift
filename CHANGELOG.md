@@ -11,7 +11,7 @@ guard let finalBatch = try await powersync.getCrudBatch(limit: 100) else {
 + try await batch.complete()
 ```
 * Fix reported progress around compactions / defrags on the sync service.
-* Support version `0.4.0` of the core extension, which improves sync performance.
+* Use version `0.4.0` of the PowerSync core extension, which improves sync performance.
 
 ## 1.1.0
 
