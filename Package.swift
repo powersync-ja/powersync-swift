@@ -8,6 +8,10 @@ let packageName = "PowerSync"
 // build. Also see docs/LocalBuild.md for details
 let localKotlinSdkOverride: String? = nil
 
+// Set this to the absolute path of your powersync-sqlite-core checkout if you want to use a
+// local build of the core extension.
+let localCoreExtension: String? = nil
+
 // Our target and dependency setup is different when a local Kotlin SDK is used. Without the local
 // SDK, we have no package dependency on Kotlin and download the XCFramework from Kotlin releases as
 // a binary target.
@@ -32,11 +36,24 @@ if let kotlinSdkPath = localKotlinSdkOverride {
     ))
 }
 
+var corePackageName = "powersync-sqlite-core-swift"
+if let corePath = localCoreExtension {
+    conditionalDependencies.append(.package(path: corePath))
+    corePackageName = "powersync-sqlite-core"
+} else {
+    // Not using a local build, so download from releases
+    conditionalDependencies.append(.package(
+        url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
+        exact: "0.4.1"
+    ))
+}
+
 let package = Package(
     name: packageName,
     platforms: [
         .iOS(.v13),
-        .macOS(.v10_15)
+        .macOS(.v10_15),
+        .watchOS(.v9)
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
@@ -44,9 +61,7 @@ let package = Package(
             name: packageName,
             targets: ["PowerSync"]),
     ],
-    dependencies: [
-        .package(url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git", exact: "0.4.1")
-    ] + conditionalDependencies,
+    dependencies: conditionalDependencies,
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
@@ -54,7 +69,7 @@ let package = Package(
             name: packageName,
             dependencies: [
                 kotlinTargetDependency,
-                .product(name: "PowerSyncSQLiteCore", package: "powersync-sqlite-core-swift")
+                .product(name: "PowerSyncSQLiteCore", package: corePackageName)
             ]),
         .testTarget(
             name: "PowerSyncTests",
