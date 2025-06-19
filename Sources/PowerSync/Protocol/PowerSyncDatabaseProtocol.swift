@@ -75,7 +75,7 @@ public struct ConnectOptions {
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
         newClientImplementation: Bool = false,
-        connectionMethod: ConnectionMethod = .http,
+        connectionMethod: ConnectionMethod = .http
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
