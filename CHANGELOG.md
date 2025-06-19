@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.1 (unreleased)
+## 1.2.0
 
 * Improved `CrudBatch` and `CrudTransaction` `complete` function extensions. Developers no longer need to specify `nil` as an argument for `writeCheckpoint` when calling `CrudBatch.complete`. The base `complete` functions still accept an optional `writeCheckpoint` argument if developers use custom write checkpoints. 
 ``` diff
@@ -12,6 +12,31 @@ guard let finalBatch = try await powersync.getCrudBatch(limit: 100) else {
 ```
 * Fix reported progress around compactions / defrags on the sync service.
 * Use version `0.4.0` of the PowerSync core extension, which improves sync performance.
+* Add a new sync client implementation written in Rust instead of Kotlin. While this client is still
+  experimental, we intend to make it the default in the future. The main benefit of this client is
+  faster sync performance, but upcoming features will also require this client. We encourage 
+  interested users to try it out by opting in to experimental APIs and passing options when
+  connecting:
+  ```Swift
+  @_spi(PowerSyncExperimental) import PowerSync
+
+  try await db.connect(connector: connector, options: ConnectOptions(
+      newClientImplementation: true,
+  ))
+  ```
+  Switching between the clients can be done at any time without compatibility issues. If you run
+  into issues with the new client, please reach out to us!
+* In addition to HTTP streams, the Swift SDK also supports fetching sync instructions from the
+  PowerSync service in a binary format. This requires the new sync client, and can then be enabled
+  on the sync options:
+  ```Swift
+  @_spi(PowerSyncExperimental) import PowerSync
+
+  try await db.connect(connector: connector, options: ConnectOptions(
+      newClientImplementation: true,
+      connectionMethod: .webSocket,
+  ))
+  ```
 
 ## 1.1.0
 

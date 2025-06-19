@@ -27,8 +27,8 @@ if let kotlinSdkPath = localKotlinSdkOverride {
     // Not using a local build, so download from releases
     conditionalTargets.append(.binaryTarget(
         name: "PowerSyncKotlin",
-        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.1.1/PowersyncKotlinRelease.zip",
-        checksum: "780437e25d41e46c2c1f555adcf330436f185d3663ef442da7141381d9c0495b"
+        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.2.0/PowersyncKotlinRelease.zip",
+        checksum: "7454481a245b46b1b63a42419ec27f88f2fcb7fba9b763e3085cb49db59dfd58"
     ))
 }
 
