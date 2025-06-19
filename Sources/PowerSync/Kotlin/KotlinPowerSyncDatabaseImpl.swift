@@ -62,9 +62,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             crudThrottleMs: Int64(resolvedOptions.crudThrottle * 1000),
             retryDelayMs: Int64(resolvedOptions.retryDelay * 1000),
             params: resolvedOptions.params.mapValues { $0.toKotlinMap() },
-            options: SyncOptions(
-                newClientImplementation: resolvedOptions.newClientImplementation,
-                method: createConnectionMethod(webSocket: useWebsockets),
+            options: createSyncOptions(
+                newClient: resolvedOptions.newClientImplementation,
+                webSocket: useWebsockets,
+                userAgent: "PowerSync Swift SDK"
             )
         )
     }
