@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1 (unreleased)
+
+* Use version `0.4.1` of the PowerSync core extension, which fixes an issue with the
+  new Rust client implementation.
+
 ## 1.2.0
 
 * Improved `CrudBatch` and `CrudTransaction` `complete` function extensions. Developers no longer need to specify `nil` as an argument for `writeCheckpoint` when calling `CrudBatch.complete`. The base `complete` functions still accept an optional `writeCheckpoint` argument if developers use custom write checkpoints. 
