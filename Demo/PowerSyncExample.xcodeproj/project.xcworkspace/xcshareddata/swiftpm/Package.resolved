@@ -11,21 +11,12 @@
       }
     },
     {
-      "identity" : "powersync-kotlin",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/powersync-ja/powersync-kotlin.git",
-      "state" : {
-        "revision" : "ccd2e595195c59d570eb93a878ad6a5cfca72ada",
-        "version" : "1.0.1+SWIFT.0"
-      }
-    },
-    {
       "identity" : "powersync-sqlite-core-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
       "state" : {
-        "revision" : "3a7fcb3be83db5b450effa5916726b19828cbcb7",
-        "version" : "0.3.14"
+        "revision" : "532952161e6150653e73cc3d59ef3f12b64b6a93",
+        "version" : "0.4.0"
       }
     },
     {
