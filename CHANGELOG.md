@@ -1,9 +1,10 @@
 # Changelog
 
-## 1.2.1 (unreleased)
+## 1.2.1
 
 * Use version `0.4.1` of the PowerSync core extension, which fixes an issue with the
   new Rust client implementation.
+* Fix crud uploads when web sockets are used as a connection method.
 
 ## 1.2.0
 
