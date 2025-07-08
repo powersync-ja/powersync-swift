@@ -8,10 +8,6 @@ _[PowerSync](https://www.powersync.com) is a sync engine for building local-firs
 
 This is the PowerSync SDK for Swift clients. The SDK reference is available [here](https://docs.powersync.com/client-sdk-references/swift).
 
-## Beta Release
-
-This SDK is currently in a beta release it is suitable for production use, given you have tested your use case(s) extensively. If you find a bug or issue, please open a [GitHub issue](https://github.com/powersync-ja/powersync-swift/issues). Questions or feedback can be posted on our [community Discord](https://discord.gg/powersync) - we'd love to hear from you.
-
 ## Structure: Packages
 
 - [Sources](./Sources/)
@@ -47,9 +43,7 @@ Add
     ]
 ```
 
-to your `Package.swift` file and pin the dependency to a specific version. The version is required because the package is in beta.
-
-to your `Package.swift` file and pin the dependency to a specific version. This is required because the package is in beta.
+to your `Package.swift` file.
 
 ## Usage
 
@@ -80,9 +74,6 @@ let powersync = PowerSyncDatabase(
 
 The PowerSync Swift SDK currently makes use of the [PowerSync Kotlin Multiplatform SDK](https://github.com/powersync-ja/powersync-kotlin) with the API tool [SKIE](https://skie.touchlab.co/) and KMMBridge under the hood to help generate and publish a native Swift package. We will move to an entirely Swift native API in v1 and do not expect there to be any breaking changes. For more details, see the [Swift SDK reference](https://docs.powersync.com/client-sdk-references/swift).
 
-## Migration from Alpha to Beta
-
-See these [developer notes](https://docs.powersync.com/client-sdk-references/swift#migrating-from-the-alpha-to-the-beta-sdk) if you are migrating from the alpha to the beta version of the Swift SDK.
 
 ## Attachments
 
