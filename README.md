@@ -6,7 +6,7 @@ _[PowerSync](https://www.powersync.com) is a sync engine for building local-firs
 
 # PowerSync Swift
 
-This is the PowerSync SDK for Swift clients. The SDK reference is available [here](https://docs.powersync.com/client-sdk-references/swift).
+This is the PowerSync SDK for Swift clients. The SDK reference is available [here](https://docs.powersync.com/client-sdk-references/swift), API references are [documented here](https://powersync-ja.github.io/powersync-swift/documentation/powersync/).
 
 ## Structure: Packages
 
@@ -72,8 +72,10 @@ let powersync = PowerSyncDatabase(
 
 ## Underlying Kotlin Dependency
 
-The PowerSync Swift SDK currently makes use of the [PowerSync Kotlin Multiplatform SDK](https://github.com/powersync-ja/powersync-kotlin) with the API tool [SKIE](https://skie.touchlab.co/) and KMMBridge under the hood to help generate and publish a native Swift package. We will move to an entirely Swift native API in v1 and do not expect there to be any breaking changes. For more details, see the [Swift SDK reference](https://docs.powersync.com/client-sdk-references/swift).
+The PowerSync Swift SDK makes use of the [PowerSync Kotlin Multiplatform SDK](https://github.com/powersync-ja/powersync-kotlin) and the API tool [SKIE](https://skie.touchlab.co/) under the hood to implement the Swift package.
+However, this dependency is resolved internally and all public APIs are written entirely in Swift.
 
+For more details, see the [Swift SDK reference](https://docs.powersync.com/client-sdk-references/swift) and generated [API references](https://powersync-ja.github.io/powersync-swift/documentation/powersync/).
 
 ## Attachments
 
