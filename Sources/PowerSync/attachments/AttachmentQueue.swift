@@ -413,6 +413,11 @@ open class AttachmentQueue {
 
         for attachment in attachments {
             guard let localUri = attachment.localUri else {
+                // Redownload synced attachments with missing localUri.
+                // Can happen when the app is reinstalled and a new sandbox is created in the iOS simulator.
+                if attachment.state == AttachmentState.synced {
+                    updates.append(attachment.with(state: .queuedDownload))
+                }
                 continue
             }
 
