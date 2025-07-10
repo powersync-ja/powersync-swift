@@ -27,7 +27,7 @@ Add
 ```swift
     dependencies: [
         ...
-        .package(url: "https://github.com/powersync-ja/powersync-swift", exact: "<version>")
+        .package(url: "https://github.com/powersync-ja/powersync-swift", from: "1.0.0")
     ],
     targets: [
         .target(
