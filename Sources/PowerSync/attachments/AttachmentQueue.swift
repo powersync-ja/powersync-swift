@@ -413,23 +413,25 @@ open class AttachmentQueue {
 
         for attachment in attachments {
             guard let localUri = attachment.localUri else {
-                // Redownload synced attachments with missing localUri.
-                // Can happen when the app is reinstalled and a new sandbox is created in the iOS simulator.
-                if attachment.state == AttachmentState.synced {
-                    updates.append(attachment.with(state: .queuedDownload))
-                }
                 continue
             }
 
             let exists = try await localStorage.fileExists(filePath: localUri)
-            if attachment.state == AttachmentState.synced ||
-                attachment.state == AttachmentState.queuedUpload &&
-                !exists
-            {
-                // The file must have been removed from the local storage
+            if exists {
+                // The file exists, this is correct
+                continue
+            }
+            
+            if attachment.state == AttachmentState.queuedUpload {
+                // The file must have been removed from the local storage before upload was completed
                 updates.append(attachment.with(
                     state: .archived,
                     localUri: .some(nil) // Clears the value
+                ))
+            } else if attachment.state == AttachmentState.synced {
+                // The file was downloaded, but removed - trigger redownload
+                updates.append(attachment.with(
+                    state: .queuedDownload
                 ))
             }
         }
