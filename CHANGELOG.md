@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.2 (unreleased)
+
+* Use version `0.4.2` of the PowerSync core extension, which improves the reliability
+  of the new Rust client implementation.
+* Fix attachments never downloading again when the sandbox path of the app (e.g. on the simulator)
+  changes.
+
 ## 1.2.1
 
 * Use version `0.4.1` of the PowerSync core extension, which fixes an issue with the
