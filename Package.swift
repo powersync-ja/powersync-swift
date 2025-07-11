@@ -42,9 +42,10 @@ if let corePath = localCoreExtension {
     corePackageName = "powersync-sqlite-core"
 } else {
     // Not using a local build, so download from releases
-    conditionalDependencies.append(.package(
-        url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
-        exact: "0.4.2"
+    conditionalTargets.append(.binaryTarget(
+        name: "powersync-sqlite-core",
+        url: "https://fsn1.your-objectstorage.com/simon-public/powersync/powersync_preview_0.zip",
+        checksum: "f239e732dea91318bb0ebb129c85ae68a6f59e8f4918c30ebfa2a5fabe0dd146"
     ))
 }
 
@@ -69,7 +70,7 @@ let package = Package(
             name: packageName,
             dependencies: [
                 kotlinTargetDependency,
-                .product(name: "PowerSyncSQLiteCore", package: corePackageName)
+                .target(name: "powersync-sqlite-core")
             ]),
         .testTarget(
             name: "PowerSyncTests",
