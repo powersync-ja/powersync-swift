@@ -41,6 +41,11 @@ public struct PendingStatement {
     /// Note that the ``RawTable/delete`` statement can only use ``PendingStatementParameter/id`` - upsert
     /// statements can also use ``PendingStatementParameter/column`` to refer to columns.
     public let parameters: [PendingStatementParameter]
+    
+    public init(sql: String, parameters: [PendingStatementParameter]) {
+        self.sql = sql
+        self.parameters = parameters
+    }
 }
 
 /// A parameter that can be used in a ``PendingStatement``.
