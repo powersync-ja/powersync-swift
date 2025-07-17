@@ -44,6 +44,30 @@ enum KotlinAdapter {
                 ignoreEmptyUpdates: table.ignoreEmptyUpdates
             )
         }
+        
+        static func toKotlin(_ table: RawTable) -> PowerSyncKotlin.RawTable {
+            return PowerSyncKotlin.RawTable(
+                name: table.name,
+                put: translateStatement(table.put),
+                delete: translateStatement(table.delete),
+            );
+        }
+        
+        private static func translateStatement(_ stmt: PendingStatement) -> PowerSyncKotlin.PendingStatement {
+            return PowerSyncKotlin.PendingStatement(
+                sql: stmt.sql,
+                parameters: stmt.parameters.map(translateParameter)
+            )
+        }
+        
+        private static func translateParameter(_ param: PendingStatementParameter) -> PowerSyncKotlin.PendingStatementParameter {
+            switch param {
+            case .id:
+                return PowerSyncKotlin.PendingStatementParameterId.shared
+            case .column(let name):
+                return PowerSyncKotlin.PendingStatementParameterColumn(name: name)
+            }
+        }
     }
 
     struct Column {
@@ -68,8 +92,12 @@ enum KotlinAdapter {
 
     struct Schema {
         static func toKotlin(_ schema: SchemaProtocol) -> PowerSyncKotlin.Schema {
-            PowerSyncKotlin.Schema(
-                tables: schema.tables.map { Table.toKotlin($0) }
+            var mappedTables: [PowerSyncKotlin.BaseTable] = []
+            mappedTables.append(contentsOf: schema.tables.map(Table.toKotlin))
+            mappedTables.append(contentsOf: schema.rawTables.map(Table.toKotlin))
+            
+            return PowerSyncKotlin.Schema(
+                tables: mappedTables
             )
         }
     }
