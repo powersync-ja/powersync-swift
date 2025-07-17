@@ -1,10 +1,15 @@
 import Foundation
 
-public protocol TableProtocol {
+/// Shared protocol for both PowerSync-managed ``Table``s as well as ``RawTable``s managed by the user.
+public protocol BaseTableProtocol {
     ///
     /// The synced table name, matching sync rules.
     ///
     var name: String { get }
+}
+
+/// Protocol for describing ``Table``s managed by PowerSync.
+public protocol TableProtocol: BaseTableProtocol {
     ///
     /// List of columns.
     ///

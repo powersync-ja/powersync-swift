@@ -1,9 +1,11 @@
 # Changelog
 
-## 1.2.2 (unreleased)
+## 1.3.0
 
 * Use version `0.4.2` of the PowerSync core extension, which improves the reliability
   of the new Rust client implementation.
+* Add support for [raw tables](https://docs.powersync.com/usage/use-case-examples/raw-tables), which
+  are custom tables managed by the user instead of JSON-based views managed by the SDK.
 * Fix attachments never downloading again when the sandbox path of the app (e.g. on the simulator)
   changes.
 
