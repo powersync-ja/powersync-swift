@@ -22,8 +22,6 @@ Follow this guide to:
 cp Secrets.template Secrets.swift
 ```
 
-Add the `Secrets.swift` file to the project in XCode. Right click on the `PowerSyncExample` tree item then select `Add files to PowerSyncExample`.
-
 3. You will need to enable `CasePathMacros` for SwiftUI Navigation. You can do this in settings, or just build the app and a dialog will be shown to enable `CasePathMacros`.
 
 ### Troubleshooting
