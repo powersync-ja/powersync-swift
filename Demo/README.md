@@ -16,10 +16,10 @@ Follow this guide to:
 
 1. Open this directory in XCode.
 
-2. Copy the `Secrets.template` file to a new Swift file and insert the credentials of your Supabase and PowerSync projects (more info can be found [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#test-everything-using-our-demo-app)).
+2. Copy the `Secrets.template.swift` file to a new `Secrets.swift` file and insert the credentials of your Supabase and PowerSync projects (more info can be found [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#test-everything-using-our-demo-app)).
 
 ```bash
-cp Secrets.template Secrets.swift
+cp Secrets.template.swift Secrets.swift
 ```
 
 3. You will need to enable `CasePathMacros` for SwiftUI Navigation. You can do this in settings, or just build the app and a dialog will be shown to enable `CasePathMacros`.
