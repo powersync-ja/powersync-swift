@@ -13,6 +13,7 @@ extension Secrets {
         return "TODO"
     }
 
+    // Optional storage bucket name. Set to nil if you don't want to use storage.
     static var supabaseStorageBucket: String? {
         return nil
     }
