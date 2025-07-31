@@ -7,11 +7,6 @@ enum Route: Hashable {
 }
 
 @Observable
-class AuthModel {
-    var isAuthenticated = false
-}
-
-@Observable
 class NavigationModel {
     var path = NavigationPath()
 }

@@ -1,10 +1,34 @@
 import Foundation
 
-// Enter your Supabase and PowerSync project details.
-enum Secrets {
-    static let powerSyncEndpoint = "https://your-id.powersync.journeyapps.com"
-    static let supabaseURL = URL(string: "https://your-id.supabase.co")!
-    static let supabaseAnonKey = "anon-key"
-    // Optional storage bucket name. Set to nil if you don't want to use storage.
-    static let supabaseStorageBucket: String? = nil
+/// A protocol which specified the base structure for secrets
+protocol SecretsProvider {
+    static var powerSyncEndpoint: String { get }
+    static var supabaseURL: URL { get }
+    static var supabaseAnonKey: String { get }
+    static var supabaseStorageBucket: String? { get }
 }
+
+/// A default implementation of [SecretsProvider].
+/// This implementation ensures the app will compile even if no actual secrets are provided.
+/// Devs should specify the actual secrets in a Git ignored file.
+extension SecretsProvider {
+    static var powerSyncEndpoint: String {
+        return "TODO"
+    }
+
+    static var supabaseURL: URL {
+        return  URL(string: "TODO")!
+    }
+
+    static var supabaseAnonKey: String {
+        return "TODO"
+    }
+
+    static var supabaseStorageBucket: String? {
+        return nil
+    }
+}
+
+
+// Default conforming type
+enum Secrets: SecretsProvider {}
