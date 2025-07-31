@@ -13,11 +13,11 @@ protocol SecretsProvider {
 /// Devs should specify the actual secrets in a Git ignored file.
 extension SecretsProvider {
     static var powerSyncEndpoint: String {
-        return "TODO"
+        return "https://todo.powersync.com"
     }
 
     static var supabaseURL: URL {
-        return  URL(string: "TODO")!
+        return  URL(string: "https://todo.supabase.co")!
     }
 
     static var supabaseAnonKey: String {

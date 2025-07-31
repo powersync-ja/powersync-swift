@@ -41,6 +41,7 @@
 		B6B3698A2C64F4B30033C307 /* Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B369892C64F4B30033C307 /* Navigation.swift */; };
 		B6FFD5322D06DA8000EEE60F /* PowerSync in Frameworks */ = {isa = PBXBuildFile; productRef = B6FFD5312D06DA8000EEE60F /* PowerSync */; };
 		BE2F26EC2DA54B2F0080F1AE /* SupabaseRemoteStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2F26EB2DA54B2A0080F1AE /* SupabaseRemoteStorage.swift */; };
+		BEE4708B2E3BBB2500140D11 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE4708A2E3BBB2500140D11 /* Secrets.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -108,6 +109,7 @@
 		B6F4213D2BC42F5B0005D0D0 /* sqlite3.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = sqlite3.c; path = "../powersync-kotlin/core/build/interop/sqlite/sqlite3.c"; sourceTree = "<group>"; };
 		B6F421402BC430B60005D0D0 /* sqlite3.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = sqlite3.h; path = "../powersync-kotlin/core/build/interop/sqlite/sqlite3.h"; sourceTree = "<group>"; };
 		BE2F26EB2DA54B2A0080F1AE /* SupabaseRemoteStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseRemoteStorage.swift; sourceTree = "<group>"; };
+		BEE4708A2E3BBB2500140D11 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -151,6 +153,7 @@
 		6A7315862B9854220004CB17 /* PowerSyncExample */ = {
 			isa = PBXGroup;
 			children = (
+				BEE4708A2E3BBB2500140D11 /* Secrets.swift */,
 				B65C4D6F2C60D58500176007 /* PowerSync */,
 				B65C4D6E2C60D52E00176007 /* Components */,
 				B65C4D6B2C60D36700176007 /* Screens */,
@@ -564,6 +567,7 @@
 				6ABD78672B9F2B4800558A41 /* RootView.swift in Sources */,
 				B66658612C62179E00159A81 /* ListView.swift in Sources */,
 				6ABD78782B9F2D2800558A41 /* Schema.swift in Sources */,
+				BEE4708B2E3BBB2500140D11 /* Secrets.swift in Sources */,
 				B65C4D6D2C60D38B00176007 /* HomeScreen.swift in Sources */,
 				6A7315882B9854220004CB17 /* PowerSyncExampleApp.swift in Sources */,
 				B666585F2C62115300159A81 /* ListRow.swift in Sources */,
