@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.4.0
+
+* Added the ability to log PowerSync network requests.
+```swift
+struct InlineLogger: NetworkLogger {
+    func log(_ message: String) {
+        print("Network: \(message)")
+    }
+}
+
+try await db.connect(
+                connector: connector,
+                options: ConnectOptions(
+                    clientConfiguration: SyncClientConfiguration(
+                        networkLogger: NetworkLoggerConfig(
+                            logLevel: .headers,
+                            logger: InlineLogger()
+                        )
+                    )
+                )
+            )
+```
+
 ## 1.3.0
 
 * Use version `0.4.2` of the PowerSync core extension, which improves the reliability

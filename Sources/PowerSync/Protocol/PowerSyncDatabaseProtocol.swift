@@ -1,5 +1,28 @@
 import Foundation
 
+/// Configuration for the sync client used to connect to the PowerSync service.
+///
+/// Provides options to customize network behavior and logging for PowerSync
+/// HTTP requests and responses.
+public struct SyncClientConfiguration {
+    /// Optional configuration for logging PowerSync HTTP requests.
+    ///
+    /// When provided, network requests will be logged according to the
+    /// specified `NetworkLogLevel`. The `logLevel` is set during initialization
+    /// and remains constant throughout the PowerSync session.
+    ///
+    /// Set to `nil` to disable network logging entirely.
+    ///
+    /// - SeeAlso: `NetworkLoggerConfig` for configuration options
+    public let networkLogger: NetworkLoggerConfig?
+    
+    /// Creates a new sync client configuration.
+    /// - Parameter networkLogger: Optional network logger configuration
+    public init(networkLogger: NetworkLoggerConfig? = nil) {
+        self.networkLogger = networkLogger
+    }
+}
+
 /// Options for configuring a PowerSync connection.
 ///
 /// Provides optional parameters to customize sync behavior such as throttling and retry policies.
@@ -41,14 +64,18 @@ public struct ConnectOptions {
     /// We encourage interested users to try the new client.
     @_spi(PowerSyncExperimental)
     public var newClientImplementation: Bool
-
-    /// The connection method used to connect to the Powersync service.
+    
+    /// Configuration for the sync client used for PowerSync requests.
     ///
-    /// The default method is ``ConnectionMethod/http``. Using ``ConnectionMethod/webSocket(_:)`` can
-    /// improve performance as a more efficient binary protocol is used. However, using the websocket connection method
-    /// requires enabling ``ConnectOptions/newClientImplementation``.
-    @_spi(PowerSyncExperimental)
-    public var connectionMethod: ConnectionMethod
+    /// Provides options to customize network behavior including logging of HTTP
+    /// requests and responses. When `nil`, default HTTP client settings are used
+    /// with no network logging.
+    ///
+    /// Set this to configure network logging or other HTTP client behaviors
+    /// specific to PowerSync operations.
+    ///
+    /// - SeeAlso: `SyncClientConfiguration` for available configuration options
+    public var clientConfiguration: SyncClientConfiguration?
     
     /// Initializes a `ConnectOptions` instance with optional values.
     ///
@@ -56,16 +83,18 @@ public struct ConnectOptions {
     ///   - crudThrottle: TimeInterval between CRUD operations in milliseconds. Defaults to `1` second.
     ///   - retryDelay: Delay TimeInterval between retry attempts in milliseconds. Defaults to `5` seconds.
     ///   - params: Custom sync parameters to send to the server. Defaults to an empty dictionary.
+    ///   - clientConfiguration: Configuration for the HTTP client used to connect to PowerSync.
     public init(
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
-        params: JsonParam = [:]
+        params: JsonParam = [:],
+        clientConfiguration: SyncClientConfiguration? = nil
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
         self.newClientImplementation = false
-        self.connectionMethod = .http
+        self.clientConfiguration = clientConfiguration
     }
     
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
@@ -75,20 +104,14 @@ public struct ConnectOptions {
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
         newClientImplementation: Bool = false,
-        connectionMethod: ConnectionMethod = .http
+        clientConfiguration: SyncClientConfiguration? = nil
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
         self.newClientImplementation = newClientImplementation
-        self.connectionMethod = connectionMethod
+        self.clientConfiguration = clientConfiguration
     }
-}
-
-@_spi(PowerSyncExperimental)
-public enum ConnectionMethod {
-    case http
-    case webSocket
 }
 
 /// A PowerSync managed database.
@@ -108,7 +131,6 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     /// Wait for the first sync to occur
     func waitForFirstSync() async throws
     
-
     /// Replace the schema with a new version. This is for advanced use cases - typically the schema
     /// should just be specified once in the constructor.
     ///
@@ -247,7 +269,7 @@ public extension PowerSyncDatabaseProtocol {
     }
     
     func disconnectAndClear(clearLocal: Bool = true) async throws {
-        try await self.disconnectAndClear(clearLocal: clearLocal)
+        try await disconnectAndClear(clearLocal: clearLocal)
     }
     
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {

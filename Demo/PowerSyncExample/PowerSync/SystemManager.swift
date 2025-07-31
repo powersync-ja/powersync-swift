@@ -13,6 +13,12 @@ func getAttachmentsDirectoryPath() throws -> String {
 
 let logTag = "SystemManager"
 
+struct InlineLogger: NetworkLogger {
+    func log(_ message: String) {
+        print("Network: \(message)")
+    }
+}
+
 @Observable
 class SystemManager {
     let connector = SupabaseConnector()
@@ -70,7 +76,17 @@ class SystemManager {
 
     func connect() async {
         do {
-            try await db.connect(connector: connector)
+            try await db.connect(
+                connector: connector,
+                options: ConnectOptions(
+                    clientConfiguration: SyncClientConfiguration(
+                        networkLogger: NetworkLoggerConfig(
+                            logLevel: .headers,
+                            logger: InlineLogger()
+                        )
+                    )
+                )
+            )
             try await attachments?.startSync()
         } catch {
             print("Unexpected error: \(error.localizedDescription)") // Catches any other error
