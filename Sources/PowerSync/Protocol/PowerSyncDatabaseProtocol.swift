@@ -65,19 +65,13 @@ public struct ConnectOptions {
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
-        newClientImplementation: Bool = false,
+        newClientImplementation: Bool = false
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
         self.newClientImplementation = newClientImplementation
     }
-}
-
-@_spi(PowerSyncExperimental)
-public enum ConnectionMethod {
-    case http
-    case webSocket
 }
 
 /// A PowerSync managed database.
