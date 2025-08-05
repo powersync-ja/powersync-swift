@@ -41,14 +41,6 @@ public struct ConnectOptions {
     /// We encourage interested users to try the new client.
     @_spi(PowerSyncExperimental)
     public var newClientImplementation: Bool
-
-    /// The connection method used to connect to the Powersync service.
-    ///
-    /// The default method is ``ConnectionMethod/http``. Using ``ConnectionMethod/webSocket(_:)`` can
-    /// improve performance as a more efficient binary protocol is used. However, using the websocket connection method
-    /// requires enabling ``ConnectOptions/newClientImplementation``.
-    @_spi(PowerSyncExperimental)
-    public var connectionMethod: ConnectionMethod
     
     /// Initializes a `ConnectOptions` instance with optional values.
     ///
@@ -65,7 +57,6 @@ public struct ConnectOptions {
         self.retryDelay = retryDelay
         self.params = params
         self.newClientImplementation = false
-        self.connectionMethod = .http
     }
     
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
@@ -75,13 +66,11 @@ public struct ConnectOptions {
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
         newClientImplementation: Bool = false,
-        connectionMethod: ConnectionMethod = .http
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
         self.newClientImplementation = newClientImplementation
-        self.connectionMethod = connectionMethod
     }
 }
 
