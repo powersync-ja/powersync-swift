@@ -52,11 +52,6 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         )
 
         let resolvedOptions = options ?? ConnectOptions()
-        let useWebsockets = switch (resolvedOptions.connectionMethod) {
-            case .http: false
-            case .webSocket: true
-        }
-
         try await kotlinDatabase.connect(
             connector: connectorAdapter,
             crudThrottleMs: Int64(resolvedOptions.crudThrottle * 1000),
@@ -64,7 +59,6 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             params: resolvedOptions.params.mapValues { $0.toKotlinMap() },
             options: createSyncOptions(
                 newClient: resolvedOptions.newClientImplementation,
-                webSocket: useWebsockets,
                 userAgent: "PowerSync Swift SDK"
             )
         )
