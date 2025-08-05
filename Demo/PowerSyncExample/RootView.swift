@@ -3,14 +3,13 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(SystemManager.self) var system
-
-    @State private var authModel = AuthModel()
+    
     @State private var navigationModel = NavigationModel()
 
     var body: some View {
         NavigationStack(path: $navigationModel.path) {
             Group {
-                if authModel.isAuthenticated {
+                if system.connector.session != nil {
                     HomeScreen()
                 } else {
                     SignInScreen()
@@ -27,7 +26,6 @@ struct RootView: View {
                 }
             }
         }
-        .environment(authModel)
         .environment(navigationModel)
     }
 }

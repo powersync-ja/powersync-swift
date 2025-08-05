@@ -8,7 +8,6 @@ private enum ActionState<Success, Failure: Error> {
 
 struct SignUpScreen: View {
     @Environment(SystemManager.self) private var system
-    @Environment(AuthModel.self) private var authModel
     @Environment(NavigationModel.self) private var navigationModel
 
     @State private var email = ""
@@ -66,7 +65,6 @@ struct SignUpScreen: View {
                 redirectTo: Constants.redirectToURL
             )
             actionState = .result(.success(()))
-            authModel.isAuthenticated = true
             navigationModel.path = NavigationPath()
         } catch {
             withAnimation {
