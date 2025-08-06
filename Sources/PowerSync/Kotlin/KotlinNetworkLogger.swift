@@ -1,25 +1,25 @@
 import PowerSyncKotlin
 
-extension NetworkLogLevel {
-    func toKotlin() -> SwiftNetworkLogLevel {
+extension SyncRequestLogLevel {
+    func toKotlin() -> SwiftSyncRequestLogLevel {
         switch self {
             case .all:
-                return SwiftNetworkLogLevel.all
+                return SwiftSyncRequestLogLevel.all
             case .headers:
-                return SwiftNetworkLogLevel.headers
+                return SwiftSyncRequestLogLevel.headers
             case .body:
-                return SwiftNetworkLogLevel.body
+                return SwiftSyncRequestLogLevel.body
             case .info:
-                return SwiftNetworkLogLevel.info
+                return SwiftSyncRequestLogLevel.info
             case .none:
-                return SwiftNetworkLogLevel.none
+                return SwiftSyncRequestLogLevel.none
         }
     }
 }
 
-extension NetworkLoggerConfig {
-    func toKotlinConfig() -> SwiftNetworkLoggerConfig {
-        return SwiftNetworkLoggerConfig(
+extension SyncRequestLoggerConfiguration {
+    func toKotlinConfig() -> SwiftRequestLoggerConfig {
+        return SwiftRequestLoggerConfig(
             logLevel: self.logLevel.toKotlin(),
             log: { [logger] message in
                 logger.log(message)

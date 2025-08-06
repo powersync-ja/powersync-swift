@@ -96,7 +96,7 @@ final class ConnectTests: XCTestCase {
         
         let fakeUrl = "https://fakepowersyncinstance.fakepowersync.local"
         
-        struct InlineLogger: NetworkLogger {
+        struct InlineLogger: SyncRequestLogger {
             let logger: (_: String) -> Void
             
             func log(_ message: String) {
@@ -130,7 +130,7 @@ final class ConnectTests: XCTestCase {
             connector: TestConnector(url: fakeUrl),
             options: ConnectOptions(
                 clientConfiguration: SyncClientConfiguration(
-                    networkLogger: NetworkLoggerConfig(
+                    requestLogger: SyncRequestLoggerConfiguration(
                         logLevel:
                         .all,
                         logger: testLogger

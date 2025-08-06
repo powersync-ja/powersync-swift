@@ -2,9 +2,10 @@
 
 ## 1.4.0
 
-* Added the ability to log PowerSync network requests.
+* Added the ability to log PowerSync sync network requests.
+
 ```swift
-struct InlineLogger: NetworkLogger {
+struct InlineLogger: SyncRequestLogger {
     func log(_ message: String) {
         print("Network: \(message)")
     }
@@ -14,7 +15,7 @@ try await db.connect(
                 connector: connector,
                 options: ConnectOptions(
                     clientConfiguration: SyncClientConfiguration(
-                        networkLogger: NetworkLoggerConfig(
+                        requestLogger: SyncRequestLoggerConfiguration(
                             logLevel: .headers,
                             logger: InlineLogger()
                         )
