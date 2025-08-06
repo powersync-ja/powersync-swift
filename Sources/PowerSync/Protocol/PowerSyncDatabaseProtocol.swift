@@ -8,10 +8,7 @@ public struct SyncClientConfiguration {
     /// Optional configuration for logging PowerSync HTTP requests.
     ///
     /// When provided, network requests will be logged according to the
-    /// specified `SyncRequestLogLevel`. The `logLevel` is set during initialization
-    /// and remains constant throughout the PowerSync session.
-    ///
-    /// Set to `nil` to disable request logging entirely.
+    /// specified `SyncRequestLoggerConfiguration`. Set to `nil` to disable request logging entirely.
     ///
     /// - SeeAlso: `SyncRequestLoggerConfiguration` for configuration options
     public let requestLogger: SyncRequestLoggerConfiguration?

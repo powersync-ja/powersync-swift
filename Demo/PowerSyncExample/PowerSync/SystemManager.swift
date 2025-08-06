@@ -13,12 +13,6 @@ func getAttachmentsDirectoryPath() throws -> String {
 
 let logTag = "SystemManager"
 
-struct InlineLogger: SyncRequestLogger {
-    func log(_ message: String) {
-        print("Network: \(message)")
-    }
-}
-
 @Observable
 class SystemManager {
     let connector = SupabaseConnector()
@@ -81,9 +75,10 @@ class SystemManager {
                 options: ConnectOptions(
                     clientConfiguration: SyncClientConfiguration(
                         requestLogger: SyncRequestLoggerConfiguration(
-                            logLevel: .headers,
-                            logger: InlineLogger()
-                        )
+                            requestLevel: .headers
+                        ) { message in
+                            self.db.logger.debug(message, tag: "SyncRequest")
+                        }
                     )
                 )
             )

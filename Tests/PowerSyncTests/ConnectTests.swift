@@ -96,21 +96,6 @@ final class ConnectTests: XCTestCase {
         
         let fakeUrl = "https://fakepowersyncinstance.fakepowersync.local"
         
-        struct InlineLogger: SyncRequestLogger {
-            let logger: (_: String) -> Void
-            
-            func log(_ message: String) {
-                logger(message)
-            }
-        }
-        
-        let testLogger = InlineLogger { message in
-            // We want to see a request to the specified instance
-            if message.contains(fakeUrl) {
-                expectation.fulfill()
-            }
-        }
-        
         class TestConnector: PowerSyncBackendConnector {
             let url: String
             
@@ -131,10 +116,13 @@ final class ConnectTests: XCTestCase {
             options: ConnectOptions(
                 clientConfiguration: SyncClientConfiguration(
                     requestLogger: SyncRequestLoggerConfiguration(
-                        logLevel:
-                        .all,
-                        logger: testLogger
-                    )
+                        requestLevel: .all
+                    ) { message in
+                        // We want to see a request to the specified instance
+                        if message.contains(fakeUrl) {
+                            expectation.fulfill()
+                        }
+                    }
                 )
             )
         )

@@ -20,9 +20,9 @@ extension SyncRequestLogLevel {
 extension SyncRequestLoggerConfiguration {
     func toKotlinConfig() -> SwiftRequestLoggerConfig {
         return SwiftRequestLoggerConfig(
-            logLevel: self.logLevel.toKotlin(),
-            log: { [logger] message in
-                logger.log(message)
+            logLevel: self.requestLevel.toKotlin(),
+            log: { [log] message in
+                log(message)
             }
         )
     }
