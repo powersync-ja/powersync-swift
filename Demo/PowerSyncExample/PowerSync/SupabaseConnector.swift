@@ -40,7 +40,10 @@ private enum PostgresFatalCodes {
 @Observable
 class SupabaseConnector: PowerSyncBackendConnector {
     let powerSyncEndpoint: String = Secrets.powerSyncEndpoint
-    let client: SupabaseClient = .init(supabaseURL: Secrets.supabaseURL, supabaseKey: Secrets.supabaseAnonKey)
+    let client: SupabaseClient = .init(
+        supabaseURL: Secrets.supabaseURL,
+        supabaseKey: Secrets.supabaseAnonKey,
+    )
     var session: Session?
     private var errorCode: String?
 
@@ -49,6 +52,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
 
     override init() {
         super.init()
+        session = client.auth.currentSession
         observeAuthStateChangesTask = Task { [weak self] in
             guard let self = self else { return }
 
