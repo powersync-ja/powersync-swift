@@ -13,7 +13,7 @@ func getAttachmentsDirectoryPath() throws -> String {
 
 let logTag = "SystemManager"
 
-struct InlineLogger: NetworkLogger {
+struct InlineLogger: SyncRequestLogger {
     func log(_ message: String) {
         print("Network: \(message)")
     }
@@ -80,7 +80,7 @@ class SystemManager {
                 connector: connector,
                 options: ConnectOptions(
                     clientConfiguration: SyncClientConfiguration(
-                        networkLogger: NetworkLoggerConfig(
+                        requestLogger: SyncRequestLoggerConfiguration(
                             logLevel: .headers,
                             logger: InlineLogger()
                         )
