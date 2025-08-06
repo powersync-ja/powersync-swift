@@ -23,6 +23,11 @@ try await db.connect(
                 )
             )
 ```
+## 1.3.1
+
+* Update SQLite to 3.50.3.
+* Support receiving binary sync lines over HTTP when the Rust client is enabled.
+* Remove the experimental websocket transport mode.
 
 ## 1.3.0
 

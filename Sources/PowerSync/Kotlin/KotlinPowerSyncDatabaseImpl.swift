@@ -52,7 +52,6 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         )
 
         let resolvedOptions = options ?? ConnectOptions()
-
         try await kotlinDatabase.connect(
             connector: connectorAdapter,
             crudThrottleMs: Int64(resolvedOptions.crudThrottle * 1000),
