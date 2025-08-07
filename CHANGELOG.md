@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.4.0 (unreleased)
+## 1.4.0
 
 * Added the ability to log PowerSync sync network requests.
 
@@ -18,11 +18,10 @@ try await database.connect(
         )
     )
 )
+```
 
 * Update core extension to 0.4.4, fixing a bug where `hasSynced` would turn `false` when losing connectivity.
 
-
-```
 ## 1.3.1
 
 * Update SQLite to 3.50.3.
