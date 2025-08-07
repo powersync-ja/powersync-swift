@@ -215,7 +215,7 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     /// The database can still be queried after this is called, but the tables
     /// would be empty.
     ///
-    /// - Parameter clearLocal: Set to false to preserve data in local-only tables.
+    /// - Parameter clearLocal: Set to false to preserve data in local-only tables. Defaults to `true`.
     func disconnectAndClear(clearLocal: Bool) async throws
     
     /// Close the database, releasing resources.
@@ -265,8 +265,8 @@ public extension PowerSyncDatabaseProtocol {
         )
     }
     
-    func disconnectAndClear(clearLocal: Bool = true) async throws {
-        try await disconnectAndClear(clearLocal: clearLocal)
+    func disconnectAndClear() async throws {
+        try await disconnectAndClear(clearLocal: true)
     }
     
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
