@@ -22,7 +22,7 @@ public enum SyncRequestLogLevel {
 /// the PowerSync session. The `requestLevel` determines which network events
 /// are logged.
 ///
-/// - Note: The request levell cannot be changed after initialization. A new call to `PowerSyncDatabase.connect` is required to change the level.
+/// - Note: The request level cannot be changed after initialization. A new call to `PowerSyncDatabase.connect` is required to change the level.
 public struct SyncRequestLoggerConfiguration {
     /// The request logging level that determines which network events are logged.
     /// Set once during initialization and used throughout the session.
@@ -33,7 +33,7 @@ public struct SyncRequestLoggerConfiguration {
     /// Creates a new network logger configuration.
     /// - Parameters:
     ///   - requestLevel: The `SyncRequestLogLevel` to use for filtering log messages
-    ///   - logHandler: A  closure which handles log messages
+    ///   - logHandler: A closure which handles log messages
     public init(
         requestLevel: SyncRequestLogLevel,
         logHandler: @escaping (_ message: String) -> Void)
