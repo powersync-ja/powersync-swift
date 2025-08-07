@@ -128,5 +128,7 @@ final class ConnectTests: XCTestCase {
         )
         
         await fulfillment(of: [expectation], timeout: 5)
+        
+        try await database.disconnectAndClear()
     }
 }
