@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.4.0
+## 1.4.0 (unreleased)
 
 * Added the ability to log PowerSync sync network requests.
 
@@ -18,6 +18,7 @@ try await database.connect(
         )
     )
 )
+
 ```
 ## 1.3.1
 
