@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
       "state" : {
-        "revision" : "21057135ce8269b43582022aa4ca56407332e6a8",
-        "version" : "0.4.2"
+        "revision" : "3396dd7eb9d4264b19e3d95bfe0d77347826f4c2",
+        "version" : "0.4.4"
       }
     }
   ],
