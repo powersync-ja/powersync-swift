@@ -1,5 +1,25 @@
 import Foundation
 
+/// Configuration for the sync client used to connect to the PowerSync service.
+///
+/// Provides options to customize network behavior and logging for PowerSync
+/// HTTP requests and responses.
+public struct SyncClientConfiguration {
+    /// Optional configuration for logging PowerSync HTTP requests.
+    ///
+    /// When provided, network requests will be logged according to the
+    /// specified `SyncRequestLoggerConfiguration`. Set to `nil` to disable request logging entirely.
+    ///
+    /// - SeeAlso: `SyncRequestLoggerConfiguration` for configuration options
+    public let requestLogger: SyncRequestLoggerConfiguration?
+    
+    /// Creates a new sync client configuration.
+    /// - Parameter requestLogger: Optional network logger configuration
+    public init(requestLogger: SyncRequestLoggerConfiguration? = nil) {
+        self.requestLogger = requestLogger
+    }
+}
+
 /// Options for configuring a PowerSync connection.
 ///
 /// Provides optional parameters to customize sync behavior such as throttling and retry policies.
@@ -42,21 +62,36 @@ public struct ConnectOptions {
     @_spi(PowerSyncExperimental)
     public var newClientImplementation: Bool
     
+    /// Configuration for the sync client used for PowerSync requests.
+    ///
+    /// Provides options to customize network behavior including logging of HTTP
+    /// requests and responses. When `nil`, default HTTP client settings are used
+    /// with no network logging.
+    ///
+    /// Set this to configure network logging or other HTTP client behaviors
+    /// specific to PowerSync operations.
+    ///
+    /// - SeeAlso: `SyncClientConfiguration` for available configuration options
+    public var clientConfiguration: SyncClientConfiguration?
+    
     /// Initializes a `ConnectOptions` instance with optional values.
     ///
     /// - Parameters:
     ///   - crudThrottle: TimeInterval between CRUD operations in milliseconds. Defaults to `1` second.
     ///   - retryDelay: Delay TimeInterval between retry attempts in milliseconds. Defaults to `5` seconds.
     ///   - params: Custom sync parameters to send to the server. Defaults to an empty dictionary.
+    ///   - clientConfiguration: Configuration for the HTTP client used to connect to PowerSync.
     public init(
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
-        params: JsonParam = [:]
+        params: JsonParam = [:],
+        clientConfiguration: SyncClientConfiguration? = nil
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
         self.newClientImplementation = false
+        self.clientConfiguration = clientConfiguration
     }
     
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
@@ -65,12 +100,14 @@ public struct ConnectOptions {
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
-        newClientImplementation: Bool = false
+        newClientImplementation: Bool = false,
+        clientConfiguration: SyncClientConfiguration? = nil
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
         self.newClientImplementation = newClientImplementation
+        self.clientConfiguration = clientConfiguration
     }
 }
 
@@ -91,7 +128,6 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     /// Wait for the first sync to occur
     func waitForFirstSync() async throws
     
-
     /// Replace the schema with a new version. This is for advanced use cases - typically the schema
     /// should just be specified once in the constructor.
     ///
@@ -179,7 +215,7 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     /// The database can still be queried after this is called, but the tables
     /// would be empty.
     ///
-    /// - Parameter clearLocal: Set to false to preserve data in local-only tables.
+    /// - Parameter clearLocal: Set to false to preserve data in local-only tables. Defaults to `true`.
     func disconnectAndClear(clearLocal: Bool) async throws
     
     /// Close the database, releasing resources.
@@ -229,8 +265,8 @@ public extension PowerSyncDatabaseProtocol {
         )
     }
     
-    func disconnectAndClear(clearLocal: Bool = true) async throws {
-        try await self.disconnectAndClear(clearLocal: clearLocal)
+    func disconnectAndClear() async throws {
+        try await disconnectAndClear(clearLocal: true)
     }
     
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {

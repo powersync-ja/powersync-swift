@@ -88,4 +88,47 @@ final class ConnectTests: XCTestCase {
         await fulfillment(of: [expectation], timeout: 5)
         watchTask.cancel()
     }
+    
+    func testSyncHTTPLogs() async throws {
+        let expectation = XCTestExpectation(
+            description: "Should log a request to the PowerSync endpoint"
+        )
+        
+        let fakeUrl = "https://fakepowersyncinstance.fakepowersync.local"
+        
+        class TestConnector: PowerSyncBackendConnector {
+            let url: String
+            
+            init(url: String) {
+                self.url = url
+            }
+            
+            override func fetchCredentials() async throws -> PowerSyncCredentials? {
+                PowerSyncCredentials(
+                    endpoint: url,
+                    token: "123"
+                )
+            }
+        }
+        
+        try await database.connect(
+            connector: TestConnector(url: fakeUrl),
+            options: ConnectOptions(
+                clientConfiguration: SyncClientConfiguration(
+                    requestLogger: SyncRequestLoggerConfiguration(
+                        requestLevel: .all
+                    ) { message in
+                        // We want to see a request to the specified instance
+                        if message.contains(fakeUrl) {
+                            expectation.fulfill()
+                        }
+                    }
+                )
+            )
+        )
+        
+        await fulfillment(of: [expectation], timeout: 5)
+        
+        try await database.disconnectAndClear()
+    }
 }

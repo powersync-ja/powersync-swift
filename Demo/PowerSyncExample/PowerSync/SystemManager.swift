@@ -70,7 +70,18 @@ class SystemManager {
 
     func connect() async {
         do {
-            try await db.connect(connector: connector)
+            try await db.connect(
+                connector: connector,
+                options: ConnectOptions(
+                    clientConfiguration: SyncClientConfiguration(
+                        requestLogger: SyncRequestLoggerConfiguration(
+                            requestLevel: .headers
+                        ) { message in
+                            self.db.logger.debug(message, tag: "SyncRequest")
+                        }
+                    )
+                )
+            )
             try await attachments?.startSync()
         } catch {
             print("Unexpected error: \(error.localizedDescription)") // Catches any other error

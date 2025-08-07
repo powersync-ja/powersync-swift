@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.4.0 (unreleased)
+
+* Added the ability to log PowerSync sync network requests.
+
+```swift
+try await database.connect(
+    connector: Connector(),
+    options: ConnectOptions(
+        clientConfiguration: SyncClientConfiguration(
+            requestLogger: SyncRequestLoggerConfiguration(
+                requestLevel: .headers
+            ) { message in
+                // Handle Network request logs here
+                print(message)
+            }
+        )
+    )
+)
+
+```
 ## 1.3.1
 
 * Update SQLite to 3.50.3.

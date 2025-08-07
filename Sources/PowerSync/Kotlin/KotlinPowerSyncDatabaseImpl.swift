@@ -59,7 +59,8 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             params: resolvedOptions.params.mapValues { $0.toKotlinMap() },
             options: createSyncOptions(
                 newClient: resolvedOptions.newClientImplementation,
-                userAgent: "PowerSync Swift SDK"
+                userAgent: "PowerSync Swift SDK",
+                loggingConfig: resolvedOptions.clientConfiguration?.requestLogger?.toKotlinConfig()
             )
         )
     }
