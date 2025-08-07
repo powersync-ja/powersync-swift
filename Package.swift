@@ -44,7 +44,7 @@ if let corePath = localCoreExtension {
     // Not using a local build, so download from releases
     conditionalDependencies.append(.package(
         url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
-        exact: "0.4.2"
+        exact: "0.4.4"
     ))
 }
 

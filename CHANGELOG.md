@@ -19,6 +19,9 @@ try await database.connect(
     )
 )
 
+* Update core extension to 0.4.4, fixing a bug where `hasSynced` would turn `false` when losing connectivity.
+
+
 ```
 ## 1.3.1
 
