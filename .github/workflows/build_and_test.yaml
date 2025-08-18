@@ -19,4 +19,4 @@ jobs:
         run: |
           xcodebuild test -scheme PowerSync -destination "platform=iOS Simulator,name=iPhone 16"
           xcodebuild test -scheme PowerSync -destination "platform=macOS,arch=arm64,name=My Mac"
-          xcodebuild test -scheme PowerSync -destination "platform=watchOS Simulator,arch=arm64"
+          xcodebuild test -scheme PowerSync -destination "platform=watchOS Simulator,arch=arm64name=Apple Watch Ultra 2"
