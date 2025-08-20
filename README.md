@@ -10,15 +10,21 @@ This is the PowerSync SDK for Swift clients. The SDK reference is available [her
 
 ## Structure: Packages
 
-- [Sources](./Sources/)
+- [Sources](./Sources/PowerSync)
 
   - This is the Swift SDK implementation.
+
+- [Sources](./Sources/StructuredQueries)
+
+  - A typed query builder using [structured-queries](https://github.com/pointfreeco/swift-structured-queries).
 
 ## Demo Apps / Example Projects
 
 The easiest way to test the PowerSync Swift SDK is to run our demo application.
 
 - [Demo/PowerSyncExample](./Demo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector.
+
+- [Demo/StructuredQueriesExample](./Demo/StructuredQueriesExample/README.md): A simple Swift executable which uses the `PowerSyncStructuredQueries` library.
 
 ## Installation
 
