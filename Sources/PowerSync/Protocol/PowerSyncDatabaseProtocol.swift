@@ -12,7 +12,7 @@ public struct SyncClientConfiguration {
     ///
     /// - SeeAlso: `SyncRequestLoggerConfiguration` for configuration options
     public let requestLogger: SyncRequestLoggerConfiguration?
-    
+
     /// Creates a new sync client configuration.
     /// - Parameter requestLogger: Optional network logger configuration
     public init(requestLogger: SyncRequestLoggerConfiguration? = nil) {
@@ -26,10 +26,10 @@ public struct SyncClientConfiguration {
 public struct ConnectOptions {
     /// Defaults to 1 second
     public static let DefaultCrudThrottle: TimeInterval = 1
-    
+
     /// Defaults to 5 seconds
     public static let DefaultRetryDelay: TimeInterval = 5
-    
+
     /// TimeInterval (in seconds) between CRUD (Create, Read, Update, Delete) operations.
     ///
     /// Default is ``ConnectOptions/DefaultCrudThrottle``.
@@ -54,14 +54,14 @@ public struct ConnectOptions {
     /// ]
     /// ```
     public var params: JsonParam
-    
+
     /// Uses a new sync client implemented in Rust instead of the one implemented in Kotlin.
     ///
     /// The new client is more efficient and will become the default in the future, but is still marked as experimental for now.
     /// We encourage interested users to try the new client.
     @_spi(PowerSyncExperimental)
     public var newClientImplementation: Bool
-    
+
     /// Configuration for the sync client used for PowerSync requests.
     ///
     /// Provides options to customize network behavior including logging of HTTP
@@ -73,7 +73,7 @@ public struct ConnectOptions {
     ///
     /// - SeeAlso: `SyncClientConfiguration` for available configuration options
     public var clientConfiguration: SyncClientConfiguration?
-    
+
     /// Initializes a `ConnectOptions` instance with optional values.
     ///
     /// - Parameters:
@@ -90,10 +90,10 @@ public struct ConnectOptions {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
-        self.newClientImplementation = false
+        newClientImplementation = false
         self.clientConfiguration = clientConfiguration
     }
-    
+
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
     @_spi(PowerSyncExperimental)
     public init(
@@ -118,25 +118,25 @@ public struct ConnectOptions {
 /// Use `PowerSyncDatabase.connect` to connect to the PowerSync service, to keep the local database in sync with the remote database.
 ///
 /// All changes to local tables are automatically recorded, whether connected or not. Once connected, the changes are uploaded.
-public protocol PowerSyncDatabaseProtocol: Queries {
+public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// The current sync status.
     var currentStatus: SyncStatus { get }
-    
+
     /// Logger used for PowerSync operations
     var logger: any LoggerProtocol { get }
-    
+
     /// Wait for the first sync to occur
     func waitForFirstSync() async throws
-    
+
     /// Replace the schema with a new version. This is for advanced use cases - typically the schema
     /// should just be specified once in the constructor.
     ///
     /// Cannot be used while connected - this should only be called before connect.
     func updateSchema(schema: SchemaProtocol) async throws
-   
+
     /// Wait for the first (possibly partial) sync to occur that contains all buckets in the given priority.
     func waitForFirstSync(priority: Int32) async throws
-    
+
     /// Connects to the PowerSync service and keeps the local database in sync with the remote database.
     ///
     /// The connection is automatically re-opened if it fails for any reason.
@@ -172,7 +172,7 @@ public protocol PowerSyncDatabaseProtocol: Queries {
         connector: PowerSyncBackendConnector,
         options: ConnectOptions?
     ) async throws
-    
+
     /// Get a batch of crud data to upload.
     ///
     /// Returns nil if there is no data to upload.
@@ -188,7 +188,7 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     /// data by transaction. One batch may contain data from multiple transactions,
     /// and a single transaction may be split over multiple batches.
     func getCrudBatch(limit: Int32) async throws -> CrudBatch?
-    
+
     /// Get the next recorded transaction to upload.
     ///
     /// Returns nil if there is no data to upload.
@@ -201,15 +201,15 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     /// Unlike `getCrudBatch`, this only returns data from a single transaction at a time.
     /// All data for the transaction is loaded into memory.
     func getNextCrudTransaction() async throws -> CrudTransaction?
-    
+
     /// Convenience method to get the current version of PowerSync.
     func getPowerSyncVersion() async throws -> String
-    
+
     /// Close the sync connection.
     ///
     /// Use `connect` to connect again.
     func disconnect() async throws
-    
+
     /// Disconnect and clear the database.
     /// Use this when logging out.
     /// The database can still be queried after this is called, but the tables
@@ -217,7 +217,7 @@ public protocol PowerSyncDatabaseProtocol: Queries {
     ///
     /// - Parameter clearLocal: Set to false to preserve data in local-only tables. Defaults to `true`.
     func disconnectAndClear(clearLocal: Bool) async throws
-    
+
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.
     ///
@@ -264,11 +264,11 @@ public extension PowerSyncDatabaseProtocol {
             )
         )
     }
-    
+
     func disconnectAndClear() async throws {
         try await disconnectAndClear(clearLocal: true)
     }
-    
+
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
         try await getCrudBatch(
             limit: limit

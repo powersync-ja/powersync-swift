@@ -1,7 +1,7 @@
 import Foundation
 import PowerSyncKotlin
 
-final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
+final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked Sendable {
     let logger: any LoggerProtocol
 
     private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
@@ -98,7 +98,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
 
     @discardableResult
-    func execute(sql: String, parameters: [Any?]?) async throws -> Int64 {
+    func execute(sql: String, parameters: [Sendable?]?) async throws -> Int64 {
         try await writeTransaction { ctx in
             try ctx.execute(
                 sql: sql,
@@ -109,7 +109,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func get<RowType>(
         sql: String,
-        parameters: [Any?]?,
+        parameters: [Sendable?]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> RowType {
         try await readLock { ctx in
@@ -123,7 +123,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func get<RowType>(
         sql: String,
-        parameters: [Any?]?,
+        parameters: [Sendable?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType {
         try await readLock { ctx in
@@ -137,7 +137,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func getAll<RowType>(
         sql: String,
-        parameters: [Any?]?,
+        parameters: [Sendable?]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> [RowType] {
         try await readLock { ctx in
@@ -151,7 +151,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func getAll<RowType>(
         sql: String,
-        parameters: [Any?]?,
+        parameters: [Sendable?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> [RowType] {
         try await readLock { ctx in
@@ -165,7 +165,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func getOptional<RowType>(
         sql: String,
-        parameters: [Any?]?,
+        parameters: [Sendable?]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> RowType? {
         try await readLock { ctx in
@@ -179,7 +179,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func getOptional<RowType>(
         sql: String,
-        parameters: [Any?]?,
+        parameters: [Sendable?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType? {
         try await readLock { ctx in
@@ -193,7 +193,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func watch<RowType>(
         sql: String,
-        parameters: [Any?]?,
+        parameters: [Sendable?]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) throws -> AsyncThrowingStream<[RowType], any Error> {
         try watch(
@@ -207,7 +207,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func watch<RowType>(
         sql: String,
-        parameters: [Any?]?,
+        parameters: [Sendable?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) throws -> AsyncThrowingStream<[RowType], any Error> {
         try watch(
@@ -389,11 +389,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
                     message: "Failed to convert pages data to UTF-8 string"
                 )
             }
-            
+
             let tableRows = try await getAll(
                 sql: "SELECT tbl_name FROM sqlite_master WHERE rootpage IN (SELECT json_each.value FROM json_each(?))",
                 parameters: [
-                    pagesString
+                    pagesString,
                 ]
             ) { try $0.getString(index: 0) }
 

@@ -2,7 +2,7 @@ import Combine
 import Foundation
 import PowerSyncKotlin
 
-class KotlinSyncStatus: KotlinSyncStatusDataProtocol, SyncStatus {
+class KotlinSyncStatus: KotlinSyncStatusDataProtocol, SyncStatus, @unchecked Sendable {
     private let baseStatus: PowerSyncKotlin.SyncStatus
 
     var base: any PowerSyncKotlin.SyncStatusData {

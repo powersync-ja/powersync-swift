@@ -12,7 +12,7 @@ public protocol SyncStatusData {
     var downloading: Bool { get }
 
     /// Realtime progress information about downloaded operations during an active sync.
-    /// 
+    ///
     /// For more information on what progress is reported, see ``SyncDownloadProgress``.
     /// This value will be non-null only if ``downloading`` is `true`.
     var downloadProgress: SyncDownloadProgress? { get }
@@ -50,7 +50,7 @@ public protocol SyncStatusData {
 }
 
 /// A protocol extending `SyncStatusData` to include flow-based updates for synchronization status.
-public protocol SyncStatus: SyncStatusData {
+public protocol SyncStatus: SyncStatusData, Sendable {
     /// Provides a flow of synchronization status updates.
     /// - Returns: An `AsyncStream` that emits updates whenever the synchronization status changes.
     func asFlow() -> AsyncStream<SyncStatusData>
