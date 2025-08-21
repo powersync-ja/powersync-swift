@@ -277,22 +277,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         return try await wrapPowerSyncException {
             try safeCast(
                 await kotlinDatabase.writeLock(
-                    callback: PowerSyncKotlin.wrapContextHandler { kotlinContext in
-                        do {
-                            return try PowerSyncKotlin.LockCallbackResult.Success(
-                                value: callback(
-                                    KotlinConnectionContext(
-                                        ctx: kotlinContext
-                                    )
-                                ))
-                        } catch {
-                            return PowerSyncKotlin.LockCallbackResult.Failure(exception:
-                                PowerSyncKotlin.PowerSyncException(
-                                    message: error.localizedDescription,
-                                    cause: nil
-                                ))
-                        }
-                    }
+                    callback: wrapLockContext(callback: callback)
                 ),
                 to: R.self
             )
@@ -305,22 +290,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         return try await wrapPowerSyncException {
             try safeCast(
                 await kotlinDatabase.writeTransaction(
-                    callback: PowerSyncKotlin.wrapTransactionContextHandler { kotlinContext in
-                        do {
-                            return try PowerSyncKotlin.LockCallbackResult.Success(
-                                value: callback(
-                                    KotlinTransactionContext(
-                                        ctx: kotlinContext
-                                    )
-                                ))
-                        } catch {
-                            return PowerSyncKotlin.LockCallbackResult.Failure(exception:
-                                PowerSyncKotlin.PowerSyncException(
-                                    message: error.localizedDescription,
-                                    cause: nil
-                                ))
-                        }
-                    }
+                    callback: wrapTransactionContext(callback: callback)
                 ),
                 to: R.self
             )
@@ -335,22 +305,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         return try await wrapPowerSyncException {
             try safeCast(
                 await kotlinDatabase.readLock(
-                    callback: PowerSyncKotlin.wrapContextHandler { kotlinContext in
-                        do {
-                            return try PowerSyncKotlin.LockCallbackResult.Success(
-                                value: callback(
-                                    KotlinConnectionContext(
-                                        ctx: kotlinContext
-                                    )
-                                ))
-                        } catch {
-                            return PowerSyncKotlin.LockCallbackResult.Failure(exception:
-                                PowerSyncKotlin.PowerSyncException(
-                                    message: error.localizedDescription,
-                                    cause: nil
-                                ))
-                        }
-                    }
+                    callback: wrapLockContext(callback: callback)
                 ),
                 to: R.self
             )
@@ -363,22 +318,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         return try await wrapPowerSyncException {
             try safeCast(
                 await kotlinDatabase.readTransaction(
-                    callback: PowerSyncKotlin.wrapTransactionContextHandler { kotlinContext in
-                        do {
-                            return try PowerSyncKotlin.LockCallbackResult.Success(
-                                value: callback(
-                                    KotlinTransactionContext(
-                                        ctx: kotlinContext
-                                    )
-                                ))
-                        } catch {
-                            return PowerSyncKotlin.LockCallbackResult.Failure(exception:
-                                PowerSyncKotlin.PowerSyncException(
-                                    message: error.localizedDescription,
-                                    cause: nil
-                                ))
-                        }
-                    }
+                    callback: wrapTransactionContext(callback: callback)
                 ),
                 to: R.self
             )
@@ -426,11 +366,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
             }
         )
 
-        let rootPages = rows.compactMap { r in
-            if (r.opcode == "OpenRead" || r.opcode == "OpenWrite") &&
-                r.p3 == 0 && r.p2 != 0
+        let rootPages = rows.compactMap { row in
+            if (row.opcode == "OpenRead" || row.opcode == "OpenWrite") &&
+                row.p3 == 0 && row.p2 != 0
             {
-                return r.p2
+                return row.p2
             }
             return nil
         }
@@ -467,4 +407,51 @@ private struct ExplainQueryResult {
     let p1: Int64
     let p2: Int64
     let p3: Int64
+}
+
+extension Error {
+    func toPowerSyncError() -> PowerSyncKotlin.PowerSyncException {
+        return PowerSyncKotlin.PowerSyncException(
+            message: localizedDescription,
+            cause: nil
+        )
+    }
+}
+
+func wrapLockContext(
+    callback: @escaping (any ConnectionContext) throws -> Any
+) throws -> PowerSyncKotlin.ThrowableLockCallback {
+    PowerSyncKotlin.wrapContextHandler { kotlinContext in
+        do {
+            return try PowerSyncKotlin.PowerSyncResult.Success(
+                value: callback(
+                    KotlinConnectionContext(
+                        ctx: kotlinContext
+                    )
+                ))
+        } catch {
+            return PowerSyncKotlin.PowerSyncResult.Failure(
+                exception: error.toPowerSyncError()
+            )
+        }
+    }
+}
+
+func wrapTransactionContext(
+    callback: @escaping (any Transaction) throws -> Any
+) throws -> PowerSyncKotlin.ThrowableTransactionCallback {
+    PowerSyncKotlin.wrapTransactionContextHandler { kotlinContext in
+        do {
+            return try PowerSyncKotlin.PowerSyncResult.Success(
+                value: callback(
+                    KotlinTransactionContext(
+                        ctx: kotlinContext
+                    )
+                ))
+        } catch {
+            return PowerSyncKotlin.PowerSyncResult.Failure(
+                exception: error.toPowerSyncError()
+            )
+        }
+    }
 }
