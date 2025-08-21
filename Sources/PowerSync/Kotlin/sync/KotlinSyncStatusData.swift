@@ -6,7 +6,10 @@ protocol KotlinSyncStatusDataProtocol: SyncStatusData {
     var base: PowerSyncKotlin.SyncStatusData { get }
 }
 
-struct KotlinSyncStatusData: KotlinSyncStatusDataProtocol, @unchecked Sendable {
+struct KotlinSyncStatusData: KotlinSyncStatusDataProtocol,
+    // We can't override the PowerSyncKotlin.SyncStatusData's Sendable status
+    @unchecked Sendable
+{
     let base: PowerSyncKotlin.SyncStatusData
 }
 
