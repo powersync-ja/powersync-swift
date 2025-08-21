@@ -55,9 +55,13 @@ public class PrintLogWriter: LogWriterProtocol {
 }
 
 /// A default logger configuration that uses `PrintLogWriter` and filters messages by minimum severity.
-public final class DefaultLogger: LoggerProtocol, @unchecked Sendable {
-    var minSeverity: LogSeverity
-    var writers: [any LogWriterProtocol]
+public final class DefaultLogger: LoggerProtocol,
+    // The shared state is guarded by the DispatchQueue
+    @unchecked Sendable
+{
+    private var minSeverity: LogSeverity
+    private var writers: [any LogWriterProtocol]
+    private let queue = DispatchQueue(label: "DefaultLogger.queue")
 
     /// Initializes the default logger with an optional minimum severity level.
     ///
@@ -70,35 +74,41 @@ public final class DefaultLogger: LoggerProtocol, @unchecked Sendable {
     }
 
     public func setWriters(_ writers: [any LogWriterProtocol]) {
-        self.writers = writers
+        queue.sync {
+            self.writers = writers
+        }
     }
 
     public func setMinSeverity(_ severity: LogSeverity) {
-        minSeverity = severity
+        queue.sync {
+            minSeverity = severity
+        }
     }
 
-    public func debug(_ message: String, tag: String? = nil) {
+    public nonisolated func debug(_ message: String, tag: String? = nil) {
         writeLog(message, severity: LogSeverity.debug, tag: tag)
     }
 
-    public func error(_ message: String, tag: String? = nil) {
+    public nonisolated func error(_ message: String, tag: String? = nil) {
         writeLog(message, severity: LogSeverity.error, tag: tag)
     }
 
-    public func info(_ message: String, tag: String? = nil) {
+    public nonisolated func info(_ message: String, tag: String? = nil) {
         writeLog(message, severity: LogSeverity.info, tag: tag)
     }
 
-    public func warning(_ message: String, tag: String? = nil) {
+    public nonisolated func warning(_ message: String, tag: String? = nil) {
         writeLog(message, severity: LogSeverity.warning, tag: tag)
     }
 
-    public func fault(_ message: String, tag: String? = nil) {
+    public nonisolated func fault(_ message: String, tag: String? = nil) {
         writeLog(message, severity: LogSeverity.fault, tag: tag)
     }
 
-    private func writeLog(_ message: String, severity: LogSeverity, tag: String?) {
-        if severity.rawValue < minSeverity.rawValue {
+    private nonisolated func writeLog(_ message: String, severity: LogSeverity, tag: String?) {
+        let currentSeverity = queue.sync { minSeverity }
+
+        if severity.rawValue < currentSeverity.rawValue {
             return
         }
 

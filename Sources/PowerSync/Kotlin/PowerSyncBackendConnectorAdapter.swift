@@ -1,6 +1,9 @@
 import OSLog
 
-final class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector, @unchecked Sendable {
+final class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector,
+    // We need to declare this since we declared KotlinPowerSyncBackendConnector as @unchecked Sendable
+    @unchecked Sendable
+{
     let swiftBackendConnector: PowerSyncBackendConnector
     let db: any PowerSyncDatabaseProtocol
     let logTag = "PowerSyncBackendConnector"
@@ -26,18 +29,17 @@ final class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector, @
         }
     }
 
-    // TODO:
-    // override func __uploadData(database _: KotlinPowerSyncDatabase) async throws {
-    //     do {
-    //         // Pass the Swift DB protocal to the connector
-    //         return try await swiftBackendConnector.uploadData(database: db)
-    //     } catch {
-    //         db.logger.error("Error while uploading data: \(error)", tag: logTag)
-    //         // Relay the error to the Kotlin SDK
-    //         try throwKotlinPowerSyncError(
-    //             message: "Connector errored while uploading data: \(error.localizedDescription)",
-    //             cause: error.localizedDescription
-    //         )
-    //     }
-    // }
+    override func __performUpload() async throws {
+        do {
+            // Pass the Swift DB protocal to the connector
+            return try await swiftBackendConnector.uploadData(database: db)
+        } catch {
+            db.logger.error("Error while uploading data: \(error)", tag: logTag)
+            // Relay the error to the Kotlin SDK
+            try throwKotlinPowerSyncError(
+                message: "Connector errored while uploading data: \(error.localizedDescription)",
+                cause: error.localizedDescription
+            )
+        }
+    }
 }

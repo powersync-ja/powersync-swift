@@ -72,7 +72,10 @@ extension KotlinConnectionContextProtocol {
     }
 }
 
-final class KotlinConnectionContext: KotlinConnectionContextProtocol, @unchecked Sendable {
+final class KotlinConnectionContext: KotlinConnectionContextProtocol,
+    // The Kotlin ConnectionContext is technically sendable, but we cannot annotate that
+    @unchecked Sendable
+{
     let ctx: PowerSyncKotlin.ConnectionContext
 
     init(ctx: PowerSyncKotlin.ConnectionContext) {
@@ -80,7 +83,10 @@ final class KotlinConnectionContext: KotlinConnectionContextProtocol, @unchecked
     }
 }
 
-final class KotlinTransactionContext: Transaction, KotlinConnectionContextProtocol, @unchecked Sendable {
+final class KotlinTransactionContext: Transaction, KotlinConnectionContextProtocol,
+    // The Kotlin ConnectionContext is technically sendable, but we cannot annotate that
+    @unchecked Sendable
+{
     let ctx: PowerSyncKotlin.ConnectionContext
 
     init(ctx: PowerSyncKotlin.PowerSyncTransaction) {
