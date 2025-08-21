@@ -3,7 +3,7 @@ import Foundation
 /**
  * Implementation of LocalStorageAdapter using FileManager
  */
-public class FileManagerStorageAdapter: LocalStorageAdapter {
+public class FileManagerStorageAdapter: LocalStorageAdapter, @unchecked Sendable {
     private let fileManager = FileManager.default
 
     public init() {}

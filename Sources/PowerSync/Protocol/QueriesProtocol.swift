@@ -3,16 +3,16 @@ import Foundation
 
 public let DEFAULT_WATCH_THROTTLE: TimeInterval = 0.03 // 30ms
 
-public struct WatchOptions<RowType> {
+public struct WatchOptions<RowType>: Sendable {
     public var sql: String
-    public var parameters: [Any?]
+    public var parameters: [Sendable?]
     public var throttle: TimeInterval
-    public var mapper: (SqlCursor) throws -> RowType
+    public var mapper: @Sendable (SqlCursor) throws -> RowType
 
     public init(
         sql: String, parameters: [Sendable?]? = [],
         throttle: TimeInterval? = DEFAULT_WATCH_THROTTLE,
-        mapper: @escaping (SqlCursor) throws -> RowType
+        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
     ) {
         self.sql = sql
         self.parameters = parameters ?? []
@@ -119,6 +119,6 @@ public extension Queries {
         _ sql: String,
         mapper: @Sendable @escaping (SqlCursor) throws -> RowType
     ) throws -> AsyncThrowingStream<[RowType], Error> {
-        return try watch(sql: sql, parameters: [Any?](), mapper: mapper)
+        return try watch(sql: sql, parameters: [Sendable?](), mapper: mapper)
     }
 }

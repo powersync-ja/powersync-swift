@@ -6,6 +6,7 @@ import Foundation
 /// This watches for changes to active attachments and performs queued
 /// download, upload, and delete operations. Syncs can be triggered manually,
 /// periodically, or based on database changes.
+@MainActor
 open class SyncingService {
     private let remoteStorage: RemoteStorageAdapter
     private let localStorage: LocalStorageAdapter
@@ -48,8 +49,8 @@ open class SyncingService {
         self.errorHandler = errorHandler
         self.syncThrottle = syncThrottle
         self.logger = logger
-        self.closed = false
-        self.lock = LockActor()
+        closed = false
+        lock = LockActor()
     }
 
     /// Starts periodic syncing of attachments.
@@ -57,18 +58,18 @@ open class SyncingService {
     /// - Parameter period: The time interval in seconds between each sync.
     public func startSync(period: TimeInterval) async throws {
         try await lock.withLock {
-            try guardClosed()
+            try await guardClosed()
 
             // Close any active sync operations
             try await _stopSync()
 
-            setupSyncFlow(period: period)
+            await setupSyncFlow(period: period)
         }
     }
 
     public func stopSync() async throws {
         try await lock.withLock {
-            try guardClosed()
+            try await guardClosed()
             try await _stopSync()
         }
     }
@@ -94,10 +95,10 @@ open class SyncingService {
     /// Cleans up internal resources and cancels any ongoing syncing.
     func close() async throws {
         try await lock.withLock {
-            try guardClosed()
+            try await guardClosed()
 
             try await _stopSync()
-            closed = true
+            await _setClosed()
         }
     }
 
@@ -137,7 +138,7 @@ open class SyncingService {
                 .sink { _ in continuation.yield(()) }
 
             continuation.onTermination = { _ in
-                cancellable.cancel()
+                continuation.finish()
             }
             self.cancellables.insert(cancellable)
         }
@@ -150,7 +151,7 @@ open class SyncingService {
                 try await withThrowingTaskGroup(of: Void.self) { group in
                     // Handle sync trigger events
                     group.addTask {
-                        let syncTrigger = self.createSyncTrigger()
+                        let syncTrigger = await self.createSyncTrigger()
 
                         for await _ in syncTrigger {
                             try Task.checkCancellation()
@@ -165,9 +166,9 @@ open class SyncingService {
 
                     // Watch attachment records. Trigger a sync on change
                     group.addTask {
-                        for try await _ in try self.attachmentsService.watchActiveAttachments() {
+                        for try await _ in try await self.attachmentsService.watchActiveAttachments() {
                             try Task.checkCancellation()
-                            self.syncTriggerSubject.send(())
+                            await self._triggerSyncSubject()
                         }
                     }
 
@@ -178,7 +179,7 @@ open class SyncingService {
                             try await self.triggerSync()
                         }
                     }
-                    
+
                     // Wait for any task to complete
                     try await group.next()
                 }
@@ -268,6 +269,16 @@ open class SyncingService {
             }
             return attachment
         }
+    }
+
+    /// Small actor isolated method to trigger the sync subject
+    private func _triggerSyncSubject() {
+        syncTriggerSubject.send(())
+    }
+
+    /// Small actor isolated method to mark as closed
+    private func _setClosed() {
+        closed = true
     }
 
     /// Deletes an attachment from remote and local storage.

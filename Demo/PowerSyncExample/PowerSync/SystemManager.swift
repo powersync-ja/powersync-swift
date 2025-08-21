@@ -14,6 +14,7 @@ func getAttachmentsDirectoryPath() throws -> String {
 let logTag = "SystemManager"
 
 @Observable
+@MainActor
 class SystemManager {
     let connector = SupabaseConnector()
     let schema = AppSchema
@@ -33,7 +34,7 @@ class SystemManager {
     }
 
     /// Creates an AttachmentQueue if a Supabase Storage bucket has been specified in the config
-    private static func createAttachmentQueue(
+    @MainActor private static func createAttachmentQueue(
         db: PowerSyncDatabaseProtocol,
         connector: SupabaseConnector
     ) -> AttachmentQueue? {
@@ -225,18 +226,20 @@ class SystemManager {
         if let attachments, let photoId = todo.photoId {
             try await attachments.deleteFile(
                 attachmentId: photoId
-            ) { tx, _ in
-                try self.deleteTodoInTX(
-                    id: todo.id,
-                    tx: tx
-                )
+            ) { _, _ in
+                // TODO:
+//                try self.deleteTodoInTX(
+//                    id: todo.id,
+//                    tx: tx
+//                )
             }
         } else {
-            try await db.writeTransaction { tx in
-                try self.deleteTodoInTX(
-                    id: todo.id,
-                    tx: tx
-                )
+            try await db.writeTransaction { _ in
+                // TODO:
+//                try self.deleteTodoInTX(
+//                    id: todo.id,
+//                    tx: tx
+//                )
             }
         }
     }

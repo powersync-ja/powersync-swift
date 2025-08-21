@@ -1,6 +1,7 @@
 import Foundation
 
 /// Service which manages attachment records.
+@MainActor
 open class AttachmentService {
     private let db: any PowerSyncDatabaseProtocol
     private let tableName: String
@@ -57,7 +58,7 @@ open class AttachmentService {
     }
 
     /// Executes a callback with exclusive access to the attachment context.
-    public func withContext<R>(callback: @Sendable @escaping (AttachmentContext) async throws -> R) async throws -> R {
+    public func withContext<R: Sendable>(callback: @Sendable @escaping (AttachmentContext) async throws -> R) async throws -> R {
         try await lock.withLock {
             try await callback(context)
         }

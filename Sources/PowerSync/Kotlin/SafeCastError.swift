@@ -1,7 +1,7 @@
 import Foundation
 
 enum SafeCastError: Error, CustomStringConvertible {
-    case typeMismatch(expected: Any.Type, actual: Any?)
+    case typeMismatch(expected: String, actual: String?)
 
     var description: String {
         switch self {
@@ -25,6 +25,6 @@ func safeCast<T>(_ value: Any?, to type: T.Type) throws -> T {
     if let castedValue = value as? T {
         return castedValue
     } else {
-        throw SafeCastError.typeMismatch(expected: type, actual: value)
+        throw SafeCastError.typeMismatch(expected: "\(type)", actual: "\(value ?? "nil")")
     }
 }

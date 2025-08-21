@@ -1,7 +1,8 @@
 import Foundation
 
 /// Context which performs actions on the attachment records
-open class AttachmentContext {
+public final class AttachmentContext: Sendable {
+    // None of these class's methods mutate shared state directly
     private let db: any PowerSyncDatabaseProtocol
     private let tableName: String
     private let logger: any LoggerProtocol
@@ -137,7 +138,7 @@ open class AttachmentContext {
     ///
     /// - Parameter callback: A callback invoked with the list of archived attachments before deletion.
     /// - Returns: `true` if all items have been deleted, `false` if there may be more archived items remaining.
-    public func deleteArchivedAttachments(callback: @escaping ([Attachment]) async throws -> Void) async throws -> Bool {
+    public func deleteArchivedAttachments(callback: @Sendable @escaping ([Attachment]) async throws -> Void) async throws -> Bool {
         let limit = 1000
         let attachments = try await db.getAll(
             sql: """
@@ -211,7 +212,7 @@ open class AttachmentContext {
                 updatedRecord.size,
                 updatedRecord.state.rawValue,
                 updatedRecord.hasSynced ?? 0,
-                updatedRecord.metaData
+                updatedRecord.metaData,
             ]
         )
 

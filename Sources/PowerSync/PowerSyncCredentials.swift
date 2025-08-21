@@ -1,10 +1,9 @@
 import Foundation
 
-
 ///
 /// Temporary credentials to connect to the PowerSync service.
 ///
-public struct PowerSyncCredentials: Codable {
+public struct PowerSyncCredentials: Codable, Sendable {
     /// PowerSync endpoint, e.g. "https://myinstance.powersync.co".
     public let endpoint: String
 
@@ -14,17 +13,18 @@ public struct PowerSyncCredentials: Codable {
     /// User ID.
     @available(*, deprecated, message: "This value is not used anymore.")
     public let userId: String? = nil
-    
+
     enum CodingKeys: String, CodingKey {
-           case endpoint
-            case token
-       }
+        case endpoint
+        case token
+    }
 
     @available(*, deprecated, message: "Use init(endpoint:token:) instead. `userId` is no longer used.")
     public init(
         endpoint: String,
         token: String,
-        userId: String? = nil) {
+        userId _: String? = nil
+    ) {
         self.endpoint = endpoint
         self.token = token
     }
@@ -34,12 +34,12 @@ public struct PowerSyncCredentials: Codable {
         self.token = token
     }
 
-    internal init(kotlin: KotlinPowerSyncCredentials) {
-        self.endpoint = kotlin.endpoint
-        self.token = kotlin.token
+    init(kotlin: KotlinPowerSyncCredentials) {
+        endpoint = kotlin.endpoint
+        token = kotlin.token
     }
 
-    internal var kotlinCredentials: KotlinPowerSyncCredentials {
+    var kotlinCredentials: KotlinPowerSyncCredentials {
         return KotlinPowerSyncCredentials(endpoint: endpoint, token: token, userId: nil)
     }
 

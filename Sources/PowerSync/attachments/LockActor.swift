@@ -4,7 +4,7 @@ actor LockActor {
     private var isLocked = false
     private var waiters: [(id: UUID, continuation: CheckedContinuation<Void, Never>)] = []
 
-    func withLock<T>(_ operation: @Sendable () async throws -> T) async throws -> T {
+    func withLock<T: Sendable>(_ operation: @Sendable () async throws -> T) async throws -> T {
         try await waitUntilUnlocked()
 
         isLocked = true

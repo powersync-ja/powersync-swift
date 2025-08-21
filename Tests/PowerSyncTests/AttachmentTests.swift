@@ -35,7 +35,7 @@ final class AttachmentTests: XCTestCase {
     }
 
     func testAttachmentDownload() async throws {
-        let queue = AttachmentQueue(
+        let queue = await AttachmentQueue(
             db: database,
             remoteStorage: {
                 struct MockRemoteStorage: RemoteStorageAdapter {
@@ -125,7 +125,7 @@ final class AttachmentTests: XCTestCase {
 
         let mockedRemote = MockRemoteStorage()
         
-        let queue = AttachmentQueue(
+        let queue = await AttachmentQueue(
             db: database,
             remoteStorage: mockedRemote,
             attachmentsDirectory: getAttachmentDirectory(),

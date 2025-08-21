@@ -1,4 +1,4 @@
-// swift-tools-version: 5.7
+// swift-tools-version: 6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -7,7 +7,7 @@ let packageName = "PowerSync"
 
 // Set this to the absolute path of your Kotlin SDK checkout if you want to use a local Kotlin
 // build. Also see docs/LocalBuild.md for details
-let localKotlinSdkOverride: String? = nil
+let localKotlinSdkOverride: String? = "/Users/stevenontong/Documents/platform_code/powersync/powersync-kotlin"
 
 // Set this to the absolute path of your powersync-sqlite-core checkout if you want to use a
 // local build of the core extension.
@@ -76,7 +76,13 @@ let package = Package(
         ),
         .testTarget(
             name: "PowerSyncTests",
-            dependencies: ["PowerSync"]
+            dependencies: ["PowerSync"],
+            // swiftSettings: [
+            //     .unsafeFlags([
+            //         "-enable-upcoming-feature", "StrictConcurrency=complete",
+            //         "-enable-upcoming-feature", "RegionBasedIsolation",
+            //     ]),
+            // ]
         ),
     ] + conditionalTargets
 )

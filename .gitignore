@@ -70,5 +70,6 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 .vscode
+.sourcekit-lsp
 
 Secrets.swift

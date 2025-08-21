@@ -1,6 +1,8 @@
 import Foundation
 import PowerSyncKotlin
 
+class Test: AnyObject {}
+
 final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked Sendable {
     let logger: any LoggerProtocol
 
@@ -107,10 +109,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         }
     }
 
-    func get<RowType>(
+    func get<RowType: Sendable>(
         sql: String,
         parameters: [Sendable?]?,
-        mapper: @escaping (SqlCursor) -> RowType
+        mapper: @Sendable @escaping (SqlCursor) -> RowType
     ) async throws -> RowType {
         try await readLock { ctx in
             try ctx.get(
@@ -121,10 +123,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         }
     }
 
-    func get<RowType>(
+    func get<RowType: Sendable>(
         sql: String,
         parameters: [Sendable?]?,
-        mapper: @escaping (SqlCursor) throws -> RowType
+        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType {
         try await readLock { ctx in
             try ctx.get(
@@ -135,10 +137,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         }
     }
 
-    func getAll<RowType>(
+    func getAll<RowType: Sendable>(
         sql: String,
         parameters: [Sendable?]?,
-        mapper: @escaping (SqlCursor) -> RowType
+        mapper: @Sendable @escaping (SqlCursor) -> RowType
     ) async throws -> [RowType] {
         try await readLock { ctx in
             try ctx.getAll(
@@ -149,10 +151,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         }
     }
 
-    func getAll<RowType>(
+    func getAll<RowType: Sendable>(
         sql: String,
         parameters: [Sendable?]?,
-        mapper: @escaping (SqlCursor) throws -> RowType
+        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
     ) async throws -> [RowType] {
         try await readLock { ctx in
             try ctx.getAll(
@@ -163,10 +165,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         }
     }
 
-    func getOptional<RowType>(
+    func getOptional<RowType: Sendable>(
         sql: String,
         parameters: [Sendable?]?,
-        mapper: @escaping (SqlCursor) -> RowType
+        mapper: @Sendable @escaping (SqlCursor) -> RowType
     ) async throws -> RowType? {
         try await readLock { ctx in
             try ctx.getOptional(
@@ -177,10 +179,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         }
     }
 
-    func getOptional<RowType>(
+    func getOptional<RowType: Sendable>(
         sql: String,
         parameters: [Sendable?]?,
-        mapper: @escaping (SqlCursor) throws -> RowType
+        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType? {
         try await readLock { ctx in
             try ctx.getOptional(
@@ -191,10 +193,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         }
     }
 
-    func watch<RowType>(
+    func watch<RowType: Sendable>(
         sql: String,
         parameters: [Sendable?]?,
-        mapper: @escaping (SqlCursor) -> RowType
+        mapper: @Sendable @escaping (SqlCursor) -> RowType
     ) throws -> AsyncThrowingStream<[RowType], any Error> {
         try watch(
             options: WatchOptions(
@@ -205,10 +207,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         )
     }
 
-    func watch<RowType>(
+    func watch<RowType: Sendable>(
         sql: String,
         parameters: [Sendable?]?,
-        mapper: @escaping (SqlCursor) throws -> RowType
+        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
     ) throws -> AsyncThrowingStream<[RowType], any Error> {
         try watch(
             options: WatchOptions(
@@ -219,7 +221,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         )
     }
 
-    func watch<RowType>(
+    func watch<RowType: Sendable>(
         options: WatchOptions<RowType>
     ) throws -> AsyncThrowingStream<[RowType], Error> {
         AsyncThrowingStream { continuation in
@@ -269,62 +271,114 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
         }
     }
 
-    func writeLock<R>(
+    func writeLock<R: Sendable>(
         callback: @escaping (any ConnectionContext) throws -> R
     ) async throws -> R {
         return try await wrapPowerSyncException {
             try safeCast(
                 await kotlinDatabase.writeLock(
-                    callback: LockCallback(
-                        callback: callback
-                    )
+                    callback: PowerSyncKotlin.wrapContextHandler { kotlinContext in
+                        do {
+                            return try PowerSyncKotlin.LockCallbackResult.Success(
+                                value: callback(
+                                    KotlinConnectionContext(
+                                        ctx: kotlinContext
+                                    )
+                                ))
+                        } catch {
+                            return PowerSyncKotlin.LockCallbackResult.Failure(exception:
+                                PowerSyncKotlin.PowerSyncException(
+                                    message: error.localizedDescription,
+                                    cause: nil
+                                ))
+                        }
+                    }
                 ),
                 to: R.self
             )
         }
     }
 
-    func writeTransaction<R>(
+    func writeTransaction<R: Sendable>(
         callback: @escaping (any Transaction) throws -> R
     ) async throws -> R {
         return try await wrapPowerSyncException {
             try safeCast(
                 await kotlinDatabase.writeTransaction(
-                    callback: TransactionCallback(
-                        callback: callback
-                    )
+                    callback: PowerSyncKotlin.wrapTransactionContextHandler { kotlinContext in
+                        do {
+                            return try PowerSyncKotlin.LockCallbackResult.Success(
+                                value: callback(
+                                    KotlinTransactionContext(
+                                        ctx: kotlinContext
+                                    )
+                                ))
+                        } catch {
+                            return PowerSyncKotlin.LockCallbackResult.Failure(exception:
+                                PowerSyncKotlin.PowerSyncException(
+                                    message: error.localizedDescription,
+                                    cause: nil
+                                ))
+                        }
+                    }
                 ),
                 to: R.self
             )
         }
     }
 
-    func readLock<R>(
-        callback: @escaping (any ConnectionContext) throws -> R
+    func readLock<R: Sendable>(
+        callback: @Sendable @escaping (any ConnectionContext) throws -> R
     )
         async throws -> R
     {
         return try await wrapPowerSyncException {
             try safeCast(
                 await kotlinDatabase.readLock(
-                    callback: LockCallback(
-                        callback: callback
-                    )
+                    callback: PowerSyncKotlin.wrapContextHandler { kotlinContext in
+                        do {
+                            return try PowerSyncKotlin.LockCallbackResult.Success(
+                                value: callback(
+                                    KotlinConnectionContext(
+                                        ctx: kotlinContext
+                                    )
+                                ))
+                        } catch {
+                            return PowerSyncKotlin.LockCallbackResult.Failure(exception:
+                                PowerSyncKotlin.PowerSyncException(
+                                    message: error.localizedDescription,
+                                    cause: nil
+                                ))
+                        }
+                    }
                 ),
                 to: R.self
             )
         }
     }
 
-    func readTransaction<R>(
+    func readTransaction<R: Sendable>(
         callback: @escaping (any Transaction) throws -> R
     ) async throws -> R {
         return try await wrapPowerSyncException {
             try safeCast(
                 await kotlinDatabase.readTransaction(
-                    callback: TransactionCallback(
-                        callback: callback
-                    )
+                    callback: PowerSyncKotlin.wrapTransactionContextHandler { kotlinContext in
+                        do {
+                            return try PowerSyncKotlin.LockCallbackResult.Success(
+                                value: callback(
+                                    KotlinTransactionContext(
+                                        ctx: kotlinContext
+                                    )
+                                ))
+                        } catch {
+                            return PowerSyncKotlin.LockCallbackResult.Failure(exception:
+                                PowerSyncKotlin.PowerSyncException(
+                                    message: error.localizedDescription,
+                                    cause: nil
+                                ))
+                        }
+                    }
                 ),
                 to: R.self
             )
@@ -336,7 +390,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
     }
 
     /// Tries to convert Kotlin PowerSyncExceptions to Swift Exceptions
-    private func wrapPowerSyncException<R>(
+    private func wrapPowerSyncException<R: Sendable>(
         handler: () async throws -> R)
         async throws -> R
     {
@@ -356,7 +410,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
 
     private func getQuerySourceTables(
         sql: String,
-        parameters: [Any?]
+        parameters: [Sendable?]
     ) async throws -> Set<String> {
         let rows = try await getAll(
             sql: "EXPLAIN \(sql)",
