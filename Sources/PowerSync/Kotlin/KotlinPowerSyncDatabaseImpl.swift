@@ -385,7 +385,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             let tableRows = try await getAll(
                 sql: "SELECT tbl_name FROM sqlite_master WHERE rootpage IN (SELECT json_each.value FROM json_each(?))",
                 parameters: [
-                    pagesString,
+                    pagesString
                 ]
             ) { try $0.getString(index: 0) }
 
@@ -411,7 +411,7 @@ extension Error {
     func toPowerSyncError() -> PowerSyncKotlin.PowerSyncException {
         return PowerSyncKotlin.PowerSyncException(
             message: localizedDescription,
-            cause: nil
+            cause: PowerSyncKotlin.KotlinThrowable(message: localizedDescription)
         )
     }
 }
