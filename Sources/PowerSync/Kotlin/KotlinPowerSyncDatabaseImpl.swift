@@ -413,7 +413,7 @@ extension Error {
     func toPowerSyncError() -> PowerSyncKotlin.PowerSyncException {
         return PowerSyncKotlin.PowerSyncException(
             message: localizedDescription,
-            cause: nil
+            cause: PowerSyncKotlin.KotlinThrowable(message: localizedDescription)
         )
     }
 }

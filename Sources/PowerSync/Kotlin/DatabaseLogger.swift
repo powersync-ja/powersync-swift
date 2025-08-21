@@ -43,7 +43,7 @@ private class KermitLogWriterAdapter: Kermit_coreLogWriter {
 class KotlinKermitLoggerConfig: PowerSyncKotlin.Kermit_coreLoggerConfig {
     var logWriterList: [Kermit_coreLogWriter]
     var minSeverity: PowerSyncKotlin.Kermit_coreSeverity
-
+    
     init(logWriterList: [Kermit_coreLogWriter], minSeverity: PowerSyncKotlin.Kermit_coreSeverity) {
         self.logWriterList = logWriterList
         self.minSeverity = minSeverity
@@ -65,7 +65,7 @@ class DatabaseLogger: LoggerProtocol, @unchecked Sendable {
     init(_ logger: any LoggerProtocol) {
         self.logger = logger
         // Set to the lowest severity. The provided logger should filter by severity
-        kLogger = PowerSyncKotlin.KermitLogger(
+        self.kLogger = PowerSyncKotlin.KermitLogger(
             config: KotlinKermitLoggerConfig(
                 logWriterList: [KermitLogWriterAdapter(logger: logger)],
                 minSeverity: Kermit_coreSeverity.verbose
