@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 5.7
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -77,12 +77,6 @@ let package = Package(
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"],
-            // swiftSettings: [
-            //     .unsafeFlags([
-            //         "-enable-upcoming-feature", "StrictConcurrency=complete",
-            //         "-enable-upcoming-feature", "RegionBasedIsolation",
-            //     ]),
-            // ]
         ),
     ] + conditionalTargets
 )
