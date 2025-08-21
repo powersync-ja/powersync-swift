@@ -6,19 +6,37 @@ import Foundation
 /// This watches for changes to active attachments and performs queued
 /// download, upload, and delete operations. Syncs can be triggered manually,
 /// periodically, or based on database changes.
-@MainActor
-open class SyncingService {
+public protocol SyncingService: Sendable {
+    /// Starts periodic syncing of attachments.
+    ///
+    /// - Parameter period: The time interval in seconds between each sync.
+    func startSync(period: TimeInterval) async throws
+
+    func stopSync() async throws
+
+    /// Cleans up internal resources and cancels any ongoing syncing.
+    func close() async throws
+
+    /// Triggers a sync operation. Can be called manually.
+    func triggerSync() async throws
+
+    /// Deletes attachments marked as archived that exist on local storage.
+    ///
+    /// - Returns: `true` if any deletions occurred, `false` otherwise.
+    func deleteArchivedAttachments(_ context: AttachmentContext) async throws -> Bool
+}
+
+actor SyncingServiceImpl: SyncingService {
     private let remoteStorage: RemoteStorageAdapter
     private let localStorage: LocalStorageAdapter
     private let attachmentsService: AttachmentService
-    private let getLocalUri: (String) async -> String
+    private let getLocalUri: @Sendable (String) async -> String
     private let errorHandler: SyncErrorHandler?
     private let syncThrottle: TimeInterval
     private var cancellables = Set<AnyCancellable>()
     private let syncTriggerSubject = PassthroughSubject<Void, Never>()
     private var periodicSyncTimer: Timer?
     private var syncTask: Task<Void, Never>?
-    private let lock: LockActor
     let logger: any LoggerProtocol
 
     let logTag = "AttachmentSync"
@@ -33,12 +51,12 @@ open class SyncingService {
     ///   - getLocalUri: Callback used to resolve a local path for saving downloaded attachments.
     ///   - errorHandler: Optional handler to determine if sync errors should be retried.
     ///   - syncThrottle: Throttle interval to control frequency of sync triggers.
-    init(
+    public init(
         remoteStorage: RemoteStorageAdapter,
         localStorage: LocalStorageAdapter,
         attachmentsService: AttachmentService,
         logger: any LoggerProtocol,
-        getLocalUri: @escaping (String) async -> String,
+        getLocalUri: @Sendable @escaping (String) async -> String,
         errorHandler: SyncErrorHandler? = nil,
         syncThrottle: TimeInterval = 5.0
     ) {
@@ -50,28 +68,23 @@ open class SyncingService {
         self.syncThrottle = syncThrottle
         self.logger = logger
         closed = false
-        lock = LockActor()
     }
 
     /// Starts periodic syncing of attachments.
     ///
     /// - Parameter period: The time interval in seconds between each sync.
     public func startSync(period: TimeInterval) async throws {
-        try await lock.withLock {
-            try await guardClosed()
+        try guardClosed()
 
-            // Close any active sync operations
-            try await _stopSync()
+        // Close any active sync operations
+        try await _stopSync()
 
-            await setupSyncFlow(period: period)
-        }
+        setupSyncFlow(period: period)
     }
 
     public func stopSync() async throws {
-        try await lock.withLock {
-            try await guardClosed()
-            try await _stopSync()
-        }
+        try guardClosed()
+        try await _stopSync()
     }
 
     private func _stopSync() async throws {
@@ -94,12 +107,10 @@ open class SyncingService {
 
     /// Cleans up internal resources and cancels any ongoing syncing.
     func close() async throws {
-        try await lock.withLock {
-            try await guardClosed()
+        try guardClosed()
 
-            try await _stopSync()
-            await _setClosed()
-        }
+        try await _stopSync()
+        _setClosed()
     }
 
     /// Triggers a sync operation. Can be called manually.
