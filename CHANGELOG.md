@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* [Internal] Instantiate Kotlin Kermit logger directly.
+
 ## 1.4.0
 
 * Added the ability to log PowerSync sync network requests.

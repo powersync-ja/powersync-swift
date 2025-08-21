@@ -40,13 +40,23 @@ private class KermitLogWriterAdapter: Kermit_coreLogWriter {
     }
 }
 
+class KotlinKermitLoggerConfig: PowerSyncKotlin.Kermit_coreLoggerConfig {
+    var logWriterList: [Kermit_coreLogWriter]
+    var minSeverity: PowerSyncKotlin.Kermit_coreSeverity
+    
+    init(logWriterList: [Kermit_coreLogWriter], minSeverity: PowerSyncKotlin.Kermit_coreSeverity) {
+        self.logWriterList = logWriterList
+        self.minSeverity = minSeverity
+    }
+}
+
 /// A logger implementation that integrates with PowerSync's Kotlin core using Kermit.
 ///
 /// This class bridges Swift log writers with the Kotlin logging system and supports
 /// runtime configuration of severity levels and writer lists.
 class DatabaseLogger: LoggerProtocol {
     /// The underlying Kermit logger instance provided by the PowerSyncKotlin SDK.
-    public let kLogger = PowerSyncKotlin.generateLogger(logger: nil)
+    public let kLogger: PowerSyncKotlin.KermitLogger
     public let logger: any LoggerProtocol
     
     /// Initializes a new logger with an optional list of writers.
@@ -55,9 +65,12 @@ class DatabaseLogger: LoggerProtocol {
     init(_ logger: any LoggerProtocol) {
         self.logger = logger
         // Set to the lowest severity. The provided logger should filter by severity
-        kLogger.mutableConfig.setMinSeverity(Kermit_coreSeverity.verbose)
-        kLogger.mutableConfig.setLogWriterList(
-            [KermitLogWriterAdapter(logger: logger)]
+        self.kLogger = PowerSyncKotlin.KermitLogger(
+            config: KotlinKermitLoggerConfig(
+                logWriterList: [KermitLogWriterAdapter(logger: logger)],
+                minSeverity: Kermit_coreSeverity.verbose
+            ),
+            tag: "PowerSync"
         )
     }
     
