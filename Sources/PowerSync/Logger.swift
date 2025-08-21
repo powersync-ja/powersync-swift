@@ -85,27 +85,27 @@ public final class DefaultLogger: LoggerProtocol,
         }
     }
 
-    public nonisolated func debug(_ message: String, tag: String? = nil) {
+    public func debug(_ message: String, tag: String? = nil) {
         writeLog(message, severity: LogSeverity.debug, tag: tag)
     }
 
-    public nonisolated func error(_ message: String, tag: String? = nil) {
+    public func error(_ message: String, tag: String? = nil) {
         writeLog(message, severity: LogSeverity.error, tag: tag)
     }
 
-    public nonisolated func info(_ message: String, tag: String? = nil) {
+    public func info(_ message: String, tag: String? = nil) {
         writeLog(message, severity: LogSeverity.info, tag: tag)
     }
 
-    public nonisolated func warning(_ message: String, tag: String? = nil) {
+    public func warning(_ message: String, tag: String? = nil) {
         writeLog(message, severity: LogSeverity.warning, tag: tag)
     }
 
-    public nonisolated func fault(_ message: String, tag: String? = nil) {
+    public func fault(_ message: String, tag: String? = nil) {
         writeLog(message, severity: LogSeverity.fault, tag: tag)
     }
 
-    private nonisolated func writeLog(_ message: String, severity: LogSeverity, tag: String?) {
+    private func writeLog(_ message: String, severity: LogSeverity, tag: String?) {
         let currentSeverity = queue.sync { minSeverity }
 
         if severity.rawValue < currentSeverity.rawValue {

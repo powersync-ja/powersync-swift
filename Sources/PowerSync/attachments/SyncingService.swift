@@ -110,7 +110,7 @@ actor SyncingServiceImpl: SyncingService {
         try guardClosed()
 
         try await _stopSync()
-        _setClosed()
+        closed = true
     }
 
     /// Triggers a sync operation. Can be called manually.
@@ -285,11 +285,6 @@ actor SyncingServiceImpl: SyncingService {
     /// Small actor isolated method to trigger the sync subject
     private func _triggerSyncSubject() {
         syncTriggerSubject.send(())
-    }
-
-    /// Small actor isolated method to mark as closed
-    private func _setClosed() {
-        closed = true
     }
 
     /// Deletes an attachment from remote and local storage.

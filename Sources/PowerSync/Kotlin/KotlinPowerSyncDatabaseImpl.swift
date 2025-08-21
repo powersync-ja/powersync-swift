@@ -1,8 +1,6 @@
 import Foundation
 import PowerSyncKotlin
 
-class Test: AnyObject {}
-
 final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked Sendable {
     let logger: any LoggerProtocol
 

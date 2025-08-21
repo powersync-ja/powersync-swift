@@ -34,7 +34,7 @@ final class AttachmentTests: XCTestCase {
     }
 
     func testAttachmentDownload() async throws {
-        let queue = await AttachmentQueue(
+        let queue = AttachmentQueue(
             db: database,
             remoteStorage: {
                 struct MockRemoteStorage: RemoteStorageAdapter {
@@ -80,27 +80,26 @@ final class AttachmentTests: XCTestCase {
             parameters: []
         )
 
-         let attachmentRecord = try await waitForMatch(
-             iteratorGenerator: { [database] in try database!.watch(
-                 options: WatchOptions(
-                     sql: "SELECT * FROM attachments",
-                     mapper: { cursor in try Attachment.fromCursor(cursor) }
-                 )) },
-             where: { results in results.first?.state == AttachmentState.synced },
-             timeout: 5
-         ).first
+        let attachmentRecord = try await waitForMatch(
+            iteratorGenerator: { [database] in try database!.watch(
+                options: WatchOptions(
+                    sql: "SELECT * FROM attachments",
+                    mapper: { cursor in try Attachment.fromCursor(cursor) }
+                )) },
+            where: { results in results.first?.state == AttachmentState.synced },
+            timeout: 5
+        ).first
 
 //         The file should exist
-         let localData = try await queue.localStorage.readFile(filePath: attachmentRecord!.localUri!)
-         XCTAssertEqual(localData.count, 3)
+        let localData = try await queue.localStorage.readFile(filePath: attachmentRecord!.localUri!)
+        XCTAssertEqual(localData.count, 3)
 
         try await queue.clearQueue()
         try await queue.close()
     }
 
     func testAttachmentUpload() async throws {
-        @MainActor
-        final class MockRemoteStorage: RemoteStorageAdapter {
+        actor MockRemoteStorage: RemoteStorageAdapter {
             public var uploadCalled = false
 
             func wasUploadCalled() -> Bool {
@@ -129,7 +128,7 @@ final class AttachmentTests: XCTestCase {
 
         let mockedRemote = MockRemoteStorage()
 
-        let queue = await AttachmentQueue(
+        let queue = AttachmentQueue(
             db: database,
             remoteStorage: mockedRemote,
             attachmentsDirectory: getAttachmentDirectory(),
