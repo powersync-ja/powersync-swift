@@ -226,6 +226,15 @@ public extension AttachmentQueueProtocol {
             }
         }
     }
+
+    func expireCache() async throws {
+        try await attachmentsService.withContext { context in
+            var done = false
+            repeat {
+                done = try await self.syncingService.deleteArchivedAttachments(context)
+            } while !done
+        }
+    }
 }
 
 /// Class used to implement the attachment queue
@@ -428,15 +437,6 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
         try await _stopSyncing()
         try await syncingService.close()
         closed = true
-    }
-
-    public func expireCache() async throws {
-        try await attachmentsService.withContext { context in
-            var done = false
-            repeat {
-                done = try await self.syncingService.deleteArchivedAttachments(context)
-            } while !done
-        }
     }
 
     /// Clears the attachment queue and deletes all attachment files
