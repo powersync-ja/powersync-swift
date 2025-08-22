@@ -3,20 +3,25 @@ import PowerSync
 import PowerSyncStructuredQueries
 import StructuredQueries
 
-@StructuredQueries.Table("users")
+@Table("users")
 struct User {
     var id: String
     var name: String
     var birthday: Date?
 }
 
-@StructuredQueries.Table("posts")
+@Table("posts")
 struct Post {
     var id: String
     var description: String
-    // TODO, inserts seem to break with this
-    @StructuredQueries.Column("user_id")
+    @Column("user_id")
     var userId: String
+}
+
+@Selection
+struct JoinedResult {
+    let postDescription: String
+    let userName: String
 }
 
 @main
@@ -30,19 +35,19 @@ struct Main {
                         name: "users",
                         columns: [
                             .text("name"),
-                            .text("birthday"),
+                            .text("birthday")
                         ]
                     ),
                     Table(
                         name: "posts",
                         columns: [
                             .text("description"),
-                            .text("user_id"),
+                            .text("user_id")
                         ]
                     ),
                 ],
             ),
-            dbFilename: "test.sqlite"
+            dbFilename: "tests.sqlite"
         )
 
         let testUserID = UUID().uuidString
@@ -66,13 +71,29 @@ struct Main {
             print(user)
         }
 
-        // TODO: column aliases seem to be broken
-        // try await Post.insert { Post(
-        //     id: UUID().uuidString, description: "A Post", userId: testUserID
-        // ) }.execute(powersync)
+        let posts = try await Post.all.fetchAll(powersync)
+        print("The posts are:")
+        for post in posts {
+            print(post)
+        }
 
-        // // TODO: fix typing in order to execute joined queries
-        // let postsWithUsers = Post.join(User.all) { $0.userId == $1.id }
-        //     .select { ($0.description, $1.name) }
+        try await Post.insert {
+            Post(
+                id: UUID().uuidString, description: "A Post", userId: testUserID
+            )
+        }.execute(powersync)
+
+        print("Joined posts are:")
+        let joinedPosts = try await Post.join(User.all) { $0.userId == $1.id }
+            .select {
+                JoinedResult.Columns(
+                    postDescription: $0.description,
+                    userName: $1.name
+                )
+            }
+            .fetchAll(powersync)
+        for joinedResult in joinedPosts {
+            print(joinedResult)
+        }
     }
 }

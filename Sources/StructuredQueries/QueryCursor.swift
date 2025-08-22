@@ -6,7 +6,7 @@ import StructuredQueries
 /// For our purposes, we can use "?" for placeholders.
 public extension QueryFragment {
     func prepareSqlite() -> (sql: String, bindings: [QueryBinding]) {
-        return prepare { _ in "?" }
+        prepare { _ in "?" }
     }
 }
 
