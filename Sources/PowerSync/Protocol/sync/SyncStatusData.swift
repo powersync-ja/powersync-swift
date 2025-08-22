@@ -1,7 +1,7 @@
 import Foundation
 
 /// A protocol representing the synchronization status of a system, providing various indicators and error states.
-public protocol SyncStatusData {
+public protocol SyncStatusData: Sendable {
     /// Indicates whether the system is currently connected.
     var connected: Bool { get }
 

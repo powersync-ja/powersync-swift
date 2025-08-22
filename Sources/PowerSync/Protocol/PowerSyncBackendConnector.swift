@@ -1,4 +1,4 @@
-public protocol PowerSyncBackendConnectorProtocol {
+public protocol PowerSyncBackendConnectorProtocol: Sendable {
     ///
     /// Get credentials for PowerSync.
     ///
@@ -28,7 +28,7 @@ public protocol PowerSyncBackendConnectorProtocol {
 /// 1. Creating credentials for connecting to the PowerSync service.
 /// 2. Applying local changes against the backend application server.
 ///
-///
+@MainActor
 open class PowerSyncBackendConnector: PowerSyncBackendConnectorProtocol {
     public init() {}
 
@@ -36,5 +36,5 @@ open class PowerSyncBackendConnector: PowerSyncBackendConnectorProtocol {
         return nil
     }
 
-    open func uploadData(database: PowerSyncDatabaseProtocol) async throws {}
+    open func uploadData(database _: PowerSyncDatabaseProtocol) async throws {}
 }

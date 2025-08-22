@@ -1,4 +1,3 @@
-
 @testable import PowerSync
 import XCTest
 
@@ -29,7 +28,7 @@ final class AttachmentTests: XCTestCase {
         database = nil
         try await super.tearDown()
     }
-    
+
     func getAttachmentDirectory() -> String {
         URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("attachments").path
     }
@@ -40,37 +39,39 @@ final class AttachmentTests: XCTestCase {
             remoteStorage: {
                 struct MockRemoteStorage: RemoteStorageAdapter {
                     func uploadFile(
-                        fileData: Data,
-                        attachment: Attachment
+                        fileData _: Data,
+                        attachment _: Attachment
                     ) async throws {}
-                    
+
                     /**
                      * Download a file from remote storage
                      */
-                    func downloadFile(attachment: Attachment) async throws -> Data {
+                    func downloadFile(attachment _: Attachment) async throws -> Data {
                         return Data([1, 2, 3])
                     }
-                    
+
                     /**
                      * Delete a file from remote storage
                      */
-                    func deleteFile(attachment: Attachment) async throws {}
+                    func deleteFile(attachment _: Attachment) async throws {}
                 }
-        
+
                 return MockRemoteStorage()
             }(),
             attachmentsDirectory: getAttachmentDirectory(),
-            watchAttachments: { try self.database.watch(options: WatchOptions(
-                sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
-                mapper: { cursor in try WatchedAttachmentItem(
-                    id: cursor.getString(name: "photo_id"),
-                    fileExtension: "jpg"
-                ) }
-            )) }
+            watchAttachments: { [database] in
+                try database!.watch(options: WatchOptions(
+                    sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
+                    mapper: { cursor in try WatchedAttachmentItem(
+                        id: cursor.getString(name: "photo_id"),
+                        fileExtension: "jpg"
+                    ) }
+                ))
+            }
         )
-        
+
         try await queue.startSync()
-        
+
         // Create a user which has a photo_id associated.
         // This will be treated as a download since no attachment record was created.
         // saveFile creates the attachment record before the updates are made.
@@ -78,58 +79,60 @@ final class AttachmentTests: XCTestCase {
             sql: "INSERT INTO users (id, name, email, photo_id) VALUES (uuid(), 'steven', 'steven@example.com', uuid())",
             parameters: []
         )
-        
-        let attachmentsWatch = try database.watch(
-            options: WatchOptions(
-                sql: "SELECT * FROM attachments",
-                mapper: { cursor in try Attachment.fromCursor(cursor) }
-            )).makeAsyncIterator()
-        
+
         let attachmentRecord = try await waitForMatch(
-            iterator: attachmentsWatch,
+            iteratorGenerator: { [database] in try database!.watch(
+                options: WatchOptions(
+                    sql: "SELECT * FROM attachments",
+                    mapper: { cursor in try Attachment.fromCursor(cursor) }
+                )) },
             where: { results in results.first?.state == AttachmentState.synced },
             timeout: 5
         ).first
-        
-        // The file should exist
+
+//         The file should exist
         let localData = try await queue.localStorage.readFile(filePath: attachmentRecord!.localUri!)
         XCTAssertEqual(localData.count, 3)
-        
+
         try await queue.clearQueue()
         try await queue.close()
     }
-    
+
     func testAttachmentUpload() async throws {
-        class MockRemoteStorage: RemoteStorageAdapter {
+        actor MockRemoteStorage: RemoteStorageAdapter {
             public var uploadCalled = false
-            
+
+            func wasUploadCalled() -> Bool {
+                return uploadCalled
+            }
+
             func uploadFile(
-                fileData: Data,
-                attachment: Attachment
+                fileData _: Data,
+                attachment _: Attachment
             ) async throws {
                 uploadCalled = true
             }
-            
+
             /**
              * Download a file from remote storage
              */
-            func downloadFile(attachment: Attachment) async throws -> Data {
+            func downloadFile(attachment _: Attachment) async throws -> Data {
                 return Data([1, 2, 3])
             }
-            
+
             /**
              * Delete a file from remote storage
              */
-            func deleteFile(attachment: Attachment) async throws {}
+            func deleteFile(attachment _: Attachment) async throws {}
         }
 
         let mockedRemote = MockRemoteStorage()
-        
+
         let queue = AttachmentQueue(
             db: database,
             remoteStorage: mockedRemote,
             attachmentsDirectory: getAttachmentDirectory(),
-            watchAttachments: { try self.database.watch(options: WatchOptions(
+            watchAttachments: { [database] in try database!.watch(options: WatchOptions(
                 sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
                 mapper: { cursor in try WatchedAttachmentItem(
                     id: cursor.getString(name: "photo_id"),
@@ -137,35 +140,36 @@ final class AttachmentTests: XCTestCase {
                 ) }
             )) }
         )
-        
+
         try await queue.startSync()
-        
-        let attachmentsWatch = try database.watch(
-            options: WatchOptions(
-                sql: "SELECT * FROM attachments",
-                mapper: { cursor in try Attachment.fromCursor(cursor) }
-            )).makeAsyncIterator()
-        
+
         _ = try await queue.saveFile(
             data: Data([3, 4, 5]),
             mediaType: "image/jpg",
             fileExtension: "jpg"
-        ) { tx, attachment in
-            _ = try tx.execute(
+        ) { transaction, attachment in
+            _ = try transaction.execute(
                 sql: "INSERT INTO users (id, name, email, photo_id) VALUES (uuid(), 'john', 'j@j.com', ?)",
                 parameters: [attachment.id]
             )
         }
-        
+
         _ = try await waitForMatch(
-            iterator: attachmentsWatch,
+            iteratorGenerator: { [database] in
+                try database!.watch(
+                    options: WatchOptions(
+                        sql: "SELECT * FROM attachments",
+                        mapper: { cursor in try Attachment.fromCursor(cursor) }
+                    ))
+            },
             where: { results in results.first?.state == AttachmentState.synced },
             timeout: 5
         ).first
-        
+
+        let uploadCalled = await mockedRemote.wasUploadCalled()
         // Upload should have been called
-        XCTAssertTrue(mockedRemote.uploadCalled)
-        
+        XCTAssertTrue(uploadCalled)
+
         try await queue.clearQueue()
         try await queue.close()
     }
@@ -176,21 +180,18 @@ public enum WaitForMatchError: Error {
     case predicateFail(message: String)
 }
 
-public func waitForMatch<T, E: Error>(
-    iterator: AsyncThrowingStream<T, E>.Iterator,
-    where predicate: @escaping (T) -> Bool,
+public func waitForMatch<T: Sendable, E: Error>(
+    iteratorGenerator: @Sendable @escaping () throws -> AsyncThrowingStream<T, E>,
+    where predicate: @Sendable @escaping (T) -> Bool,
     timeout: TimeInterval
 ) async throws -> T {
     let timeoutNanoseconds = UInt64(timeout * 1_000_000_000)
 
     return try await withThrowingTaskGroup(of: T.self) { group in
         // Task to wait for a matching value
-        group.addTask {
-            var localIterator = iterator
-            while let value = try await localIterator.next() {
-                if predicate(value) {
-                    return value
-                }
+        group.addTask { [iteratorGenerator] in
+            for try await value in try iteratorGenerator() where predicate(value) {
+                return value
             }
             throw WaitForMatchError.timeout() // stream ended before match
         }
@@ -214,13 +215,13 @@ func waitFor(
     predicate: () async throws -> Void
 ) async throws {
     let intervalNanoseconds = UInt64(interval * 1_000_000_000)
-    
+
     let timeoutDate = Date(
         timeIntervalSinceNow: timeout
     )
-    
+
     var lastError: Error?
-    
+
     while Date() < timeoutDate {
         do {
             try await predicate()
@@ -230,7 +231,7 @@ func waitFor(
         }
         try await Task.sleep(nanoseconds: intervalNanoseconds)
     }
-    
+
     throw WaitForMatchError.timeout(
         lastError: lastError
     )

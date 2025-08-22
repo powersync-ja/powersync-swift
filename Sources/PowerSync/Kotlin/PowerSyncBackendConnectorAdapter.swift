@@ -1,6 +1,9 @@
 import OSLog
 
-class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector {
+final class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector,
+    // We need to declare this since we declared KotlinPowerSyncBackendConnector as @unchecked Sendable
+    @unchecked Sendable
+{
     let swiftBackendConnector: PowerSyncBackendConnector
     let db: any PowerSyncDatabaseProtocol
     let logTag = "PowerSyncBackendConnector"
@@ -26,7 +29,7 @@ class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector {
         }
     }
 
-    override func __uploadData(database: KotlinPowerSyncDatabase) async throws {
+    override func __performUpload() async throws {
         do {
             // Pass the Swift DB protocal to the connector
             return try await swiftBackendConnector.uploadData(database: db)

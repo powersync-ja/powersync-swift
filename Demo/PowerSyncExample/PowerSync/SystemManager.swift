@@ -13,6 +13,7 @@ func getAttachmentsDirectoryPath() throws -> String {
 
 let logTag = "SystemManager"
 
+@MainActor
 @Observable
 class SystemManager {
     let connector = SupabaseConnector()
@@ -225,23 +226,23 @@ class SystemManager {
         if let attachments, let photoId = todo.photoId {
             try await attachments.deleteFile(
                 attachmentId: photoId
-            ) { tx, _ in
+            ) { transaction, _ in
                 try self.deleteTodoInTX(
                     id: todo.id,
-                    tx: tx
+                    tx: transaction
                 )
             }
         } else {
-            try await db.writeTransaction { tx in
+            try await db.writeTransaction { transaction in
                 try self.deleteTodoInTX(
                     id: todo.id,
-                    tx: tx
+                    tx: transaction
                 )
             }
         }
     }
 
-    private func deleteTodoInTX(id: String, tx: ConnectionContext) throws {
+    private nonisolated func deleteTodoInTX(id: String, tx: ConnectionContext) throws {
         _ = try tx.execute(
             sql: "DELETE FROM \(TODOS_TABLE) WHERE id = ?",
             parameters: [id]
