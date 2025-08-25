@@ -13,7 +13,6 @@ func getAttachmentsDirectoryPath() throws -> String {
 
 let logTag = "SystemManager"
 
-@MainActor
 @Observable
 class SystemManager {
     let connector = SupabaseConnector()
@@ -242,7 +241,7 @@ class SystemManager {
         }
     }
 
-    private nonisolated func deleteTodoInTX(id: String, tx: ConnectionContext) throws {
+    private func deleteTodoInTX(id: String, tx: ConnectionContext) throws {
         _ = try tx.execute(
             sql: "DELETE FROM \(TODOS_TABLE) WHERE id = ?",
             parameters: [id]

@@ -169,7 +169,7 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     ///
     /// - Throws: An error if the connection fails or if the database is not properly configured.
     func connect(
-        connector: PowerSyncBackendConnector,
+        connector: PowerSyncBackendConnectorProtocol,
         options: ConnectOptions?
     ) async throws
 

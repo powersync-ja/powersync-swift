@@ -45,7 +45,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     }
 
     func connect(
-        connector: PowerSyncBackendConnector,
+        connector: PowerSyncBackendConnectorProtocol,
         options: ConnectOptions?
     ) async throws {
         let connectorAdapter = PowerSyncBackendConnectorAdapter(

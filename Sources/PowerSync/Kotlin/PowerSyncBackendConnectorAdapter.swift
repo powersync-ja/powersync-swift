@@ -4,12 +4,12 @@ final class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector,
     // We need to declare this since we declared KotlinPowerSyncBackendConnector as @unchecked Sendable
     @unchecked Sendable
 {
-    let swiftBackendConnector: PowerSyncBackendConnector
+    let swiftBackendConnector: PowerSyncBackendConnectorProtocol
     let db: any PowerSyncDatabaseProtocol
     let logTag = "PowerSyncBackendConnector"
 
     init(
-        swiftBackendConnector: PowerSyncBackendConnector,
+        swiftBackendConnector: PowerSyncBackendConnectorProtocol,
         db: any PowerSyncDatabaseProtocol
     ) {
         self.swiftBackendConnector = swiftBackendConnector
