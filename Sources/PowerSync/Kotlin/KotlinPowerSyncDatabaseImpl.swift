@@ -1,9 +1,11 @@
 import Foundation
 import PowerSyncKotlin
 
-final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked Sendable {
+final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
+    // `PowerSyncKotlin.PowerSyncDatabase` cannot be marked as Sendable
+    @unchecked Sendable
+{
     let logger: any LoggerProtocol
-
     private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
     private let encoder = JSONEncoder()
     let currentStatus: SyncStatus
@@ -270,7 +272,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
     }
 
     func writeLock<R: Sendable>(
-        callback: @escaping (any ConnectionContext) throws -> R
+        callback: @Sendable @escaping (any ConnectionContext) throws -> R
     ) async throws -> R {
         return try await wrapPowerSyncException {
             try safeCast(
@@ -283,7 +285,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
     }
 
     func writeTransaction<R: Sendable>(
-        callback: @escaping (any Transaction) throws -> R
+        callback: @Sendable @escaping (any Transaction) throws -> R
     ) async throws -> R {
         return try await wrapPowerSyncException {
             try safeCast(
@@ -311,7 +313,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol, @unchecked S
     }
 
     func readTransaction<R: Sendable>(
-        callback: @escaping (any Transaction) throws -> R
+        callback: @Sendable @escaping (any Transaction) throws -> R
     ) async throws -> R {
         return try await wrapPowerSyncException {
             try safeCast(
@@ -417,7 +419,7 @@ extension Error {
 }
 
 func wrapLockContext(
-    callback: @escaping (any ConnectionContext) throws -> Any
+    callback: @Sendable @escaping (any ConnectionContext) throws -> Any
 ) throws -> PowerSyncKotlin.ThrowableLockCallback {
     PowerSyncKotlin.wrapContextHandler { kotlinContext in
         do {
@@ -436,7 +438,7 @@ func wrapLockContext(
 }
 
 func wrapTransactionContext(
-    callback: @escaping (any Transaction) throws -> Any
+    callback: @Sendable @escaping (any Transaction) throws -> Any
 ) throws -> PowerSyncKotlin.ThrowableTransactionCallback {
     PowerSyncKotlin.wrapTransactionContextHandler { kotlinContext in
         do {

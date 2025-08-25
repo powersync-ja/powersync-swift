@@ -148,9 +148,6 @@ public actor SyncingService: SyncingServiceProtocol {
                 )
                 .sink { _ in continuation.yield(()) }
 
-            continuation.onTermination = { _ in
-                cancellable.cancel()
-            }
             self.cancellables.insert(cancellable)
         }
     }

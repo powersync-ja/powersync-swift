@@ -1,4 +1,4 @@
-// swift-tools-version: 5.7
+// swift-tools-version: 6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -54,14 +54,14 @@ let package = Package(
     platforms: [
         .iOS(.v13),
         .macOS(.v10_15),
-        .watchOS(.v9),
+        .watchOS(.v9)
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: packageName,
             targets: ["PowerSync"]
-        ),
+        )
     ],
     dependencies: conditionalDependencies,
     targets: [
@@ -71,12 +71,12 @@ let package = Package(
             name: packageName,
             dependencies: [
                 kotlinTargetDependency,
-                .product(name: "PowerSyncSQLiteCore", package: corePackageName),
+                .product(name: "PowerSyncSQLiteCore", package: corePackageName)
             ]
         ),
         .testTarget(
             name: "PowerSyncTests",
-            dependencies: ["PowerSync"],
-        ),
+            dependencies: ["PowerSync"]
+        )
     ] + conditionalTargets
 )
