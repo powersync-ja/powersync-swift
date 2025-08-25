@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol AttachmentContext: Sendable {
+public protocol AttachmentContextProtocol: Sendable {
     var db: any PowerSyncDatabaseProtocol { get }
     var tableName: String { get }
     var logger: any LoggerProtocol { get }
@@ -44,7 +44,7 @@ public protocol AttachmentContext: Sendable {
     func clearQueue() async throws
 }
 
-public extension AttachmentContext {
+public extension AttachmentContextProtocol {
     func deleteAttachment(id: String) async throws {
         _ = try await db.execute(
             sql: "DELETE FROM \(tableName) WHERE id = ?",
@@ -158,7 +158,7 @@ public extension AttachmentContext {
             parameters: [
                 AttachmentState.archived.rawValue,
                 limit,
-                maxArchivedCount,
+                maxArchivedCount
             ]
         ) { cursor in
             try Attachment.fromCursor(cursor)
@@ -224,7 +224,7 @@ public extension AttachmentContext {
 }
 
 /// Context which performs actions on the attachment records
-public actor AttachmentContextImpl: AttachmentContext {
+public actor AttachmentContext: AttachmentContextProtocol {
     public let db: any PowerSyncDatabaseProtocol
     public let tableName: String
     public let logger: any LoggerProtocol

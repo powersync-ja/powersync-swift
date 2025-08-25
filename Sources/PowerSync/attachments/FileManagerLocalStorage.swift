@@ -4,9 +4,13 @@ import Foundation
  * Implementation of LocalStorageAdapter using FileManager
  */
 public actor FileManagerStorageAdapter: LocalStorageAdapter {
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
 
-    public init() {}
+    public init(
+        fileManager: FileManager? = nil
+    ) {
+        self.fileManager = fileManager ?? FileManager.default
+    }
 
     public func saveFile(filePath: String, data: Data) async throws -> Int64 {
         return try await Task {

@@ -28,7 +28,7 @@ public protocol PowerSyncBackendConnectorProtocol: Sendable {
 /// 1. Creating credentials for connecting to the PowerSync service.
 /// 2. Applying local changes against the backend application server.
 ///
-@MainActor
+@MainActor // This class is non-final, we can use actor isolation to make it Sendable
 open class PowerSyncBackendConnector: PowerSyncBackendConnectorProtocol {
     public init() {}
 

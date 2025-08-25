@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol AttachmentService: Sendable {
+public protocol AttachmentServiceProtocol: Sendable {
     /// Watches for changes to the attachments table.
     func watchActiveAttachments() async throws -> AsyncThrowingStream<[String], Error>
 
@@ -11,7 +11,7 @@ public protocol AttachmentService: Sendable {
 }
 
 /// Service which manages attachment records.
-actor AttachmentServiceImpl: AttachmentService {
+actor AttachmentServiceImpl: AttachmentServiceProtocol {
     private let db: any PowerSyncDatabaseProtocol
     private let tableName: String
     private let logger: any LoggerProtocol
@@ -29,7 +29,7 @@ actor AttachmentServiceImpl: AttachmentService {
         self.db = db
         self.tableName = tableName
         self.logger = logger
-        context = AttachmentContextImpl(
+        context = AttachmentContext(
             db: db,
             tableName: tableName,
             logger: logger,
@@ -63,7 +63,10 @@ actor AttachmentServiceImpl: AttachmentService {
         }
     }
 
-    public func withContext<R: Sendable>(callback: @Sendable @escaping (AttachmentContext) async throws -> R) async throws -> R {
+    public func withContext<R: Sendable>(
+        callback: @Sendable @escaping (AttachmentContext
+        ) async throws -> R) async throws -> R
+    {
         try await callback(context)
     }
 }

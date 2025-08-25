@@ -6,9 +6,8 @@ public let defaultAttachmentsTableName = "attachments"
 
 public protocol AttachmentQueueProtocol: Sendable {
     var db: any PowerSyncDatabaseProtocol { get }
-    var attachmentsService: any AttachmentService { get }
+    var attachmentsService: any AttachmentServiceProtocol { get }
     var localStorage: any LocalStorageAdapter { get }
-    var syncingService: any SyncingService { get }
     var downloadAttachments: Bool { get }
 
     /// Starts the attachment sync process
@@ -226,15 +225,6 @@ public extension AttachmentQueueProtocol {
             }
         }
     }
-
-    func expireCache() async throws {
-        try await attachmentsService.withContext { context in
-            var done = false
-            repeat {
-                done = try await self.syncingService.deleteArchivedAttachments(context)
-            } while !done
-        }
-    }
 }
 
 /// Class used to implement the attachment queue
@@ -284,7 +274,7 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
     public let logger: any LoggerProtocol
 
     /// Attachment service for interacting with attachment records
-    public let attachmentsService: AttachmentService
+    public let attachmentsService: AttachmentServiceProtocol
 
     private var syncStatusTask: Task<Void, Error>?
     private var cancellables = Set<AnyCancellable>()
@@ -337,7 +327,7 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
             logger: self.logger,
             maxArchivedCount: archivedCacheLimit
         )
-        syncingService = SyncingServiceImpl(
+        syncingService = SyncingService(
             remoteStorage: self.remoteStorage,
             localStorage: self.localStorage,
             attachmentsService: attachmentsService,
@@ -445,6 +435,15 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
             try await context.clearQueue()
             // Remove the attachments directory
             try await self.localStorage.rmDir(path: self.attachmentsDirectory)
+        }
+    }
+
+    public func expireCache() async throws {
+        try await attachmentsService.withContext { context in
+            var done = false
+            repeat {
+                done = try await self.syncingService.deleteArchivedAttachments(context)
+            } while !done
         }
     }
 

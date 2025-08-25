@@ -6,7 +6,7 @@ import Foundation
 /// This watches for changes to active attachments and performs queued
 /// download, upload, and delete operations. Syncs can be triggered manually,
 /// periodically, or based on database changes.
-public protocol SyncingService: Sendable {
+public protocol SyncingServiceProtocol: Sendable {
     /// Starts periodic syncing of attachments.
     ///
     /// - Parameter period: The time interval in seconds between each sync.
@@ -26,10 +26,10 @@ public protocol SyncingService: Sendable {
     func deleteArchivedAttachments(_ context: AttachmentContext) async throws -> Bool
 }
 
-actor SyncingServiceImpl: SyncingService {
+public actor SyncingService: SyncingServiceProtocol {
     private let remoteStorage: RemoteStorageAdapter
     private let localStorage: LocalStorageAdapter
-    private let attachmentsService: AttachmentService
+    private let attachmentsService: AttachmentServiceProtocol
     private let getLocalUri: @Sendable (String) async -> String
     private let errorHandler: SyncErrorHandler?
     private let syncThrottle: TimeInterval
@@ -54,7 +54,7 @@ actor SyncingServiceImpl: SyncingService {
     public init(
         remoteStorage: RemoteStorageAdapter,
         localStorage: LocalStorageAdapter,
-        attachmentsService: AttachmentService,
+        attachmentsService: AttachmentServiceProtocol,
         logger: any LoggerProtocol,
         getLocalUri: @Sendable @escaping (String) async -> String,
         errorHandler: SyncErrorHandler? = nil,
@@ -106,7 +106,7 @@ actor SyncingServiceImpl: SyncingService {
     }
 
     /// Cleans up internal resources and cancels any ongoing syncing.
-    func close() async throws {
+    public func close() async throws {
         try guardClosed()
 
         try await _stopSync()
@@ -114,7 +114,7 @@ actor SyncingServiceImpl: SyncingService {
     }
 
     /// Triggers a sync operation. Can be called manually.
-    func triggerSync() async throws {
+    public func triggerSync() async throws {
         try guardClosed()
         syncTriggerSubject.send(())
     }
@@ -122,7 +122,7 @@ actor SyncingServiceImpl: SyncingService {
     /// Deletes attachments marked as archived that exist on local storage.
     ///
     /// - Returns: `true` if any deletions occurred, `false` otherwise.
-    func deleteArchivedAttachments(_ context: AttachmentContext) async throws -> Bool {
+    public func deleteArchivedAttachments(_ context: AttachmentContext) async throws -> Bool {
         return try await context.deleteArchivedAttachments { pendingDelete in
             for attachment in pendingDelete {
                 guard let localUri = attachment.localUri else { continue }
@@ -149,7 +149,7 @@ actor SyncingServiceImpl: SyncingService {
                 .sink { _ in continuation.yield(()) }
 
             continuation.onTermination = { _ in
-                continuation.finish()
+                cancellable.cancel()
             }
             self.cancellables.insert(cancellable)
         }
