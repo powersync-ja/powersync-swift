@@ -62,8 +62,14 @@ let package = Package(
             name: packageName,
             targets: ["PowerSync"]
         ),
+        .library(
+            name: "PowerSyncStructuredQueries",
+            targets: ["PowerSyncStructuredQueries"]
+        ),
     ],
-    dependencies: conditionalDependencies,
+    dependencies: [
+        .package(url: "https://github.com/pointfreeco/swift-structured-queries", from: "0.4.0"),
+    ] + conditionalDependencies,
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
@@ -77,6 +83,21 @@ let package = Package(
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"],
+        ),
+        .target(
+            name: "PowerSyncStructuredQueries",
+            dependencies: [
+                .byName(name: packageName),
+                .product(name: "StructuredQueries", package: "swift-structured-queries"),
+            ],
+            path: "Sources/StructuredQueries"
+        ),
+        .executableTarget(
+            name: "StructuredQueriesExample",
+            dependencies: [
+                .byName(name: "PowerSyncStructuredQueries"),
+            ],
+            path: "Demo/StructuredQueriesExample"
         ),
     ] + conditionalTargets
 )
