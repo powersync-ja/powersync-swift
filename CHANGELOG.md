@@ -2,7 +2,9 @@
 
 ## Unreleased
 
+* Fix null values in CRUD entries being reported as strings.
 * [Internal] Instantiate Kotlin Kermit logger directly.
+* [Internal] Improved connection context error handling.
 
 ## 1.4.0
 
