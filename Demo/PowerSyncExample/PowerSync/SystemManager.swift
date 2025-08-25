@@ -225,17 +225,17 @@ class SystemManager {
         if let attachments, let photoId = todo.photoId {
             try await attachments.deleteFile(
                 attachmentId: photoId
-            ) { tx, _ in
+            ) { transaction, _ in
                 try self.deleteTodoInTX(
                     id: todo.id,
-                    tx: tx
+                    tx: transaction
                 )
             }
         } else {
-            try await db.writeTransaction { tx in
+            try await db.writeTransaction { transaction in
                 try self.deleteTodoInTX(
                     id: todo.id,
-                    tx: tx
+                    tx: transaction
                 )
             }
         }

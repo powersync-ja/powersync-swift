@@ -47,7 +47,7 @@ let schema = Schema(
 )
 ```
 
-2. Create an `AttachmentQueue` instance. This class provides default syncing utilities and implements a default sync strategy. It can be subclassed for custom functionality:
+2. Create an `AttachmentQueue` instance. This class provides default syncing utilities and implements a default sync strategy.
 
 ```swift
 func getAttachmentsDirectoryPath() throws -> String {
@@ -78,6 +78,9 @@ let queue = AttachmentQueue(
     ) }
 )
 ```
+
+Note: `AttachmentQueue` is an Actor which implements `AttachmentQueueProtocol`. The `AttachmentQueueProtocol` can be subclassed for custom queue functionality if required.
+
 - The `attachmentsDirectory` specifies where local attachment files should be stored. `FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("attachments")` is a good choice.
 - The `remoteStorage` is responsible for connecting to the attachments backend. See the `RemoteStorageAdapter` protocol definition.
 - `watchAttachments` is closure which generates a publisher of `WatchedAttachmentItem`. These items represent the attachments that should be present in the application.

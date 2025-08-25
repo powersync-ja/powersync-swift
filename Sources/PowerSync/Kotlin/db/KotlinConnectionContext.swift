@@ -10,17 +10,17 @@ protocol KotlinConnectionContextProtocol: ConnectionContext {
 
 /// Implements most of `ConnectionContext` using the `ctx` provided.
 extension KotlinConnectionContextProtocol {
-    func execute(sql: String, parameters: [Any?]?) throws -> Int64 {
+    func execute(sql: String, parameters: [Sendable?]?) throws -> Int64 {
         try ctx.execute(
             sql: sql,
             parameters: mapParameters(parameters)
         )
     }
 
-    func getOptional<RowType>(
+    func getOptional<RowType: Sendable>(
         sql: String,
-        parameters: [Any?]?,
-        mapper: @escaping (any SqlCursor) throws -> RowType
+        parameters: [Sendable?]?,
+        mapper: @Sendable @escaping (any SqlCursor) throws -> RowType
     ) throws -> RowType? {
         return try wrapQueryCursorTyped(
             mapper: mapper,
@@ -35,10 +35,10 @@ extension KotlinConnectionContextProtocol {
         )
     }
 
-    func getAll<RowType>(
+    func getAll<RowType: Sendable>(
         sql: String,
-        parameters: [Any?]?,
-        mapper: @escaping (any SqlCursor) throws -> RowType
+        parameters: [Sendable?]?,
+        mapper: @Sendable @escaping (any SqlCursor) throws -> RowType
     ) throws -> [RowType] {
         return try wrapQueryCursorTyped(
             mapper: mapper,
@@ -53,10 +53,10 @@ extension KotlinConnectionContextProtocol {
         )
     }
 
-    func get<RowType>(
+    func get<RowType: Sendable>(
         sql: String,
-        parameters: [Any?]?,
-        mapper: @escaping (any SqlCursor) throws -> RowType
+        parameters: [Sendable?]?,
+        mapper: @Sendable @escaping (any SqlCursor) throws -> RowType
     ) throws -> RowType {
         return try wrapQueryCursorTyped(
             mapper: mapper,
@@ -72,7 +72,10 @@ extension KotlinConnectionContextProtocol {
     }
 }
 
-class KotlinConnectionContext: KotlinConnectionContextProtocol {
+final class KotlinConnectionContext: KotlinConnectionContextProtocol,
+    // The Kotlin ConnectionContext is technically sendable, but we cannot annotate that
+    @unchecked Sendable
+{
     let ctx: PowerSyncKotlin.ConnectionContext
 
     init(ctx: PowerSyncKotlin.ConnectionContext) {
@@ -80,7 +83,10 @@ class KotlinConnectionContext: KotlinConnectionContextProtocol {
     }
 }
 
-class KotlinTransactionContext: Transaction, KotlinConnectionContextProtocol {
+final class KotlinTransactionContext: Transaction, KotlinConnectionContextProtocol,
+    // The Kotlin ConnectionContext is technically sendable, but we cannot annotate that
+    @unchecked Sendable
+{
     let ctx: PowerSyncKotlin.ConnectionContext
 
     init(ctx: PowerSyncKotlin.PowerSyncTransaction) {

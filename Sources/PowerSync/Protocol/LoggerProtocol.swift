@@ -1,4 +1,4 @@
-public enum LogSeverity: Int, CaseIterable {
+public enum LogSeverity: Int, CaseIterable, Sendable {
     /// Detailed information typically used for debugging.
     case debug = 0
 
@@ -47,35 +47,35 @@ public protocol LogWriterProtocol {
 /// A protocol defining the interface for a logger that supports severity filtering and multiple writers.
 ///
 /// Conformers provide logging APIs and manage attached log writers.
-public protocol LoggerProtocol {
+public protocol LoggerProtocol: Sendable {
     /// Logs an informational message.
     ///
     /// - Parameters:
     ///   - message: The content of the log message.
     ///   - tag: An optional tag to categorize the message.
     func info(_ message: String, tag: String?)
-    
+
     /// Logs an error message.
     ///
     /// - Parameters:
     ///   - message: The content of the log message.
     ///   - tag: An optional tag to categorize the message.
     func error(_ message: String, tag: String?)
-    
+
     /// Logs a debug message.
     ///
     /// - Parameters:
     ///   - message: The content of the log message.
     ///   - tag: An optional tag to categorize the message.
     func debug(_ message: String, tag: String?)
-    
+
     /// Logs a warning message.
     ///
     /// - Parameters:
     ///   - message: The content of the log message.
     ///   - tag: An optional tag to categorize the message.
     func warning(_ message: String, tag: String?)
-    
+
     /// Logs a fault message, typically used for critical system-level failures.
     ///
     /// - Parameters:

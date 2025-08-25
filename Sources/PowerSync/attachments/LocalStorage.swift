@@ -4,7 +4,7 @@ import Foundation
 public enum PowerSyncAttachmentError: Error {
     /// A general error with an associated message
     case generalError(String)
-    
+
     /// Indicates no matching attachment record could be found
     case notFound(String)
 
@@ -16,13 +16,13 @@ public enum PowerSyncAttachmentError: Error {
 
     /// The given file or directory path was invalid
     case invalidPath(String)
-    
+
     /// The attachments queue or sub services have been closed
     case closed(String)
 }
 
 /// Protocol defining an adapter interface for local file storage
-public protocol LocalStorageAdapter {
+public protocol LocalStorageAdapter: Sendable {
     /// Saves data to a file at the specified path.
     ///
     /// - Parameters:

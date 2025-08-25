@@ -1,5 +1,5 @@
 /// Enum representing the state of an attachment
-public enum AttachmentState: Int {
+public enum AttachmentState: Int, Sendable {
     /// The attachment has been queued for download from the cloud storage
     case queuedDownload
     /// The attachment has been queued for upload to the cloud storage
@@ -24,7 +24,7 @@ public enum AttachmentState: Int {
 }
 
 /// Struct representing an attachment
-public struct Attachment {
+public struct Attachment: Sendable {
     /// Unique identifier for the attachment
     public let id: String
 
@@ -91,7 +91,7 @@ public struct Attachment {
     func with(
         filename: String? = nil,
         state: AttachmentState? = nil,
-        timestamp : Int = 0,
+        timestamp: Int = 0,
         hasSynced: Bool? = nil,
         localUri: String?? = .none,
         mediaType: String?? = .none,
@@ -110,19 +110,18 @@ public struct Attachment {
             metaData: resolveOverride(metaData, current: self.metaData)
         )
     }
-    
+
     /// Resolves double optionals
     /// if a non nil value is provided: the override will be used
     /// if .some(nil) is provided: The value will be set to nil
     /// // if nil is provided:  the current value will be preserved
     private func resolveOverride<T>(_ override: T??, current: T?) -> T? {
         if let value = override {
-            return value  // could be nil (explicit clear) or a value
+            return value // could be nil (explicit clear) or a value
         } else {
-            return current  // not provided, use current
+            return current // not provided, use current
         }
     }
-
 
     /// Constructs an `Attachment` from a `SqlCursor`.
     ///

@@ -73,8 +73,8 @@ final class ConnectTests: XCTestCase {
             description: "Watch Sync Status"
         )
         
-        let watchTask = Task {
-            for try await _ in database.currentStatus.asFlow() {
+        let watchTask = Task { [database] in
+            for try await _ in database!.currentStatus.asFlow() {
                 expectation.fulfill()
             }
         }

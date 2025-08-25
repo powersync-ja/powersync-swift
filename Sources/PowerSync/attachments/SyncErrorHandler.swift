@@ -6,7 +6,7 @@ import Foundation
 /// operations (download, upload, delete) should be retried upon failure.
 ///
 /// If an operation fails and should not be retried, the attachment record is archived.
-public protocol SyncErrorHandler {
+public protocol SyncErrorHandler: Sendable {
     /// Handles a download error for a specific attachment.
     ///
     /// - Parameters:
@@ -44,7 +44,7 @@ public protocol SyncErrorHandler {
 /// Default implementation of `SyncErrorHandler`.
 ///
 /// By default, all operations return `false`, indicating no retry.
-public class DefaultSyncErrorHandler: SyncErrorHandler {
+public final class DefaultSyncErrorHandler: SyncErrorHandler, Sendable {
     public init() {}
 
     public func onDownloadError(attachment _: Attachment, error _: Error) async -> Bool {

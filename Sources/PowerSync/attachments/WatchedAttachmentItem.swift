@@ -4,7 +4,7 @@ import Foundation
 
 /// A watched attachment record item.
 /// This is usually returned from watching all relevant attachment IDs.
-public struct WatchedAttachmentItem {
+public struct WatchedAttachmentItem: Sendable {
     /// Id for the attachment record
     public let id: String
 

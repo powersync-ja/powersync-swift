@@ -38,7 +38,7 @@ private enum PostgresFatalCodes {
 }
 
 @Observable
-class SupabaseConnector: PowerSyncBackendConnector {
+final class SupabaseConnector: PowerSyncBackendConnectorProtocol {
     let powerSyncEndpoint: String = Secrets.powerSyncEndpoint
     let client: SupabaseClient = .init(
         supabaseURL: Secrets.supabaseURL,
@@ -50,8 +50,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
     @ObservationIgnored
     private var observeAuthStateChangesTask: Task<Void, Error>?
 
-    override init() {
-        super.init()
+    init() {
         session = client.auth.currentSession
         observeAuthStateChangesTask = Task { [weak self] in
             guard let self = self else { return }
@@ -80,7 +79,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
         return client.storage.from(bucket)       
     }
 
-    override func fetchCredentials() async throws -> PowerSyncCredentials? {
+    func fetchCredentials() async throws -> PowerSyncCredentials? {
         session = try await client.auth.session
 
         if session == nil {
@@ -92,7 +91,7 @@ class SupabaseConnector: PowerSyncBackendConnector {
         return PowerSyncCredentials(endpoint: powerSyncEndpoint, token: token)
     }
 
-    override func uploadData(database: PowerSyncDatabaseProtocol) async throws {
+    func uploadData(database: PowerSyncDatabaseProtocol) async throws {
         guard let transaction = try await database.getNextCrudTransaction() else { return }
 
         var lastEntry: CrudEntry?
