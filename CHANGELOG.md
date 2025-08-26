@@ -2,10 +2,12 @@
 
 ## Unreleased
 
-* [Internal] Instantiate the Kotlin Kermit logger directly.
+* Fix null values in CRUD entries being reported as strings.
 * Added support for Swift 6 strict concurrency checking.
 * *Potential Breaking Change*: Attachment helpers have been updated to better support Swift 6 strict concurrency checking. `Actor` isolation is improved, but developers who customize or extend `AttachmentQueue` will need to update their implementations. The default instantiation of `AttachmentQueue` remains unchanged.
 `AttachmentQueueProtocol` now defines the basic requirements for an attachment queue, with most base functionality provided via an extension. Custom implementations should extend `AttachmentQueueProtocol`.
+* [Internal] Instantiate Kotlin Kermit logger directly.
+* [Internal] Improved connection context error handling.
 
 ## 1.4.0
 

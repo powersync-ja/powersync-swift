@@ -250,7 +250,7 @@ public extension PowerSyncDatabaseProtocol {
     ///     params: params
     /// )
     func connect(
-        connector: PowerSyncBackendConnector,
+        connector: PowerSyncBackendConnectorProtocol,
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:]
