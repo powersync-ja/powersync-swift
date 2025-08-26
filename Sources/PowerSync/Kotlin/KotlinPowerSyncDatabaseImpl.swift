@@ -2,52 +2,85 @@ import Foundation
 import PowerSyncKotlin
 
 final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
-    private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
+    let logger: any LoggerProtocol
 
-    var currentStatus: SyncStatus { kotlinDatabase.currentStatus }
+    private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
+    private let encoder = JSONEncoder()
+    let currentStatus: SyncStatus
 
     init(
         schema: Schema,
-        dbFilename: String
+        dbFilename: String,
+        logger: DatabaseLogger
     ) {
         let factory = PowerSyncKotlin.DatabaseDriverFactory()
         kotlinDatabase = PowerSyncDatabase(
             factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),
-            dbFilename: dbFilename
+            dbFilename: dbFilename,
+            logger: logger.kLogger
         )
-    }
-
-    init(kotlinDatabase: KotlinPowerSyncDatabase) {
-        self.kotlinDatabase = kotlinDatabase
+        self.logger = logger
+        currentStatus = KotlinSyncStatus(
+            baseStatus: kotlinDatabase.currentStatus
+        )
     }
 
     func waitForFirstSync() async throws {
         try await kotlinDatabase.waitForFirstSync()
     }
 
+    func updateSchema(schema: any SchemaProtocol) async throws {
+        try await kotlinDatabase.updateSchema(
+            schema: KotlinAdapter.Schema.toKotlin(schema)
+        )
+    }
+
+    func waitForFirstSync(priority: Int32) async throws {
+        try await kotlinDatabase.waitForFirstSync(
+            priority: priority
+        )
+    }
+
     func connect(
         connector: PowerSyncBackendConnector,
-        crudThrottleMs: Int64 = 1000,
-        retryDelayMs: Int64 = 5000,
-        params: [String: JsonParam?] = [:]
+        options: ConnectOptions?
     ) async throws {
-        let connectorAdapter = PowerSyncBackendConnectorAdapter(swiftBackendConnector: connector)
+        let connectorAdapter = PowerSyncBackendConnectorAdapter(
+            swiftBackendConnector: connector,
+            db: self
+        )
 
+        let resolvedOptions = options ?? ConnectOptions()
         try await kotlinDatabase.connect(
             connector: connectorAdapter,
-            crudThrottleMs: crudThrottleMs,
-            retryDelayMs: retryDelayMs,
-            params: params
+            crudThrottleMs: Int64(resolvedOptions.crudThrottle * 1000),
+            retryDelayMs: Int64(resolvedOptions.retryDelay * 1000),
+            params: resolvedOptions.params.mapValues { $0.toKotlinMap() },
+            options: createSyncOptions(
+                newClient: resolvedOptions.newClientImplementation,
+                userAgent: "PowerSync Swift SDK",
+                loggingConfig: resolvedOptions.clientConfiguration?.requestLogger?.toKotlinConfig()
+            )
         )
     }
 
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
-        try await kotlinDatabase.getCrudBatch(limit: limit)
+        guard let base = try await kotlinDatabase.getCrudBatch(limit: limit) else {
+            return nil
+        }
+        return try KotlinCrudBatch(
+            batch: base
+        )
     }
 
     func getNextCrudTransaction() async throws -> CrudTransaction? {
-        try await kotlinDatabase.getNextCrudTransaction()
+        guard let base = try await kotlinDatabase.getNextCrudTransaction() else {
+            return nil
+        }
+        return try KotlinCrudTransaction(
+            transaction: base
+        )
     }
 
     func getPowerSyncVersion() async throws -> String {
@@ -59,166 +92,364 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
 
     func disconnectAndClear(clearLocal: Bool = true) async throws {
-        try await kotlinDatabase.disconnectAndClear(clearLocal: clearLocal)
+        try await kotlinDatabase.disconnectAndClear(
+            clearLocal: clearLocal
+        )
     }
 
-    func execute(sql: String, parameters: [Any]?) async throws -> Int64 {
-        try Int64(truncating: await kotlinDatabase.execute(sql: sql, parameters: parameters))
+    @discardableResult
+    func execute(sql: String, parameters: [Any?]?) async throws -> Int64 {
+        try await writeTransaction { ctx in
+            try ctx.execute(
+                sql: sql,
+                parameters: parameters
+            )
+        }
     }
 
     func get<RowType>(
         sql: String,
-        parameters: [Any]?,
+        parameters: [Any?]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> RowType {
-        try safeCast(await kotlinDatabase.get(
-            sql: sql,
-            parameters: parameters,
-            mapper: mapper
-        ), to: RowType.self)
+        try await readLock { ctx in
+            try ctx.get(
+                sql: sql,
+                parameters: parameters,
+                mapper: mapper
+            )
+        }
     }
 
     func get<RowType>(
         sql: String,
-        parameters: [Any]?,
+        parameters: [Any?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType {
-        return try await wrapQueryCursorTyped(
-            mapper: mapper,
-            executor: { wrappedMapper in
-                try await self.kotlinDatabase.get(
-                    sql: sql,
-                    parameters: parameters,
-                    mapper: wrappedMapper
-                )
-            },
-            resultType: RowType.self
-        )
+        try await readLock { ctx in
+            try ctx.get(
+                sql: sql,
+                parameters: parameters,
+                mapper: mapper
+            )
+        }
     }
 
     func getAll<RowType>(
         sql: String,
-        parameters: [Any]?,
+        parameters: [Any?]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> [RowType] {
-        try safeCast(await kotlinDatabase.getAll(
-            sql: sql,
-            parameters: parameters,
-            mapper: mapper
-        ), to: [RowType].self)
+        try await readLock { ctx in
+            try ctx.getAll(
+                sql: sql,
+                parameters: parameters,
+                mapper: mapper
+            )
+        }
     }
 
     func getAll<RowType>(
         sql: String,
-        parameters: [Any]?,
+        parameters: [Any?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> [RowType] {
-        try await wrapQueryCursorTyped(
-            mapper: mapper,
-            executor: { wrappedMapper in
-                try await self.kotlinDatabase.getAll(
-                    sql: sql,
-                    parameters: parameters,
-                    mapper: wrappedMapper
-                )
-            },
-            resultType: [RowType].self
-        )
+        try await readLock { ctx in
+            try ctx.getAll(
+                sql: sql,
+                parameters: parameters,
+                mapper: mapper
+            )
+        }
     }
 
     func getOptional<RowType>(
         sql: String,
-        parameters: [Any]?,
+        parameters: [Any?]?,
         mapper: @escaping (SqlCursor) -> RowType
     ) async throws -> RowType? {
-        try safeCast(await kotlinDatabase.getOptional(
-            sql: sql,
-            parameters: parameters,
-            mapper: mapper
-        ), to: RowType?.self)
+        try await readLock { ctx in
+            try ctx.getOptional(
+                sql: sql,
+                parameters: parameters,
+                mapper: mapper
+            )
+        }
     }
 
     func getOptional<RowType>(
         sql: String,
-        parameters: [Any]?,
+        parameters: [Any?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType? {
-        try await wrapQueryCursorTyped(
-            mapper: mapper,
-            executor: { wrappedMapper in
-                try await self.kotlinDatabase.getOptional(
-                    sql: sql,
-                    parameters: parameters,
-                    mapper: wrappedMapper
-                )
-            },
-            resultType: RowType?.self
-        )
-    }
-
-    func watch<RowType>(
-        sql: String,
-        parameters: [Any]?,
-        mapper: @escaping (SqlCursor) -> RowType
-    ) throws -> AsyncThrowingStream<[RowType], Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    for await values in try self.kotlinDatabase.watch(
-                        sql: sql,
-                        parameters: parameters,
-                        mapper: mapper
-                    ) {
-                        try continuation.yield(safeCast(values, to: [RowType].self))
-                    }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
+        try await readLock { ctx in
+            try ctx.getOptional(
+                sql: sql,
+                parameters: parameters,
+                mapper: mapper
+            )
         }
     }
 
     func watch<RowType>(
         sql: String,
-        parameters: [Any]?,
+        parameters: [Any?]?,
+        mapper: @escaping (SqlCursor) -> RowType
+    ) throws -> AsyncThrowingStream<[RowType], any Error> {
+        try watch(
+            options: WatchOptions(
+                sql: sql,
+                parameters: parameters,
+                mapper: mapper
+            )
+        )
+    }
+
+    func watch<RowType>(
+        sql: String,
+        parameters: [Any?]?,
         mapper: @escaping (SqlCursor) throws -> RowType
+    ) throws -> AsyncThrowingStream<[RowType], any Error> {
+        try watch(
+            options: WatchOptions(
+                sql: sql,
+                parameters: parameters,
+                mapper: mapper
+            )
+        )
+    }
+
+    func watch<RowType>(
+        options: WatchOptions<RowType>
     ) throws -> AsyncThrowingStream<[RowType], Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            // Create an outer task to monitor cancellation
+            let task = Task {
                 do {
-                    var mapperError: Error?
-                    for try await values in try self.kotlinDatabase.watch(
-                        sql: sql,
-                        parameters: parameters,
-                        mapper: { cursor in do {
-                            return try mapper(cursor)
-                        } catch {
-                            mapperError = error
-                            // The value here does not matter. We will throw the exception later
-                            // This is not ideal, this is only a workaround until we expose fine grained access to Kotlin SDK internals.
-                            return nil as RowType?
-                        } }
+                    let watchedTables = try await self.getQuerySourceTables(
+                        sql: options.sql,
+                        parameters: options.parameters
+                    )
+
+                    // Watching for changes in the database
+                    for try await _ in try self.kotlinDatabase.onChange(
+                        tables: Set(watchedTables),
+                        throttleMs: Int64(options.throttle * 1000),
+                        triggerImmediately: true // Allows emitting the first result even if there aren't changes
                     ) {
-                        if mapperError != nil {
-                            throw mapperError!
-                        }
-                        try continuation.yield(safeCast(values, to: [RowType].self))
+                        // Check if the outer task is cancelled
+                        try Task.checkCancellation()
+
+                        try continuation.yield(
+                            safeCast(
+                                await self.getAll(
+                                    sql: options.sql,
+                                    parameters: options.parameters,
+                                    mapper: options.mapper
+                                ),
+                                to: [RowType].self
+                            )
+                        )
                     }
+
                     continuation.finish()
                 } catch {
-                    continuation.finish(throwing: error)
+                    if error is CancellationError {
+                        continuation.finish()
+                    } else {
+                        continuation.finish(throwing: error)
+                    }
                 }
+            }
+
+            // Propagate cancellation from the outer task to the inner task
+            continuation.onTermination = { @Sendable _ in
+                task.cancel() // This cancels the inner task when the stream is terminated
             }
         }
     }
 
-    public func writeTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
-        return try safeCast(await kotlinDatabase.writeTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
+    func writeLock<R>(
+        callback: @escaping (any ConnectionContext) throws -> R
+    ) async throws -> R {
+        return try await wrapPowerSyncException {
+            try safeCast(
+                await kotlinDatabase.writeLock(
+                    callback: wrapLockContext(callback: callback)
+                ),
+                to: R.self
+            )
+        }
     }
 
-    public func readTransaction<R>(callback: @escaping (any PowerSyncTransaction) throws -> R) async throws -> R {
-        return try safeCast(await kotlinDatabase.readTransaction(callback: TransactionCallback(callback: callback)), to: R.self)
+    func writeTransaction<R>(
+        callback: @escaping (any Transaction) throws -> R
+    ) async throws -> R {
+        return try await wrapPowerSyncException {
+            try safeCast(
+                await kotlinDatabase.writeTransaction(
+                    callback: wrapTransactionContext(callback: callback)
+                ),
+                to: R.self
+            )
+        }
+    }
+
+    func readLock<R>(
+        callback: @escaping (any ConnectionContext) throws -> R
+    )
+        async throws -> R
+    {
+        return try await wrapPowerSyncException {
+            try safeCast(
+                await kotlinDatabase.readLock(
+                    callback: wrapLockContext(callback: callback)
+                ),
+                to: R.self
+            )
+        }
+    }
+
+    func readTransaction<R>(
+        callback: @escaping (any Transaction) throws -> R
+    ) async throws -> R {
+        return try await wrapPowerSyncException {
+            try safeCast(
+                await kotlinDatabase.readTransaction(
+                    callback: wrapTransactionContext(callback: callback)
+                ),
+                to: R.self
+            )
+        }
+    }
+
+    func close() async throws {
+        try await kotlinDatabase.close()
+    }
+
+    /// Tries to convert Kotlin PowerSyncExceptions to Swift Exceptions
+    private func wrapPowerSyncException<R>(
+        handler: () async throws -> R)
+        async throws -> R
+    {
+        do {
+            return try await handler()
+        } catch {
+            // Try and parse errors back from the Kotlin side
+            if let mapperError = SqlCursorError.fromDescription(error.localizedDescription) {
+                throw mapperError
+            }
+
+            throw PowerSyncError.operationFailed(
+                underlyingError: error
+            )
+        }
+    }
+
+    private func getQuerySourceTables(
+        sql: String,
+        parameters: [Any?]
+    ) async throws -> Set<String> {
+        let rows = try await getAll(
+            sql: "EXPLAIN \(sql)",
+            parameters: parameters,
+            mapper: { cursor in
+                try ExplainQueryResult(
+                    addr: cursor.getString(index: 0),
+                    opcode: cursor.getString(index: 1),
+                    p1: cursor.getInt64(index: 2),
+                    p2: cursor.getInt64(index: 3),
+                    p3: cursor.getInt64(index: 4)
+                )
+            }
+        )
+
+        let rootPages = rows.compactMap { row in
+            if (row.opcode == "OpenRead" || row.opcode == "OpenWrite") &&
+                row.p3 == 0 && row.p2 != 0
+            {
+                return row.p2
+            }
+            return nil
+        }
+
+        do {
+            let pagesData = try encoder.encode(rootPages)
+
+            guard let pagesString = String(data: pagesData, encoding: .utf8) else {
+                throw PowerSyncError.operationFailed(
+                    message: "Failed to convert pages data to UTF-8 string"
+                )
+            }
+
+            let tableRows = try await getAll(
+                sql: "SELECT tbl_name FROM sqlite_master WHERE rootpage IN (SELECT json_each.value FROM json_each(?))",
+                parameters: [
+                    pagesString
+                ]
+            ) { try $0.getString(index: 0) }
+
+            return Set(tableRows)
+        } catch {
+            throw PowerSyncError.operationFailed(
+                message: "Could not determine watched query tables",
+                underlyingError: error
+            )
+        }
     }
 }
 
+private struct ExplainQueryResult {
+    let addr: String
+    let opcode: String
+    let p1: Int64
+    let p2: Int64
+    let p3: Int64
+}
+
+extension Error {
+    func toPowerSyncError() -> PowerSyncKotlin.PowerSyncException {
+        return PowerSyncKotlin.PowerSyncException(
+            message: localizedDescription,
+            cause: PowerSyncKotlin.KotlinThrowable(message: localizedDescription)
+        )
+    }
+}
+
+func wrapLockContext(
+    callback: @escaping (any ConnectionContext) throws -> Any
+) throws -> PowerSyncKotlin.ThrowableLockCallback {
+    PowerSyncKotlin.wrapContextHandler { kotlinContext in
+        do {
+            return try PowerSyncKotlin.PowerSyncResult.Success(
+                value: callback(
+                    KotlinConnectionContext(
+                        ctx: kotlinContext
+                    )
+                ))
+        } catch {
+            return PowerSyncKotlin.PowerSyncResult.Failure(
+                exception: error.toPowerSyncError()
+            )
+        }
+    }
+}
+
+func wrapTransactionContext(
+    callback: @escaping (any Transaction) throws -> Any
+) throws -> PowerSyncKotlin.ThrowableTransactionCallback {
+    PowerSyncKotlin.wrapTransactionContextHandler { kotlinContext in
+        do {
+            return try PowerSyncKotlin.PowerSyncResult.Success(
+                value: callback(
+                    KotlinTransactionContext(
+                        ctx: kotlinContext
+                    )
+                ))
+        } catch {
+            return PowerSyncKotlin.PowerSyncResult.Failure(
+                exception: error.toPowerSyncError()
+            )
+        }
+    }
+}

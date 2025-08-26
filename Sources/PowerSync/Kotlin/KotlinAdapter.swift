@@ -1,6 +1,6 @@
 import PowerSyncKotlin
 
-internal struct KotlinAdapter {
+enum KotlinAdapter {
     struct Index {
         static func toKotlin(_ index: IndexProtocol) -> PowerSyncKotlin.Index {
             PowerSyncKotlin.Index(
@@ -23,14 +23,50 @@ internal struct KotlinAdapter {
 
     struct Table {
         static func toKotlin(_ table: TableProtocol) -> PowerSyncKotlin.Table {
-            PowerSyncKotlin.Table(
+            let trackPreviousKotlin: PowerSyncKotlin.TrackPreviousValuesOptions? = if let track = table.trackPreviousValues {
+                PowerSyncKotlin.TrackPreviousValuesOptions(
+                    columnFilter: track.columnFilter,
+                    onlyWhenChanged: track.onlyWhenChanged
+                )
+            } else {
+                nil
+            }
+            
+            return PowerSyncKotlin.Table(
                 name: table.name,
-                columns: table.columns.map {Column.toKotlin($0)},
+                columns: table.columns.map { Column.toKotlin($0) },
                 indexes: table.indexes.map { Index.toKotlin($0) },
                 localOnly: table.localOnly,
                 insertOnly: table.insertOnly,
-                viewNameOverride: table.viewNameOverride
+                viewNameOverride: table.viewNameOverride,
+                trackMetadata: table.trackMetadata,
+                trackPreviousValues: trackPreviousKotlin,
+                ignoreEmptyUpdates: table.ignoreEmptyUpdates
             )
+        }
+        
+        static func toKotlin(_ table: RawTable) -> PowerSyncKotlin.RawTable {
+            return PowerSyncKotlin.RawTable(
+                name: table.name,
+                put: translateStatement(table.put),
+                delete: translateStatement(table.delete)
+            );
+        }
+        
+        private static func translateStatement(_ stmt: PendingStatement) -> PowerSyncKotlin.PendingStatement {
+            return PowerSyncKotlin.PendingStatement(
+                sql: stmt.sql,
+                parameters: stmt.parameters.map(translateParameter)
+            )
+        }
+        
+        private static func translateParameter(_ param: PendingStatementParameter) -> PowerSyncKotlin.PendingStatementParameter {
+            switch param {
+            case .id:
+                return PowerSyncKotlin.PendingStatementParameterId.shared
+            case .column(let name):
+                return PowerSyncKotlin.PendingStatementParameterColumn(name: name)
+            }
         }
     }
 
@@ -56,8 +92,12 @@ internal struct KotlinAdapter {
 
     struct Schema {
         static func toKotlin(_ schema: SchemaProtocol) -> PowerSyncKotlin.Schema {
-            PowerSyncKotlin.Schema(
-                tables: schema.tables.map { Table.toKotlin($0) }
+            var mappedTables: [PowerSyncKotlin.BaseTable] = []
+            mappedTables.append(contentsOf: schema.tables.map(Table.toKotlin))
+            mappedTables.append(contentsOf: schema.rawTables.map(Table.toKotlin))
+            
+            return PowerSyncKotlin.Schema(
+                tables: mappedTables
             )
         }
     }

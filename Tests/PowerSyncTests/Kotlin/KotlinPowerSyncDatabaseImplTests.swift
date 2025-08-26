@@ -2,7 +2,7 @@
 import XCTest
 
 final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
-    private var database: KotlinPowerSyncDatabaseImpl!
+    private var database: (any PowerSyncDatabaseProtocol)!
     private var schema: Schema!
 
     override func setUp() async throws {
@@ -10,7 +10,8 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         schema = Schema(tables: [
             Table(name: "users", columns: [
                 .text("name"),
-                .text("email")
+                .text("email"),
+                .text("photo_id")
             ]),
             Table(name: "tasks", columns: [
                 .text("user_id"),
@@ -25,20 +26,22 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         database = KotlinPowerSyncDatabaseImpl(
             schema: schema,
-            dbFilename: ":memory:"
+            dbFilename: ":memory:",
+            logger: DatabaseLogger(DefaultLogger())
         )
         try await database.disconnectAndClear()
     }
 
     override func tearDown() async throws {
         try await database.disconnectAndClear()
+        try await database.close()
         database = nil
         try await super.tearDown()
     }
 
     func testExecuteError() async throws {
         do {
-            _ = try await database.execute(
+            try await database.execute(
                 sql: "INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)",
                 parameters: ["1", "Test User", "test@example.com"]
             )
@@ -52,7 +55,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     }
 
     func testInsertAndGet() async throws {
-        _ = try await database.execute(
+        try await database.execute(
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
             parameters: ["1", "Test User", "test@example.com"]
         )
@@ -99,7 +102,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "SELECT name FROM users WHERE id = ?",
             parameters: ["999"]
         ) { cursor in
-            cursor.getString(index: 0)!
+            try cursor.getString(name: "name")
         }
 
         XCTAssertNil(nonExistent)
@@ -113,7 +116,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "SELECT name FROM users WHERE id = ?",
             parameters: ["1"]
         ) { cursor in
-            cursor.getString(index: 0)!
+            try cursor.getString(index: 0)
         }
 
         XCTAssertEqual(existing, "Test User")
@@ -141,7 +144,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     }
 
     func testMapperError() async throws {
-        _ = try await database.execute(
+        try await database.execute(
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
             parameters: ["1", "Test User", "test@example.com"]
         )
@@ -150,7 +153,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 sql: "SELECT id, name, email FROM users WHERE id = ?",
                 parameters: ["1"]
             ) { _ throws in
-                throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "cursor error"])
+                throw NSError(
+                    domain: "TestError",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "cursor error"]
+                )
             }
             XCTFail("Expected an error to be thrown")
         } catch {
@@ -159,7 +166,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     }
 
     func testGetAll() async throws {
-        _ = try await database.execute(
+        try await database.execute(
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?), (?, ?, ?)",
             parameters: ["1", "User 1", "user1@example.com", "2", "User 2", "user2@example.com"]
         )
@@ -207,13 +214,13 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         // Create an actor to handle concurrent mutations
         actor ResultsStore {
-            private var results: [[String]] = []
+            private var results: Set<String> = []
 
             func append(_ names: [String]) {
-                results.append(names)
+                results.formUnion(names)
             }
 
-            func getResults() -> [[String]] {
+            func getResults() -> Set<String> {
                 results
             }
 
@@ -225,11 +232,12 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let resultsStore = ResultsStore()
 
         let stream = try database.watch(
-            sql: "SELECT name FROM users ORDER BY id",
-            parameters: nil
-        ) { cursor in
-            cursor.getString(index: 0)!
-        }
+            options: WatchOptions(
+                sql: "SELECT name FROM users ORDER BY id",
+                mapper: { cursor in
+                    try cursor.getString(index: 0)
+                }
+            ))
 
         let watchTask = Task {
             for try await names in stream {
@@ -254,8 +262,12 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         watchTask.cancel()
 
         let finalResults = await resultsStore.getResults()
-        XCTAssertEqual(finalResults.count, 2)
-        XCTAssertEqual(finalResults[1], ["User 1", "User 2"])
+        // The count of invocations here can vary a lot depending on the order of execution
+        // In some cases the creation of the users can fire before the initial watched query
+        // has emitted a result.
+        // However the watched query should always emit the latest result set.
+        XCTAssertLessThanOrEqual(finalResults.count, 3)
+        XCTAssertEqual(finalResults, ["User 1", "User 2"])
     }
 
     func testWatchError() async throws {
@@ -264,7 +276,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 sql: "SELECT name FROM usersfail ORDER BY id",
                 parameters: nil
             ) { cursor in
-                cursor.getString(index: 0)!
+                try cursor.getString(index: 0)
             }
 
             // Actually consume the stream to trigger the error
@@ -322,10 +334,10 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "SELECT COUNT(*) FROM users",
             parameters: []
         ) { cursor in
-            cursor.getLong(index: 0)
+            try cursor.getInt(index: 0)
         }
 
-        XCTAssertEqual(result as! Int, 2)
+        XCTAssertEqual(result, 2)
     }
 
     func testWriteLongerTransaction() async throws {
@@ -349,10 +361,10 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             sql: "SELECT COUNT(*) FROM users",
             parameters: []
         ) { cursor in
-            cursor.getLong(index: 0)
+            try cursor.getInt(index: 0)
         }
 
-        XCTAssertEqual(result as! Int, 2 * loopCount)
+        XCTAssertEqual(result, 2 * loopCount)
     }
 
     func testWriteTransactionError() async throws {
@@ -394,7 +406,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let result = try await database.getOptional(
             sql: "SELECT COUNT(*) FROM users",
             parameters: []
-        ) { cursor in try cursor.getLong(index: 0)
+        ) { cursor in try cursor.getInt(index: 0)
         }
 
         XCTAssertEqual(result, 0)
@@ -411,21 +423,21 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 sql: "SELECT COUNT(*) FROM users",
                 parameters: []
             ) { cursor in
-                cursor.getLong(index: 0)
+                try cursor.getInt(index: 0)
             }
 
-            XCTAssertEqual(result as! Int, 1)
+            XCTAssertEqual(result, 1)
         }
     }
 
     func testReadTransactionError() async throws {
         do {
             _ = try await database.readTransaction { transaction in
-                let result = try transaction.get(
+                _ = try transaction.get(
                     sql: "SELECT COUNT(*) FROM usersfail",
                     parameters: []
                 ) { cursor in
-                    cursor.getLong(index: 0)
+                    try cursor.getInt(index: 0)
                 }
             }
         } catch {
@@ -442,7 +454,6 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             var description: String
             var comment: String
         }
-
 
         _ = try await database.writeTransaction { transaction in
             _ = try transaction.execute(
@@ -472,27 +483,136 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         }
 
         let result = try await database.getAll(
-                sql: """
-                        SELECT
-                            users.name as name,
-                            tasks.description as description,
-                            comments.comment as comment
-                        FROM users
-                        LEFT JOIN tasks ON users.id = tasks.user_id
-                        LEFT JOIN comments ON tasks.id = comments.task_id;
-                """,
-                parameters: []
+            sql: """
+                    SELECT
+                        users.name as name,
+                        tasks.description as description,
+                        comments.comment as comment
+                    FROM users
+                    LEFT JOIN tasks ON users.id = tasks.user_id
+                    LEFT JOIN comments ON tasks.id = comments.task_id;
+            """,
+            parameters: []
+        ) { cursor in
+            try JoinOutput(
+                name: cursor.getString(name: "name"),
+                description: cursor.getString(name: "description"),
+                comment: cursor.getStringOptional(name: "comment") ?? ""
+            )
+        }
+
+        XCTAssertEqual(result.count, 3)
+        XCTAssertEqual(result[0], JoinOutput(name: "Test User", description: "task 1", comment: "comment 1"))
+        XCTAssertEqual(result[1], JoinOutput(name: "Test User", description: "task 1", comment: "comment 2"))
+        XCTAssertEqual(result[2], JoinOutput(name: "Test User", description: "task 2", comment: ""))
+        /// Transactions should return the value returned from the callback
+        func testTransactionReturnValue() async throws {
+            // Should pass through nil
+            let txNil = try await database.writeTransaction { _ in
+                nil as Any?
+            }
+            XCTAssertNil(txNil)
+
+            let txString = try await database.writeTransaction { _ in
+                "Hello"
+            }
+            XCTAssertEqual(txString, "Hello")
+        }
+
+        /// Transactions should return the value returned from the callback
+        func testTransactionGenerics() async throws {
+            // Should pass through nil
+            try await database.writeTransaction { tx in
+                let result = try tx.get(
+                    sql: "SELECT FALSE as col",
+                    parameters: []
+                ) { cursor in
+                    try cursor.getBoolean(name: "col")
+                }
+
+                // result should be typed as Bool
+                XCTAssertFalse(result)
+            }
+        }
+
+        func testFTS() async throws {
+            let supported = try await database.get(
+                "SELECT sqlite_compileoption_used('ENABLE_FTS5');"
             ) { cursor in
-                JoinOutput(
-                    name: try cursor.getString(name: "name"),
-                    description: try cursor.getString(name: "description"),
-                    comment: try cursor.getStringOptional(name: "comment") ?? ""
-                )
+                try cursor.getInt(index: 0)
             }
 
-            XCTAssertEqual(result.count, 3)
-            XCTAssertEqual(result[0] , JoinOutput(name: "Test User", description: "task 1", comment: "comment 1"))
-            XCTAssertEqual(result[1] , JoinOutput(name: "Test User", description: "task 1", comment: "comment 2"))
-            XCTAssertEqual(result[2] , JoinOutput(name: "Test User", description: "task 2", comment: ""))
+            XCTAssertEqual(supported, 1)
+        }
+
+        func testUpdatingSchema() async throws {
+            _ = try await database.execute(
+                sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+                parameters: ["1", "Test User", "test@example.com"]
+            )
+
+            let newSchema = Schema(tables: [
+                Table(
+                    name: "users",
+                    columns: [
+                        .text("name"),
+                        .text("email"),
+                    ],
+                    viewNameOverride: "people"
+                ),
+            ])
+
+            try await database.updateSchema(schema: newSchema)
+
+            let peopleCount = try await database.get(
+                sql: "SELECT COUNT(*) FROM people",
+                parameters: []
+            ) { cursor in try cursor.getInt(index: 0) }
+
+            XCTAssertEqual(peopleCount, 1)
+        }
+
+        func testCustomLogger() async throws {
+            let testWriter = TestLogWriterAdapter()
+            let logger = DefaultLogger(minSeverity: LogSeverity.debug, writers: [testWriter])
+
+            let db2 = KotlinPowerSyncDatabaseImpl(
+                schema: schema,
+                dbFilename: ":memory:",
+                logger: DatabaseLogger(logger)
+            )
+
+            try await db2.close()
+
+            let warningIndex = testWriter.logs.firstIndex(
+                where: { value in
+                    value.contains("warning: Multiple PowerSync instances for the same database have been detected")
+                }
+            )
+
+            XCTAssert(warningIndex! >= 0)
+        }
+
+        func testMinimumSeverity() async throws {
+            let testWriter = TestLogWriterAdapter()
+            let logger = DefaultLogger(minSeverity: LogSeverity.error, writers: [testWriter])
+
+            let db2 = KotlinPowerSyncDatabaseImpl(
+                schema: schema,
+                dbFilename: ":memory:",
+                logger: DatabaseLogger(logger)
+            )
+
+            try await db2.close()
+
+            let warningIndex = testWriter.logs.firstIndex(
+                where: { value in
+                    value.contains("warning: Multiple PowerSync instances for the same database have been detected")
+                }
+            )
+
+            // The warning should not be present due to the min severity
+            XCTAssert(warningIndex == nil)
+        }
     }
 }

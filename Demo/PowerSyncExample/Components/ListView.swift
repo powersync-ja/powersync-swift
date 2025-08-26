@@ -1,6 +1,7 @@
 import SwiftUI
 import IdentifiedCollections
 import SwiftUINavigation
+import PowerSync
 
 struct ListView: View {
     @Environment(SystemManager.self) private var system
@@ -9,8 +10,32 @@ struct ListView: View {
     @State private var error: Error?
     @State private var newList: NewListContent?
     @State private var editing: Bool = false
+    @State private var status: SyncStatusData? = nil
 
     var body: some View {
+        if status?.hasSynced != true {
+            VStack {
+                if let status = self.status {
+                    if status.hasSynced != true {
+                        Text("Busy with initial sync...")
+                        
+                        if let progress = status.downloadProgress {
+                            ProgressView(value: progress.fraction)
+                            
+                            if progress.downloadedOperations == progress.totalOperations {
+                                Text("Applying server-side changes...")
+                            } else {
+                                Text("Downloaded \(progress.downloadedOperations) out of \(progress.totalOperations)")
+                            }
+                        }
+                    }
+                } else {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                }
+            }
+        }
+
         List {
             if let error {
                 ErrorText(error)
@@ -67,6 +92,13 @@ struct ListView: View {
                 withAnimation {
                     self.lists = IdentifiedArrayOf(uniqueElements: ls)
                 }
+            }
+        }
+        .task {
+            self.status = system.db.currentStatus
+            
+            for await status in system.db.currentStatus.asFlow() {
+                self.status = status
             }
         }
     }

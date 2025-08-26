@@ -1,8 +1,12 @@
 import Foundation
 
-// Enter your Supabase and PowerSync project details.
-enum Secrets {
-    static let powerSyncEndpoint = "https://your-id.powersync.journeyapps.com"
-    static let supabaseURL = URL(string: "https://your-id.supabase.co")!
-    static let supabaseAnonKey = "anon-key"
+/// A protocol which specified the base structure for secrets
+protocol SecretsProvider {
+    static var powerSyncEndpoint: String { get }
+    static var supabaseURL: URL { get }
+    static var supabaseAnonKey: String { get }
+    static var supabaseStorageBucket: String? { get }
 }
+
+// Default conforming type
+enum Secrets: SecretsProvider {}

@@ -190,6 +190,35 @@ final class TableTests: XCTestCase {
         }
     }
     
+    func testInvalidLocalOnlyTrackMetadata() {
+        let table = Table(name: "test", columns: [Column.text("name")], localOnly: true, trackMetadata: true)
+        
+        XCTAssertThrowsError(try table.validate()) { error in
+            guard case TableError.metadataForLocalTable(let tableName) = error else {
+                XCTFail("Expected metadataForLocalTable error")
+                return
+            }
+            XCTAssertEqual(tableName, "test")
+        }
+    }
+    
+    func testInvalidLocalOnlyTrackPrevious() {
+        let table = Table(
+            name: "test_prev",
+            columns: [Column.text("name")],
+            localOnly: true,
+            trackPreviousValues: TrackPreviousValuesOptions()
+        )
+        
+        XCTAssertThrowsError(try table.validate()) { error in
+            guard case TableError.trackPreviousForLocalTable(let tableName) = error else {
+                XCTFail("Expected trackPreviousForLocalTable error")
+                return
+            }
+            XCTAssertEqual(tableName, "test_prev")
+        }
+    }
+    
     func testValidTableValidation() throws {
         let table = Table(
             name: "users",

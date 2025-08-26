@@ -3,14 +3,13 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(SystemManager.self) var system
-
-    @State private var authModel = AuthModel()
+    
     @State private var navigationModel = NavigationModel()
 
     var body: some View {
         NavigationStack(path: $navigationModel.path) {
             Group {
-                if authModel.isAuthenticated {
+                if system.connector.session != nil {
                     HomeScreen()
                 } else {
                     SignInScreen()
@@ -18,24 +17,17 @@ struct RootView: View {
             }
             .navigationDestination(for: Route.self) { route in
                 switch route {
-                    case .home:
-                        HomeScreen()
-                    case .signIn:
-                        SignInScreen()
-                    case .signUp:
-                        SignUpScreen()
-                    }
+                case .home:
+                    HomeScreen()
+                case .signIn:
+                    SignInScreen()
+                case .signUp:
+                    SignUpScreen()
+                }
             }
         }
-        .task {
-            if(system.db == nil) {
-                system.openDb()
-            }
-        }
-        .environment(authModel)
         .environment(navigationModel)
     }
-
 }
 
 #Preview {

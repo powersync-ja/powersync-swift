@@ -1,0 +1,57 @@
+name: Deploy Docs
+
+on:
+  push:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docs
+        run: |
+          xcodebuild docbuild \
+           -scheme PowerSync \
+           -destination 'platform=macOS' \
+           -derivedDataPath ./DerivedData \
+           -configuration Release
+
+      - name: Process Docs
+        run: |
+          xcrun docc process-archive \
+            transform-for-static-hosting \
+            ./DerivedData/Build/Products/Release/PowerSync.doccarchive/ \
+            --output-path ./docs-site \
+            --hosting-base-path /powersync-swift
+
+      #  The Docs are available at the path mentioned below. We can override the index.html to automatically redirect to the documentation page.
+      - name: Prepare static files
+        run: |
+          echo '<script>window.location.href += "/documentation/powersync"</script>' > ./docs-site/index.html
+
+      - name: Upload static files as artifact
+        id: deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+
+  # Deployment job
+  deploy:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment:
+      name: github-pages
+      url: ${{ needs.build.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

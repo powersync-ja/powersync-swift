@@ -36,4 +36,8 @@ let todos = Table(
     ]
 )
 
-let AppSchema = Schema(lists, todos)
+let AppSchema = Schema(
+    lists,
+    todos,
+    createAttachmentTable(name: "attachments")
+)
