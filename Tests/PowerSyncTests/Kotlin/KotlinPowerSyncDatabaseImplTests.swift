@@ -12,15 +12,6 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 .text("name"),
                 .text("email"),
                 .text("photo_id")
-            ]),
-            Table(name: "tasks", columns: [
-                .text("user_id"),
-                .text("description"),
-                .text("tags")
-            ]),
-            Table(name: "comments", columns: [
-                .text("task_id"),
-                .text("comment"),
             ])
         ])
 
@@ -448,6 +439,116 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         }
     }
 
+    /// Transactions should return the value returned from the callback
+    func testTransactionReturnValue() async throws {
+        // Should pass through nil
+        let txNil = try await database.writeTransaction { _ in
+            nil as Any?
+        }
+        XCTAssertNil(txNil)
+
+        let txString = try await database.writeTransaction { _ in
+            "Hello"
+        }
+        XCTAssertEqual(txString, "Hello")
+    }
+
+    /// Transactions should return the value returned from the callback
+    func testTransactionGenerics() async throws {
+        // Should pass through nil
+        try await database.writeTransaction { tx in
+            let result = try tx.get(
+                sql: "SELECT FALSE as col",
+                parameters: []
+            ) { cursor in
+                try cursor.getBoolean(name: "col")
+            }
+
+            // result should be typed as Bool
+            XCTAssertFalse(result)
+        }
+    }
+
+    func testFTS() async throws {
+        let supported = try await database.get(
+            "SELECT sqlite_compileoption_used('ENABLE_FTS5');"
+        ) { cursor in
+            try cursor.getInt(index: 0)
+        }
+
+        XCTAssertEqual(supported, 1)
+    }
+
+    func testUpdatingSchema() async throws {
+        _ = try await database.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "Test User", "test@example.com"]
+        )
+
+        let newSchema = Schema(tables: [
+            Table(
+                name: "users",
+                columns: [
+                    .text("name"),
+                    .text("email"),
+                ],
+                viewNameOverride: "people"
+            ),
+        ])
+
+        try await database.updateSchema(schema: newSchema)
+
+        let peopleCount = try await database.get(
+            sql: "SELECT COUNT(*) FROM people",
+            parameters: []
+        ) { cursor in try cursor.getInt(index: 0) }
+
+        XCTAssertEqual(peopleCount, 1)
+    }
+
+    func testCustomLogger() async throws {
+        let testWriter = TestLogWriterAdapter()
+        let logger = DefaultLogger(minSeverity: LogSeverity.debug, writers: [testWriter])
+
+        let db2 = KotlinPowerSyncDatabaseImpl(
+            schema: schema,
+            dbFilename: ":memory:",
+            logger: DatabaseLogger(logger)
+        )
+
+        try await db2.close()
+
+        let warningIndex = testWriter.logs.firstIndex(
+            where: { value in
+                value.contains("warning: Multiple PowerSync instances for the same database have been detected")
+            }
+        )
+
+        XCTAssert(warningIndex! >= 0)
+    }
+
+    func testMinimumSeverity() async throws {
+        let testWriter = TestLogWriterAdapter()
+        let logger = DefaultLogger(minSeverity: LogSeverity.error, writers: [testWriter])
+
+        let db2 = KotlinPowerSyncDatabaseImpl(
+            schema: schema,
+            dbFilename: ":memory:",
+            logger: DatabaseLogger(logger)
+        )
+
+        try await db2.close()
+
+        let warningIndex = testWriter.logs.firstIndex(
+            where: { value in
+                value.contains("warning: Multiple PowerSync instances for the same database have been detected")
+            }
+        )
+
+        // The warning should not be present due to the min severity
+        XCTAssert(warningIndex == nil)
+    }
+
     func testJoin() async throws {
         struct JoinOutput: Equatable {
             var name: String
@@ -455,30 +556,53 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             var comment: String
         }
 
-        _ = try await database.writeTransaction { transaction in
+        try await database.updateSchema(schema:
+            Schema(tables: [
+                Table(name: "users", columns: [
+                    .text("name"),
+                    .text("email"),
+                    .text("photo_id")
+                ]),
+                Table(name: "tasks", columns: [
+                    .text("user_id"),
+                    .text("description"),
+                    .text("tags")
+                ]),
+                Table(name: "comments", columns: [
+                    .text("task_id"),
+                    .text("comment"),
+                ])
+            ])
+        )
+
+        try await database.writeTransaction { transaction in
+            let userId = UUID().uuidString
             _ = try transaction.execute(
                 sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
-                parameters: ["1", "Test User", "test@example.com"]
+                parameters: [userId, "Test User", "test@example.com"]
             )
 
-            _ = try transaction.execute(
+            let task1Id = UUID().uuidString
+            let task2Id = UUID().uuidString
+
+            try transaction.execute(
                 sql: "INSERT INTO tasks (id, user_id, description) VALUES (?, ?, ?)",
-                parameters: ["1", "1", "task 1"]
+                parameters: [task1Id, userId, "task 1"]
             )
 
-            _ = try transaction.execute(
+            try transaction.execute(
                 sql: "INSERT INTO tasks (id, user_id, description) VALUES (?, ?, ?)",
-                parameters: ["2", "1", "task 2"]
+                parameters: [task2Id, userId, "task 2"]
             )
 
-            _ = try transaction.execute(
-                sql: "INSERT INTO comments (id, task_id, comment) VALUES (?, ?, ?)",
-                parameters: ["1", "1", "comment 1"]
+            try transaction.execute(
+                sql: "INSERT INTO comments (id, task_id, comment) VALUES (uuid(), ?, ?)",
+                parameters: [task1Id, "comment 1"]
             )
 
-            _ = try transaction.execute(
-                sql: "INSERT INTO comments (id, task_id, comment) VALUES (?, ?, ?)",
-                parameters: ["2", "1", "comment 2"]
+            try transaction.execute(
+                sql: "INSERT INTO comments (id, task_id, comment) VALUES (uuid(), ?, ?)",
+                parameters: [task2Id, "comment 2"]
             )
         }
 
@@ -501,118 +625,8 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             )
         }
 
-        XCTAssertEqual(result.count, 3)
+        XCTAssertEqual(result.count, 2)
         XCTAssertEqual(result[0], JoinOutput(name: "Test User", description: "task 1", comment: "comment 1"))
-        XCTAssertEqual(result[1], JoinOutput(name: "Test User", description: "task 1", comment: "comment 2"))
-        XCTAssertEqual(result[2], JoinOutput(name: "Test User", description: "task 2", comment: ""))
-        /// Transactions should return the value returned from the callback
-        func testTransactionReturnValue() async throws {
-            // Should pass through nil
-            let txNil = try await database.writeTransaction { _ in
-                nil as Any?
-            }
-            XCTAssertNil(txNil)
-
-            let txString = try await database.writeTransaction { _ in
-                "Hello"
-            }
-            XCTAssertEqual(txString, "Hello")
-        }
-
-        /// Transactions should return the value returned from the callback
-        func testTransactionGenerics() async throws {
-            // Should pass through nil
-            try await database.writeTransaction { tx in
-                let result = try tx.get(
-                    sql: "SELECT FALSE as col",
-                    parameters: []
-                ) { cursor in
-                    try cursor.getBoolean(name: "col")
-                }
-
-                // result should be typed as Bool
-                XCTAssertFalse(result)
-            }
-        }
-
-        func testFTS() async throws {
-            let supported = try await database.get(
-                "SELECT sqlite_compileoption_used('ENABLE_FTS5');"
-            ) { cursor in
-                try cursor.getInt(index: 0)
-            }
-
-            XCTAssertEqual(supported, 1)
-        }
-
-        func testUpdatingSchema() async throws {
-            _ = try await database.execute(
-                sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
-                parameters: ["1", "Test User", "test@example.com"]
-            )
-
-            let newSchema = Schema(tables: [
-                Table(
-                    name: "users",
-                    columns: [
-                        .text("name"),
-                        .text("email"),
-                    ],
-                    viewNameOverride: "people"
-                ),
-            ])
-
-            try await database.updateSchema(schema: newSchema)
-
-            let peopleCount = try await database.get(
-                sql: "SELECT COUNT(*) FROM people",
-                parameters: []
-            ) { cursor in try cursor.getInt(index: 0) }
-
-            XCTAssertEqual(peopleCount, 1)
-        }
-
-        func testCustomLogger() async throws {
-            let testWriter = TestLogWriterAdapter()
-            let logger = DefaultLogger(minSeverity: LogSeverity.debug, writers: [testWriter])
-
-            let db2 = KotlinPowerSyncDatabaseImpl(
-                schema: schema,
-                dbFilename: ":memory:",
-                logger: DatabaseLogger(logger)
-            )
-
-            try await db2.close()
-
-            let warningIndex = testWriter.logs.firstIndex(
-                where: { value in
-                    value.contains("warning: Multiple PowerSync instances for the same database have been detected")
-                }
-            )
-
-            XCTAssert(warningIndex! >= 0)
-        }
-
-        func testMinimumSeverity() async throws {
-            let testWriter = TestLogWriterAdapter()
-            let logger = DefaultLogger(minSeverity: LogSeverity.error, writers: [testWriter])
-
-            let db2 = KotlinPowerSyncDatabaseImpl(
-                schema: schema,
-                dbFilename: ":memory:",
-                logger: DatabaseLogger(logger)
-            )
-
-            try await db2.close()
-
-            let warningIndex = testWriter.logs.firstIndex(
-                where: { value in
-                    value.contains("warning: Multiple PowerSync instances for the same database have been detected")
-                }
-            )
-
-            // The warning should not be present due to the min severity
-            XCTAssert(warningIndex == nil)
-        }
+        XCTAssertEqual(result[1], JoinOutput(name: "Test User", description: "task 2", comment: "comment 2"))
     }
 }
