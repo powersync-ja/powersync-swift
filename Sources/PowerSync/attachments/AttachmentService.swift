@@ -64,9 +64,8 @@ actor AttachmentServiceImpl: AttachmentServiceProtocol {
     }
 
     public func withContext<R: Sendable>(
-        callback: @Sendable @escaping (AttachmentContext
-        ) async throws -> R) async throws -> R
-    {
+        callback: @Sendable @escaping (AttachmentContext) async throws -> R
+    ) async throws -> R {
         try await callback(context)
     }
 }

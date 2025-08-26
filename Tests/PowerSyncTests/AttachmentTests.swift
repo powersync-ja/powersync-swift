@@ -59,8 +59,8 @@ final class AttachmentTests: XCTestCase {
                 return MockRemoteStorage()
             }(),
             attachmentsDirectory: getAttachmentDirectory(),
-            watchAttachments: { [database] in
-                try database!.watch(options: WatchOptions(
+            watchAttachments: { [database = database!] in
+                try database.watch(options: WatchOptions(
                     sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
                     mapper: { cursor in try WatchedAttachmentItem(
                         id: cursor.getString(name: "photo_id"),
@@ -81,7 +81,7 @@ final class AttachmentTests: XCTestCase {
         )
 
         let attachmentRecord = try await waitForMatch(
-            iteratorGenerator: { [database] in try database!.watch(
+            iteratorGenerator: { [database = database!] in try database.watch(
                 options: WatchOptions(
                     sql: "SELECT * FROM attachments",
                     mapper: { cursor in try Attachment.fromCursor(cursor) }
@@ -132,7 +132,7 @@ final class AttachmentTests: XCTestCase {
             db: database,
             remoteStorage: mockedRemote,
             attachmentsDirectory: getAttachmentDirectory(),
-            watchAttachments: { [database] in try database!.watch(options: WatchOptions(
+            watchAttachments: { [database = database!] in try database.watch(options: WatchOptions(
                 sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
                 mapper: { cursor in try WatchedAttachmentItem(
                     id: cursor.getString(name: "photo_id"),
@@ -155,8 +155,8 @@ final class AttachmentTests: XCTestCase {
         }
 
         _ = try await waitForMatch(
-            iteratorGenerator: { [database] in
-                try database!.watch(
+            iteratorGenerator: { [database = database!] in
+                try database.watch(
                     options: WatchOptions(
                         sql: "SELECT * FROM attachments",
                         mapper: { cursor in try Attachment.fromCursor(cursor) }
