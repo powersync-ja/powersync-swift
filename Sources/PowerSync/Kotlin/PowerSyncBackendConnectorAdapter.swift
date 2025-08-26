@@ -29,7 +29,7 @@ final class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector,
         }
     }
 
-    override func __performUpload() async throws {
+    override func __uploadData(database _: KotlinPowerSyncDatabase) async throws {
         do {
             // Pass the Swift DB protocal to the connector
             return try await swiftBackendConnector.uploadData(database: db)
