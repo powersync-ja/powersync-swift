@@ -8,11 +8,14 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         schema = Schema(tables: [
-            Table(name: "users", columns: [
-                .text("name"),
-                .text("email"),
-                .text("photo_id")
-            ])
+            Table(
+                name: "users",
+                columns: [
+                    .text("name"),
+                    .text("email"),
+                    .text("photo_id")
+                ]
+            )
         ])
 
         database = KotlinPowerSyncDatabaseImpl(
@@ -577,7 +580,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         try await database.writeTransaction { transaction in
             let userId = UUID().uuidString
-            _ = try transaction.execute(
+            try transaction.execute(
                 sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                 parameters: [userId, "Test User", "test@example.com"]
             )
