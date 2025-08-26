@@ -31,7 +31,7 @@ jobs:
           xcode-version: latest-stable
       - name: Use Swift 6
         run: |
-          sed -i '' 's|// swift-tools-version:[0-9.]*|// swift-tools-version:6.1|' Package.swift
+          sed -i '' 's|^// swift-tools-version:.*$|// swift-tools-version:6.1|' Package.swift
       - name: Build and Test
         run: |
           swift build -Xswiftc -strict-concurrency=complete
