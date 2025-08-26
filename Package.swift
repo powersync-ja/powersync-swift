@@ -2,6 +2,7 @@
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
+
 let packageName = "PowerSync"
 
 // Set this to the absolute path of your Kotlin SDK checkout if you want to use a local Kotlin
@@ -31,8 +32,8 @@ if let kotlinSdkPath = localKotlinSdkOverride {
     // Not using a local build, so download from releases
     conditionalTargets.append(.binaryTarget(
         name: "PowerSyncKotlin",
-        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.4.0/PowersyncKotlinRelease.zip",
-        checksum: "e800db216fc1c9722e66873deb4f925530267db6dbd5e2114dd845cc62c28cd9"
+        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.5.0/PowersyncKotlinRelease.zip",
+        checksum: "cb1d717d28411aff0bfdeeaa837ae01514ebf5d64203dc565a9520a2912bae9d"
     ))
 }
 
@@ -59,7 +60,8 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: packageName,
-            targets: ["PowerSync"]),
+            targets: ["PowerSync"]
+        )
     ],
     dependencies: conditionalDependencies,
     targets: [
@@ -70,10 +72,11 @@ let package = Package(
             dependencies: [
                 kotlinTargetDependency,
                 .product(name: "PowerSyncSQLiteCore", package: corePackageName)
-            ]),
+            ]
+        ),
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]
-        ),
+        )
     ] + conditionalTargets
 )
