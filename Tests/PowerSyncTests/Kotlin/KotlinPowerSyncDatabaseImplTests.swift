@@ -13,9 +13,9 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 columns: [
                     .text("name"),
                     .text("email"),
-                    .text("photo_id"),
+                    .text("photo_id")
                 ]
-            ),
+            )
         ])
 
         database = KotlinPowerSyncDatabaseImpl(
@@ -550,5 +550,86 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         // The warning should not be present due to the min severity
         XCTAssert(warningIndex == nil)
+    }
+
+    func testJoin() async throws {
+        struct JoinOutput: Equatable {
+            var name: String
+            var description: String
+            var comment: String
+        }
+
+        try await database.updateSchema(schema:
+            Schema(tables: [
+                Table(name: "users", columns: [
+                    .text("name"),
+                    .text("email"),
+                    .text("photo_id")
+                ]),
+                Table(name: "tasks", columns: [
+                    .text("user_id"),
+                    .text("description"),
+                    .text("tags")
+                ]),
+                Table(name: "comments", columns: [
+                    .text("task_id"),
+                    .text("comment"),
+                ])
+            ])
+        )
+
+        try await database.writeTransaction { transaction in
+            let userId = UUID().uuidString
+            try transaction.execute(
+                sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+                parameters: [userId, "Test User", "test@example.com"]
+            )
+
+            let task1Id = UUID().uuidString
+            let task2Id = UUID().uuidString
+
+            try transaction.execute(
+                sql: "INSERT INTO tasks (id, user_id, description) VALUES (?, ?, ?)",
+                parameters: [task1Id, userId, "task 1"]
+            )
+
+            try transaction.execute(
+                sql: "INSERT INTO tasks (id, user_id, description) VALUES (?, ?, ?)",
+                parameters: [task2Id, userId, "task 2"]
+            )
+
+            try transaction.execute(
+                sql: "INSERT INTO comments (id, task_id, comment) VALUES (uuid(), ?, ?)",
+                parameters: [task1Id, "comment 1"]
+            )
+
+            try transaction.execute(
+                sql: "INSERT INTO comments (id, task_id, comment) VALUES (uuid(), ?, ?)",
+                parameters: [task2Id, "comment 2"]
+            )
+        }
+
+        let result = try await database.getAll(
+            sql: """
+                    SELECT
+                        users.name as name,
+                        tasks.description as description,
+                        comments.comment as comment
+                    FROM users
+                    LEFT JOIN tasks ON users.id = tasks.user_id
+                    LEFT JOIN comments ON tasks.id = comments.task_id;
+            """,
+            parameters: []
+        ) { cursor in
+            try JoinOutput(
+                name: cursor.getString(name: "name"),
+                description: cursor.getString(name: "description"),
+                comment: cursor.getStringOptional(name: "comment") ?? ""
+            )
+        }
+
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0], JoinOutput(name: "Test User", description: "task 1", comment: "comment 1"))
+        XCTAssertEqual(result[1], JoinOutput(name: "Test User", description: "task 2", comment: "comment 2"))
     }
 }
