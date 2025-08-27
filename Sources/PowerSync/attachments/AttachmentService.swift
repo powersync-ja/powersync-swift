@@ -1,14 +1,23 @@
 import Foundation
 
+public protocol AttachmentServiceProtocol: Sendable {
+    /// Watches for changes to the attachments table.
+    func watchActiveAttachments() async throws -> AsyncThrowingStream<[String], Error>
+
+    /// Executes a callback with exclusive access to the attachment context.
+    func withContext<R: Sendable>(
+        callback: @Sendable @escaping (AttachmentContext) async throws -> R
+    ) async throws -> R
+}
+
 /// Service which manages attachment records.
-open class AttachmentService {
+actor AttachmentServiceImpl: AttachmentServiceProtocol {
     private let db: any PowerSyncDatabaseProtocol
     private let tableName: String
     private let logger: any LoggerProtocol
     private let logTag = "AttachmentService"
 
     private let context: AttachmentContext
-    private let lock: LockActor
 
     /// Initializes the attachment service with the specified database, table name, logger, and max archived count.
     public init(
@@ -26,10 +35,8 @@ open class AttachmentService {
             logger: logger,
             maxArchivedCount: maxArchivedCount
         )
-        lock = LockActor()
     }
 
-    /// Watches for changes to the attachments table.
     public func watchActiveAttachments() throws -> AsyncThrowingStream<[String], Error> {
         logger.info("Watching attachments...", tag: logTag)
 
@@ -49,17 +56,16 @@ open class AttachmentService {
             parameters: [
                 AttachmentState.queuedUpload.rawValue,
                 AttachmentState.queuedDownload.rawValue,
-                AttachmentState.queuedDelete.rawValue,
+                AttachmentState.queuedDelete.rawValue
             ]
         ) { cursor in
             try cursor.getString(name: "id")
         }
     }
 
-    /// Executes a callback with exclusive access to the attachment context.
-    public func withContext<R>(callback: @Sendable @escaping (AttachmentContext) async throws -> R) async throws -> R {
-        try await lock.withLock {
-            try await callback(context)
-        }
+    public func withContext<R: Sendable>(
+        callback: @Sendable @escaping (AttachmentContext) async throws -> R
+    ) async throws -> R {
+        try await callback(context)
     }
 }

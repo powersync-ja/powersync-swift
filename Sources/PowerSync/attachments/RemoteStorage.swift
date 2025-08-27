@@ -1,7 +1,7 @@
 import Foundation
 
 /// Adapter for interfacing with remote attachment storage.
-public protocol RemoteStorageAdapter {
+public protocol RemoteStorageAdapter: Sendable {
     /// Uploads a file to remote storage.
     ///
     /// - Parameters:

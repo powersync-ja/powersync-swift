@@ -14,9 +14,9 @@ import PowerSyncKotlin
 /// and other functionality—without modifying the public `PowerSyncDatabase` API to include
 /// Swift-specific logic.
 func wrapQueryCursor<RowType, ReturnType>(
-    mapper: @escaping (SqlCursor) throws -> RowType,
+    mapper: @Sendable @escaping (SqlCursor) throws -> RowType,
     //    The Kotlin APIs return the results as Any, we can explicitly cast internally
-    executor: @escaping (_ wrappedMapper: @escaping (PowerSyncKotlin.SqlCursor) -> RowType?) throws -> ReturnType
+    executor: @Sendable @escaping (_ wrappedMapper: @escaping (PowerSyncKotlin.SqlCursor) -> RowType?) throws -> ReturnType
 ) throws -> ReturnType {
     var mapperException: Error?
 
@@ -36,7 +36,7 @@ func wrapQueryCursor<RowType, ReturnType>(
     }
 
     let executionResult = try executor(wrappedMapper)
-    
+
     if let mapperException {
         // Allow propagating the error
         throw mapperException
@@ -45,22 +45,20 @@ func wrapQueryCursor<RowType, ReturnType>(
     return executionResult
 }
 
-
-func wrapQueryCursorTyped<RowType, ReturnType>(
-    mapper: @escaping (SqlCursor) throws -> RowType,
+func wrapQueryCursorTyped<RowType: Sendable, ReturnType: Sendable>(
+    mapper: @Sendable @escaping (SqlCursor) throws -> RowType,
     //    The Kotlin APIs return the results as Any, we can explicitly cast internally
-    executor: @escaping (_ wrappedMapper: @escaping (PowerSyncKotlin.SqlCursor) -> RowType?) throws -> Any?,
+    executor: @Sendable @escaping (_ wrappedMapper: @escaping (PowerSyncKotlin.SqlCursor) -> Any?) throws -> Any?,
     resultType: ReturnType.Type
 ) throws -> ReturnType {
     return try safeCast(
-         wrapQueryCursor(
+        wrapQueryCursor(
             mapper: mapper,
             executor: executor
         ), to:
         resultType
     )
 }
-
 
 /// Throws a `PowerSyncException` using a helper provided by the Kotlin SDK.
 /// We can't directly throw Kotlin `PowerSyncException`s from Swift, but we can delegate the throwing
@@ -73,7 +71,7 @@ func wrapQueryCursorTyped<RowType, ReturnType>(
 ///             to any calling Kotlin stack.
 /// This only works for SKIEE methods which have an associated completion handler which handles annotated errors.
 /// This seems to only apply for Kotlin suspending function bindings.
-func throwKotlinPowerSyncError (message: String, cause: String? = nil) throws {
+func throwKotlinPowerSyncError(message: String, cause: String? = nil) throws {
     try throwPowerSyncException(
         exception: PowerSyncKotlin.PowerSyncException(
             message: message,

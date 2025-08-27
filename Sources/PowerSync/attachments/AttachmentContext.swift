@@ -1,66 +1,80 @@
 import Foundation
 
-/// Context which performs actions on the attachment records
-open class AttachmentContext {
-    private let db: any PowerSyncDatabaseProtocol
-    private let tableName: String
-    private let logger: any LoggerProtocol
-    private let logTag = "AttachmentService"
-    private let maxArchivedCount: Int64
-
-    /// Table used for storing attachments in the attachment queue.
-    private var table: String {
-        return tableName
-    }
-
-    /// Initializes a new `AttachmentContext`.
-    public init(
-        db: PowerSyncDatabaseProtocol,
-        tableName: String,
-        logger: any LoggerProtocol,
-        maxArchivedCount: Int64
-    ) {
-        self.db = db
-        self.tableName = tableName
-        self.logger = logger
-        self.maxArchivedCount = maxArchivedCount
-    }
+public protocol AttachmentContextProtocol: Sendable {
+    var db: any PowerSyncDatabaseProtocol { get }
+    var tableName: String { get }
+    var logger: any LoggerProtocol { get }
+    var maxArchivedCount: Int64 { get }
 
     /// Deletes the attachment from the attachment queue.
-    public func deleteAttachment(id: String) async throws {
+    func deleteAttachment(id: String) async throws
+
+    /// Sets the state of the attachment to ignored (archived).
+    func ignoreAttachment(id: String) async throws
+
+    /// Gets the attachment from the attachment queue using an ID.
+    func getAttachment(id: String) async throws -> Attachment?
+
+    /// Saves the attachment to the attachment queue.
+    func saveAttachment(attachment: Attachment) async throws -> Attachment
+
+    /// Saves multiple attachments to the attachment queue.
+    func saveAttachments(attachments: [Attachment]) async throws
+
+    /// Gets all the IDs of attachments in the attachment queue.
+    func getAttachmentIds() async throws -> [String]
+
+    /// Gets all attachments in the attachment queue.
+    func getAttachments() async throws -> [Attachment]
+
+    /// Gets all active attachments that require an operation to be performed.
+    func getActiveAttachments() async throws -> [Attachment]
+
+    /// Deletes attachments that have been archived.
+    ///
+    /// - Parameter callback: A callback invoked with the list of archived attachments before deletion.
+    /// - Returns: `true` if all items have been deleted, `false` if there may be more archived items remaining.
+    func deleteArchivedAttachments(
+        callback: @Sendable @escaping ([Attachment]) async throws -> Void
+    ) async throws -> Bool
+
+    /// Clears the attachment queue.
+    ///
+    /// - Note: Currently only used for testing purposes.
+    func clearQueue() async throws
+}
+
+public extension AttachmentContextProtocol {
+    func deleteAttachment(id: String) async throws {
         _ = try await db.execute(
-            sql: "DELETE FROM \(table) WHERE id = ?",
+            sql: "DELETE FROM \(tableName) WHERE id = ?",
             parameters: [id]
         )
     }
 
-    /// Sets the state of the attachment to ignored (archived).
-    public func ignoreAttachment(id: String) async throws {
+    func ignoreAttachment(id: String) async throws {
         _ = try await db.execute(
-            sql: "UPDATE \(table) SET state = ? WHERE id = ?",
+            sql: "UPDATE \(tableName) SET state = ? WHERE id = ?",
             parameters: [AttachmentState.archived.rawValue, id]
         )
     }
 
-    /// Gets the attachment from the attachment queue using an ID.
-    public func getAttachment(id: String) async throws -> Attachment? {
+    func getAttachment(id: String) async throws -> Attachment? {
         return try await db.getOptional(
-            sql: "SELECT * FROM \(table) WHERE id = ?",
+            sql: "SELECT * FROM \(tableName) WHERE id = ?",
             parameters: [id]
         ) { cursor in
             try Attachment.fromCursor(cursor)
         }
     }
 
-    /// Saves the attachment to the attachment queue.
-    public func saveAttachment(attachment: Attachment) async throws -> Attachment {
+    func saveAttachment(attachment: Attachment) async throws -> Attachment {
         return try await db.writeTransaction { ctx in
             try self.upsertAttachment(attachment, context: ctx)
         }
     }
 
-    /// Saves multiple attachments to the attachment queue.
-    public func saveAttachments(attachments: [Attachment]) async throws {
+    func saveAttachments(attachments: [Attachment]) async throws {
         if attachments.isEmpty {
             return
         }
@@ -72,24 +86,22 @@ open class AttachmentContext {
         }
     }
 
-    /// Gets all the IDs of attachments in the attachment queue.
-    public func getAttachmentIds() async throws -> [String] {
+    func getAttachmentIds() async throws -> [String] {
         return try await db.getAll(
-            sql: "SELECT id FROM \(table) WHERE id IS NOT NULL",
+            sql: "SELECT id FROM \(tableName) WHERE id IS NOT NULL",
             parameters: []
         ) { cursor in
             try cursor.getString(name: "id")
         }
     }
 
-    /// Gets all attachments in the attachment queue.
-    public func getAttachments() async throws -> [Attachment] {
+    func getAttachments() async throws -> [Attachment] {
         return try await db.getAll(
             sql: """
             SELECT 
                 * 
             FROM 
-                \(table) 
+                \(tableName) 
             WHERE 
                 id IS NOT NULL
             ORDER BY 
@@ -101,14 +113,13 @@ open class AttachmentContext {
         }
     }
 
-    /// Gets all active attachments that require an operation to be performed.
-    public func getActiveAttachments() async throws -> [Attachment] {
+    func getActiveAttachments() async throws -> [Attachment] {
         return try await db.getAll(
             sql: """
             SELECT 
                 *
             FROM
-                \(table) 
+                \(tableName) 
             WHERE 
                 state = ?
                 OR state = ?
@@ -126,25 +137,18 @@ open class AttachmentContext {
         }
     }
 
-    /// Clears the attachment queue.
-    ///
-    /// - Note: Currently only used for testing purposes.
-    public func clearQueue() async throws {
-        _ = try await db.execute("DELETE FROM \(table)")
+    func clearQueue() async throws {
+        _ = try await db.execute("DELETE FROM \(tableName)")
     }
 
-    /// Deletes attachments that have been archived.
-    ///
-    /// - Parameter callback: A callback invoked with the list of archived attachments before deletion.
-    /// - Returns: `true` if all items have been deleted, `false` if there may be more archived items remaining.
-    public func deleteArchivedAttachments(callback: @escaping ([Attachment]) async throws -> Void) async throws -> Bool {
+    func deleteArchivedAttachments(callback: @Sendable @escaping ([Attachment]) async throws -> Void) async throws -> Bool {
         let limit = 1000
         let attachments = try await db.getAll(
             sql: """
             SELECT
                 * 
             FROM 
-                \(table)
+                \(tableName)
             WHERE 
                 state = ?
             ORDER BY
@@ -154,7 +158,7 @@ open class AttachmentContext {
             parameters: [
                 AttachmentState.archived.rawValue,
                 limit,
-                maxArchivedCount,
+                maxArchivedCount
             ]
         ) { cursor in
             try Attachment.fromCursor(cursor)
@@ -166,7 +170,7 @@ open class AttachmentContext {
         let idsString = String(data: ids, encoding: .utf8)!
 
         _ = try await db.execute(
-            sql: "DELETE FROM \(table) WHERE id IN (SELECT value FROM json_each(?));",
+            sql: "DELETE FROM \(tableName) WHERE id IN (SELECT value FROM json_each(?));",
             parameters: [idsString]
         )
 
@@ -179,7 +183,7 @@ open class AttachmentContext {
     ///   - attachment: The attachment to upsert.
     ///   - context: The database transaction context.
     /// - Returns: The original attachment.
-    public func upsertAttachment(
+    func upsertAttachment(
         _ attachment: Attachment,
         context: ConnectionContext
     ) throws -> Attachment {
@@ -198,7 +202,7 @@ open class AttachmentContext {
         try context.execute(
             sql: """
             INSERT OR REPLACE INTO 
-                \(table) (id, timestamp, filename, local_uri, media_type, size, state, has_synced, meta_data) 
+                \(tableName) (id, timestamp, filename, local_uri, media_type, size, state, has_synced, meta_data) 
             VALUES
                 (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -216,5 +220,25 @@ open class AttachmentContext {
         )
 
         return attachment
+    }
+}
+
+/// Context which performs actions on the attachment records
+public actor AttachmentContext: AttachmentContextProtocol {
+    public let db: any PowerSyncDatabaseProtocol
+    public let tableName: String
+    public let logger: any LoggerProtocol
+    public let maxArchivedCount: Int64
+
+    public init(
+        db: PowerSyncDatabaseProtocol,
+        tableName: String,
+        logger: any LoggerProtocol,
+        maxArchivedCount: Int64
+    ) {
+        self.db = db
+        self.tableName = tableName
+        self.logger = logger
+        self.maxArchivedCount = maxArchivedCount
     }
 }

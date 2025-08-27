@@ -1,4 +1,11 @@
-public protocol PowerSyncBackendConnectorProtocol {
+
+/// Implement this to connect an app backend.
+///
+/// The connector is responsible for:
+/// 1. Creating credentials for connecting to the PowerSync service.
+/// 2. Applying local changes against the backend application server.
+///
+public protocol PowerSyncBackendConnectorProtocol: Sendable {
     ///
     /// Get credentials for PowerSync.
     ///
@@ -22,19 +29,16 @@ public protocol PowerSyncBackendConnectorProtocol {
     func uploadData(database: PowerSyncDatabaseProtocol) async throws
 }
 
-/// Implement this to connect an app backend.
-///
-/// The connector is responsible for:
-/// 1. Creating credentials for connecting to the PowerSync service.
-/// 2. Applying local changes against the backend application server.
-///
-///
-open class PowerSyncBackendConnector: PowerSyncBackendConnectorProtocol {
+@available(*, deprecated, message: "PowerSyncBackendConnector is deprecated. Please implement PowerSyncBackendConnectorProtocol directly in your own class.")
+open class PowerSyncBackendConnector: PowerSyncBackendConnectorProtocol,
+    // This class is non-final, implementations should strictly conform to Sendable
+    @unchecked Sendable
+{
     public init() {}
 
     open func fetchCredentials() async throws -> PowerSyncCredentials? {
         return nil
     }
 
-    open func uploadData(database: PowerSyncDatabaseProtocol) async throws {}
+    open func uploadData(database _: PowerSyncDatabaseProtocol) async throws {}
 }
