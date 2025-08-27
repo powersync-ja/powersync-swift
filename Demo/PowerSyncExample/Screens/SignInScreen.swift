@@ -78,5 +78,6 @@ struct SignInScreen: View {
     NavigationStack {
         SignInScreen()
             .environment(SystemManager())
+            .environment(NavigationModel())
     }
 }

@@ -78,5 +78,6 @@ struct SignUpScreen: View {
     NavigationStack {
         SignUpScreen()
             .environment(SystemManager())
+            .environment(NavigationModel())
     }
 }
