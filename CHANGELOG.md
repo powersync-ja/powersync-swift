@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5.0
 
 * Fix null values in CRUD entries being reported as strings.
 * Added support for Swift 6 strict concurrency checking.
