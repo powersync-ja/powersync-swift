@@ -39,8 +39,9 @@
 		B666587C2C63B88700159A81 /* SwiftUINavigationCore in Frameworks */ = {isa = PBXBuildFile; productRef = B666587B2C63B88700159A81 /* SwiftUINavigationCore */; };
 		B69F7D862C8EE27400565448 /* AnyCodable in Frameworks */ = {isa = PBXBuildFile; productRef = B69F7D852C8EE27400565448 /* AnyCodable */; };
 		B6B3698A2C64F4B30033C307 /* Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B369892C64F4B30033C307 /* Navigation.swift */; };
-		B6FFD5322D06DA8000EEE60F /* PowerSync in Frameworks */ = {isa = PBXBuildFile; productRef = B6FFD5312D06DA8000EEE60F /* PowerSync */; };
 		BE2F26EC2DA54B2F0080F1AE /* SupabaseRemoteStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2F26EB2DA54B2A0080F1AE /* SupabaseRemoteStorage.swift */; };
+		BEDBE19C2E5F0299004E1AB5 /* PowerSyncDynamic in Frameworks */ = {isa = PBXBuildFile; productRef = BEDBE19B2E5F0299004E1AB5 /* PowerSyncDynamic */; };
+		BEDBE19D2E5F0299004E1AB5 /* PowerSyncDynamic in Embed Frameworks */ = {isa = PBXBuildFile; productRef = BEDBE19B2E5F0299004E1AB5 /* PowerSyncDynamic */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		BEE4708B2E3BBB2500140D11 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE4708A2E3BBB2500140D11 /* Secrets.swift */; };
 /* End PBXBuildFile section */
 
@@ -51,6 +52,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
+				BEDBE19D2E5F0299004E1AB5 /* PowerSyncDynamic in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -120,11 +122,11 @@
 				B66658772C63B7BB00159A81 /* IdentifiedCollections in Frameworks */,
 				B69F7D862C8EE27400565448 /* AnyCodable in Frameworks */,
 				B666587C2C63B88700159A81 /* SwiftUINavigationCore in Frameworks */,
-				B6FFD5322D06DA8000EEE60F /* PowerSync in Frameworks */,
 				6A9669022B9EE69500B05DCF /* Supabase in Frameworks */,
 				6A9669002B9EE4FE00B05DCF /* PostgREST in Frameworks */,
 				6A9668FE2B9EE4FE00B05DCF /* Auth in Frameworks */,
 				B666587A2C63B88700159A81 /* SwiftUINavigation in Frameworks */,
+				BEDBE19C2E5F0299004E1AB5 /* PowerSyncDynamic in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -487,7 +489,7 @@
 				B66658792C63B88700159A81 /* SwiftUINavigation */,
 				B666587B2C63B88700159A81 /* SwiftUINavigationCore */,
 				B69F7D852C8EE27400565448 /* AnyCodable */,
-				B6FFD5312D06DA8000EEE60F /* PowerSync */,
+				BEDBE19B2E5F0299004E1AB5 /* PowerSyncDynamic */,
 			);
 			productName = PowerSyncExample;
 			productReference = 6A7315842B9854220004CB17 /* PowerSyncExample.app */;
@@ -885,10 +887,10 @@
 			package = B69F7D842C8EE27300565448 /* XCRemoteSwiftPackageReference "AnyCodable" */;
 			productName = AnyCodable;
 		};
-		B6FFD5312D06DA8000EEE60F /* PowerSync */ = {
+		BEDBE19B2E5F0299004E1AB5 /* PowerSyncDynamic */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 18F30B282CCA4B3B00A58917 /* XCLocalSwiftPackageReference "../../powersync-swift" */;
-			productName = PowerSync;
+			productName = PowerSyncDynamic;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

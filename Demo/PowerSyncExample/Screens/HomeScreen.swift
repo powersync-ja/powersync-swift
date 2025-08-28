@@ -33,5 +33,6 @@ struct HomeScreen: View {
     NavigationStack{
         HomeScreen()
             .environment(SystemManager())
+            .environment(NavigationModel())
     }
 }

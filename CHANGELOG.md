@@ -10,6 +10,7 @@
 
 * *Potential Breaking Change*: Attachment helpers have been updated to better support Swift 6 strict concurrency checking. `Actor` isolation is improved, but developers who customize or extend `AttachmentQueue` will need to update their implementations. The default instantiation of `AttachmentQueue` remains unchanged.
 `AttachmentQueueProtocol` now defines the basic requirements for an attachment queue, with most base functionality provided via an extension. Custom implementations should extend `AttachmentQueueProtocol`.
+* Added `PowerSyncDynamic` product to package. Importing this product should restore XCode preview functionality.
 * [Internal] Instantiate Kotlin Kermit logger directly.
 * [Internal] Improved connection context error handling.
 

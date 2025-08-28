@@ -16,9 +16,9 @@ jobs:
           xcode-version: latest-stable
       - name: Build and Test
         run: |
-          xcodebuild test -scheme PowerSync -destination "platform=iOS Simulator,name=iPhone 16"
-          xcodebuild test -scheme PowerSync -destination "platform=macOS,arch=arm64,name=My Mac"
-          xcodebuild test -scheme PowerSync -destination "platform=watchOS Simulator,arch=arm64,name=Apple Watch Ultra 2 (49mm)"
+          xcodebuild test -scheme PowerSync-Package -destination "platform=iOS Simulator,name=iPhone 16"
+          xcodebuild test -scheme PowerSync-Package -destination "platform=macOS,arch=arm64,name=My Mac"
+          xcodebuild test -scheme PowerSync-Package -destination "platform=watchOS Simulator,arch=arm64,name=Apple Watch Ultra 2 (49mm)"
 
   buildSwift6:
     name: Build and test with Swift 6

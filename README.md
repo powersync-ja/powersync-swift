@@ -80,3 +80,13 @@ For more details, see the [Swift SDK reference](https://docs.powersync.com/clien
 ## Attachments
 
 See the attachments [README](./Sources/PowerSync/attachments/README.md) for more information.
+
+## XCode Previews
+
+XCode previews currently fail to load in a reasonable time after adding PowerSync to an XCode project. XCode requires dynamic linking for previews. This is enabled by enabling `ENABLE_DEBUG_DYLIB` in the XCode project. It seems like the previews fail to load due to PowerSync providing a `binaryTarget` which is linked statically by default.
+
+XCode previews can be enabled by either:
+
+Enabling `Editor -> Canvas -> Use Legacy Previews Execution` in XCode.
+
+Or adding the `PowerSyncDynamic` product when adding PowerSync to your project. This product will assert that PowerSync should be dynamically linked, which restores XCode previews.

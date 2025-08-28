@@ -61,6 +61,16 @@ let package = Package(
         .library(
             name: packageName,
             targets: ["PowerSync"]
+        ),
+        .library(
+            name: "\(packageName)Dynamic",
+            // The default value normally specifies that the library is compatible with both static and dynamic linking,
+            // where the value used is typically specified by the consumer - which is usually defaulted to static linking.
+            // It's not straight forward to configure the linking option used by XCode consumers - specifying
+            // this additional product allows consumers to add it to their project, forcing dynamic linking.
+            // Dynamic linking is particularly important for XCode previews.
+            type: .dynamic,
+            targets: ["PowerSync"]
         )
     ],
     dependencies: conditionalDependencies,
