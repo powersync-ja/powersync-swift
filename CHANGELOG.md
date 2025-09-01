@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1 (unreleased)
+
+* Update core extension to 0.4.5 ([changelog](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.4.5))
+
 ## 1.5.0
 
 * Fix null values in CRUD entries being reported as strings.
