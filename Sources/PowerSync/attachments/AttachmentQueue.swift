@@ -471,7 +471,7 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
                 updates.append(attachment.with(
                     localUri: newLocalUri
                 ))
-            } else if attachment.state == AttachmentState.queuedUpload {
+            } else if attachment.state == AttachmentState.queuedUpload || attachment.state == AttachmentState.archived {
                 // The file must have been removed from the local storage before upload was completed
                 updates.append(attachment.with(
                     state: .archived,
