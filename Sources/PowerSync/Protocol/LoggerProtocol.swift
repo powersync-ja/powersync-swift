@@ -34,7 +34,7 @@ public enum LogSeverity: Int, CaseIterable, Sendable {
 /// A protocol for writing log messages to a specific backend or output.
 ///
 /// Conformers handle the actual writing or forwarding of log messages.
-public protocol LogWriterProtocol {
+public protocol LogWriterProtocol: Sendable {
     /// Logs a message with the given severity and optional tag.
     ///
     /// - Parameters:
