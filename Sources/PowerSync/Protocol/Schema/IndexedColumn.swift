@@ -3,7 +3,7 @@ import Foundation
 ///
 /// Describes an indexed column.
 ///
-public protocol IndexedColumnProtocol {
+public protocol IndexedColumnProtocol: Sendable {
     ///
     /// Name of the column to index.
     ///
@@ -17,7 +17,7 @@ public protocol IndexedColumnProtocol {
 public struct IndexedColumn: IndexedColumnProtocol {
     public let column: String
     public let ascending: Bool
-    
+
     public init(
         column: String,
         ascending: Bool = true
@@ -25,14 +25,14 @@ public struct IndexedColumn: IndexedColumnProtocol {
         self.column = column
         self.ascending = ascending
     }
-    
+
     ///
     /// Creates ascending IndexedColumn
     ///
     public static func ascending(_ column: String) -> IndexedColumn {
         IndexedColumn(column: column, ascending: true)
     }
-    
+
     ///
     /// Creates descending IndexedColumn
     ///

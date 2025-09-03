@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Provides options to customize network behavior and logging for PowerSync
 /// HTTP requests and responses.
-public struct SyncClientConfiguration {
+public struct SyncClientConfiguration: Sendable {
     /// Optional configuration for logging PowerSync HTTP requests.
     ///
     /// When provided, network requests will be logged according to the
@@ -23,7 +23,7 @@ public struct SyncClientConfiguration {
 /// Options for configuring a PowerSync connection.
 ///
 /// Provides optional parameters to customize sync behavior such as throttling and retry policies.
-public struct ConnectOptions {
+public struct ConnectOptions: Sendable {
     /// Defaults to 1 second
     public static let DefaultCrudThrottle: TimeInterval = 1
 

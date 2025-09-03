@@ -13,9 +13,9 @@ struct AddListView: View {
                 Task {
                     do {
                         try await system.insertList(newList)
-                        await completion(.success(true))
+                        completion(.success(true))
                     } catch {
-                        await completion(.failure(error))
+                        completion(.failure(error))
                         throw error
                     }
                 }

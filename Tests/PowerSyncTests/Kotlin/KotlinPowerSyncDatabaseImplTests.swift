@@ -18,7 +18,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             )
         ])
 
-        database = KotlinPowerSyncDatabaseImpl(
+        database = PowerSyncDatabase(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(DefaultLogger())
