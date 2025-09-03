@@ -521,7 +521,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         try await db2.close()
 
-        let warningIndex = testWriter.logs.firstIndex(
+        let warningIndex = testWriter.getLogs().firstIndex(
             where: { value in
                 value.contains("warning: Multiple PowerSync instances for the same database have been detected")
             }
@@ -542,7 +542,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         try await db2.close()
 
-        let warningIndex = testWriter.logs.firstIndex(
+        let warningIndex = testWriter.getLogs().firstIndex(
             where: { value in
                 value.contains("warning: Multiple PowerSync instances for the same database have been detected")
             }
