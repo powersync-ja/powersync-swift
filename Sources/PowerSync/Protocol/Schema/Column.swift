@@ -1,7 +1,7 @@
 import Foundation
 import PowerSyncKotlin
 
-public protocol ColumnProtocol: Equatable {
+public protocol ColumnProtocol: Equatable, Sendable {
     /// Name of the column.
     var name: String { get }
     /// Type of the column.
@@ -15,7 +15,7 @@ public protocol ColumnProtocol: Equatable {
     var type: ColumnData { get }
 }
 
-public enum ColumnData {
+public enum ColumnData: Sendable {
     case text
     case integer
     case real
@@ -25,7 +25,7 @@ public enum ColumnData {
 public struct Column: ColumnProtocol {
     public let name: String
     public let type: ColumnData
-    
+
     public init(
         name: String,
         type: ColumnData
@@ -33,15 +33,15 @@ public struct Column: ColumnProtocol {
         self.name = name
         self.type = type
     }
-    
+
     public static func text(_ name: String) -> Column {
         Column(name: name, type: .text)
     }
-    
+
     public static func integer(_ name: String) -> Column {
         Column(name: name, type: .integer)
     }
-    
+
     public static func real(_ name: String) -> Column {
         Column(name: name, type: .real)
     }

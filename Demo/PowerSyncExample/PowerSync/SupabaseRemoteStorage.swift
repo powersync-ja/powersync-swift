@@ -2,7 +2,7 @@ import Foundation
 import PowerSync
 import Supabase
 
-class SupabaseRemoteStorage: RemoteStorageAdapter {
+final class SupabaseRemoteStorage: RemoteStorageAdapter {
     let storage: Supabase.StorageFileApi
 
     init(storage: Supabase.StorageFileApi) {

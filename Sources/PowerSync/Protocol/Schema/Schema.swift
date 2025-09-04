@@ -1,9 +1,9 @@
-public protocol SchemaProtocol {
+public protocol SchemaProtocol: Sendable {
     ///
     /// Tables used in Schema
     ///
     var tables: [Table] { get }
-    
+
     /// Raw tables referenced in the schema.
     var rawTables: [RawTable] { get }
     ///
@@ -20,13 +20,14 @@ public struct Schema: SchemaProtocol {
         self.tables = tables
         self.rawTables = rawTables
     }
+
     ///
     /// Convenience initializer with variadic parameters
     ///
     public init(_ tables: BaseTableProtocol...) {
         var managedTables: [Table] = []
         var rawTables: [RawTable] = []
-        
+
         for table in tables {
             if let table = table as? Table {
                 managedTables.append(table)
@@ -36,7 +37,7 @@ public struct Schema: SchemaProtocol {
                 fatalError("BaseTableProtocol must only be implemented in Swift SDK")
             }
         }
-        
+
         self.init(tables: managedTables, rawTables: rawTables)
     }
 

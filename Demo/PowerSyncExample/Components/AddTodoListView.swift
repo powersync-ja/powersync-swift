@@ -15,9 +15,9 @@ struct AddTodoListView: View {
                 Task{
                     do {
                         try await system.insertTodo(newTodo, listId)
-                        await completion(.success(true))
+                        completion(.success(true))
                     } catch {
-                        await completion(.failure(error))
+                        completion(.failure(error))
                         throw error
                     }
                 }

@@ -103,11 +103,17 @@ extension KotlinProgressWithOperationsProtocol {
     }
 }
 
-struct KotlinProgressWithOperations: KotlinProgressWithOperationsProtocol {
+struct KotlinProgressWithOperations: KotlinProgressWithOperationsProtocol,
+    // We can't mark  PowerSyncKotlin.ProgressWithOperations as Sendable
+    @unchecked Sendable
+{
     let base: PowerSyncKotlin.ProgressWithOperations
 }
 
-struct KotlinSyncDownloadProgress: KotlinProgressWithOperationsProtocol, SyncDownloadProgress {
+struct KotlinSyncDownloadProgress: KotlinProgressWithOperationsProtocol, SyncDownloadProgress,
+    // We can't mark  PowerSyncKotlin.SyncDownloadProgress as Sendable
+    @unchecked Sendable
+{
     let progress: PowerSyncKotlin.SyncDownloadProgress
 
     var base: any PowerSyncKotlin.ProgressWithOperations {

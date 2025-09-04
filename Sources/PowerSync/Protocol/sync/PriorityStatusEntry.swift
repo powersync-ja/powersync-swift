@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents the status of a bucket priority, including synchronization details.
-public struct PriorityStatusEntry {
+public struct PriorityStatusEntry: Sendable {
     /// The priority of the bucket.
     public let priority: BucketPriority
 

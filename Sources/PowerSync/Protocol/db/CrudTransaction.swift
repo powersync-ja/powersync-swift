@@ -1,7 +1,7 @@
 import Foundation
 
 /// A transaction of client-side changes.
-public protocol CrudTransaction {
+public protocol CrudTransaction: Sendable {
     /// Unique transaction id.
     ///
     /// If nil, this contains a list of changes recorded without an explicit transaction associated.
