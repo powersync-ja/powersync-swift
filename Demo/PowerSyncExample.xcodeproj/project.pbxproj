@@ -3,10 +3,14 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0B29DBE92E686D6000D60A06 /* FtsSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B29DBE82E686D5A00D60A06 /* FtsSetup.swift */; };
+		0B29DBEB2E68876500D60A06 /* SearchResultItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B29DBEA2E68875C00D60A06 /* SearchResultItem.swift */; };
+		0B29DBED2E68887A00D60A06 /* SearchScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B29DBEC2E68887700D60A06 /* SearchScreen.swift */; };
+		0B29DBEF2E68898C00D60A06 /* SearchResultRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B29DBEE2E68898800D60A06 /* SearchResultRow.swift */; };
 		6A4AD3852B9EE763005CBFD4 /* SupabaseConnector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AD3842B9EE763005CBFD4 /* SupabaseConnector.swift */; };
 		6A4AD3892B9EEB21005CBFD4 /* _Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AD3882B9EEB21005CBFD4 /* _Secrets.swift */; };
 		6A4AD3902B9EF775005CBFD4 /* ErrorText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4AD38F2B9EF775005CBFD4 /* ErrorText.swift */; };
@@ -60,6 +64,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0B29DBE82E686D5A00D60A06 /* FtsSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FtsSetup.swift; sourceTree = "<group>"; };
+		0B29DBEA2E68875C00D60A06 /* SearchResultItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultItem.swift; sourceTree = "<group>"; };
+		0B29DBEC2E68887700D60A06 /* SearchScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchScreen.swift; sourceTree = "<group>"; };
+		0B29DBEE2E68898800D60A06 /* SearchResultRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultRow.swift; sourceTree = "<group>"; };
 		18CC627A2CC7A8B5009F7CDE /* powersync-kotlin */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "powersync-kotlin"; path = "../powersync-kotlin"; sourceTree = SOURCE_ROOT; };
 		6A4AD3842B9EE763005CBFD4 /* SupabaseConnector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConnector.swift; sourceTree = "<group>"; };
 		6A4AD3882B9EEB21005CBFD4 /* _Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = _Secrets.swift; sourceTree = "<group>"; };
@@ -200,6 +208,7 @@
 		B65C4D6B2C60D36700176007 /* Screens */ = {
 			isa = PBXGroup;
 			children = (
+				0B29DBEC2E68887700D60A06 /* SearchScreen.swift */,
 				6A9669032B9EE6FA00B05DCF /* SignInScreen.swift */,
 				B65C4D6C2C60D38B00176007 /* HomeScreen.swift */,
 				B65C4D702C60D7D800176007 /* SignUpScreen.swift */,
@@ -211,6 +220,7 @@
 		B65C4D6E2C60D52E00176007 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				0B29DBEE2E68898800D60A06 /* SearchResultRow.swift */,
 				6ABD78792B9F2D8300558A41 /* TodoListRow.swift */,
 				6ABD786A2B9F2C1500558A41 /* TodoListView.swift */,
 				B66658622C621CA700159A81 /* AddTodoListView.swift */,
@@ -225,6 +235,8 @@
 		B65C4D6F2C60D58500176007 /* PowerSync */ = {
 			isa = PBXGroup;
 			children = (
+				0B29DBEA2E68875C00D60A06 /* SearchResultItem.swift */,
+				0B29DBE82E686D5A00D60A06 /* FtsSetup.swift */,
 				BE2F26EB2DA54B2A0080F1AE /* SupabaseRemoteStorage.swift */,
 				6A7315BA2B98BDD30004CB17 /* SystemManager.swift */,
 				6A4AD3842B9EE763005CBFD4 /* SupabaseConnector.swift */,
@@ -556,6 +568,8 @@
 				6ABD787C2B9F2E6700558A41 /* Debug.swift in Sources */,
 				B666585B2C620C3900159A81 /* Constants.swift in Sources */,
 				6ABD78802B9F2F1300558A41 /* AddListView.swift in Sources */,
+				0B29DBEF2E68898C00D60A06 /* SearchResultRow.swift in Sources */,
+				0B29DBED2E68887A00D60A06 /* SearchScreen.swift in Sources */,
 				6A4AD3892B9EEB21005CBFD4 /* _Secrets.swift in Sources */,
 				B65C4D712C60D7D800176007 /* SignUpScreen.swift in Sources */,
 				B6B3698A2C64F4B30033C307 /* Navigation.swift in Sources */,
@@ -570,11 +584,13 @@
 				B66658612C62179E00159A81 /* ListView.swift in Sources */,
 				6ABD78782B9F2D2800558A41 /* Schema.swift in Sources */,
 				BEE4708B2E3BBB2500140D11 /* Secrets.swift in Sources */,
+				0B29DBE92E686D6000D60A06 /* FtsSetup.swift in Sources */,
 				B65C4D6D2C60D38B00176007 /* HomeScreen.swift in Sources */,
 				6A7315882B9854220004CB17 /* PowerSyncExampleApp.swift in Sources */,
 				B666585F2C62115300159A81 /* ListRow.swift in Sources */,
 				BE2F26EC2DA54B2F0080F1AE /* SupabaseRemoteStorage.swift in Sources */,
 				B66658632C621CA700159A81 /* AddTodoListView.swift in Sources */,
+				0B29DBEB2E68876500D60A06 /* SearchResultItem.swift in Sources */,
 				B666585D2C620E9E00159A81 /* WifiIcon.swift in Sources */,
 				6A9669042B9EE6FA00B05DCF /* SignInScreen.swift in Sources */,
 				6A7315BB2B98BDD30004CB17 /* SystemManager.swift in Sources */,
