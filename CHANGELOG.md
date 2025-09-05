@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.5.1 (unreleased)
+## 1.5.1
 
 * Update core extension to 0.4.5 ([changelog](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.4.5))
 * Additional Swift 6 Strict Concurrency Checking declarations added for remaining protocols.
