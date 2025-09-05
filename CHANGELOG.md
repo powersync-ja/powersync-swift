@@ -4,6 +4,7 @@
 
 * Update core extension to 0.4.5 ([changelog](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.4.5))
 * Additional Swift 6 Strict Concurrency Checking declarations added for remaining protocols.
+* Fix issue in legacy sync client where local writes made offline could have their upload delayed until a keepalive event was received. This could also cause downloaded updates to be delayed even further until all uploads were completed.
 
 ## 1.5.0
 
