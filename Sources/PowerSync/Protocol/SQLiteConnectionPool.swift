@@ -15,7 +15,7 @@ public protocol SQLiteConnectionPoolProtocol {
 
     /// Invokes the callback with all connections leased from the pool.
     func withAllConnections(
-        onConnection: @escaping (
+        onConnection: @Sendable @escaping (
             _ writer: OpaquePointer,
             _ readers: [OpaquePointer]
         ) -> Void,

@@ -69,7 +69,8 @@ class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
     func write(
         onConnection: @Sendable @escaping (OpaquePointer) -> Void
     ) async throws {
-        try await pool.write { database in
+        // Don't start an explicit transaction
+        try await pool.writeWithoutTransaction { database in
             guard let connection = database.sqliteConnection else {
                 return
             }
