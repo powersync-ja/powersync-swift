@@ -513,7 +513,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let testWriter = TestLogWriterAdapter()
         let logger = DefaultLogger(minSeverity: LogSeverity.debug, writers: [testWriter])
 
-        let db2 = KotlinPowerSyncDatabaseImpl(
+        let db2 = openKotlinDBWithFactory(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(logger)
@@ -534,7 +534,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let testWriter = TestLogWriterAdapter()
         let logger = DefaultLogger(minSeverity: LogSeverity.error, writers: [testWriter])
 
-        let db2 = KotlinPowerSyncDatabaseImpl(
+        let db2 = openKotlinDBWithFactory(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(logger)

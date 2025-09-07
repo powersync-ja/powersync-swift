@@ -11,18 +11,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     let currentStatus: SyncStatus
 
     init(
-        schema: Schema,
-        dbFilename: String,
+        kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase,
         logger: DatabaseLogger
     ) {
-        let factory = PowerSyncKotlin.DatabaseDriverFactory()
-        kotlinDatabase = PowerSyncDatabase(
-            factory: factory,
-            schema: KotlinAdapter.Schema.toKotlin(schema),
-            dbFilename: dbFilename,
-            logger: logger.kLogger
-        )
         self.logger = logger
+        self.kotlinDatabase = kotlinDatabase
         currentStatus = KotlinSyncStatus(
             baseStatus: kotlinDatabase.currentStatus
         )
@@ -399,6 +392,39 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
             )
         }
     }
+}
+
+func openKotlinDBWithFactory(
+    schema: Schema,
+    dbFilename: String,
+    logger: DatabaseLogger
+) -> PowerSyncDatabaseProtocol {
+    return KotlinPowerSyncDatabaseImpl(
+        kotlinDatabase: PowerSyncDatabase(
+            factory: PowerSyncKotlin.DatabaseDriverFactory(),
+            schema: KotlinAdapter.Schema.toKotlin(schema),
+            dbFilename: dbFilename,
+            logger: logger.kLogger
+        ),
+        logger: logger
+    )
+}
+
+func openKotlinDBWithPool(
+    schema: Schema,
+    pool: SQLiteConnectionPoolProtocol,
+    identifier: String,
+    logger: DatabaseLogger
+) -> PowerSyncDatabaseProtocol {
+    return KotlinPowerSyncDatabaseImpl(
+        kotlinDatabase: openPowerSyncWithPool(
+            pool: pool.toKotlin(),
+            identifier: identifier,
+            schema: KotlinAdapter.Schema.toKotlin(schema),
+            logger: logger.kLogger
+        ),
+        logger: logger
+    )
 }
 
 private struct ExplainQueryResult {

@@ -14,10 +14,23 @@ public func PowerSyncDatabase(
     dbFilename: String = DEFAULT_DB_FILENAME,
     logger: (any LoggerProtocol) = DefaultLogger()
 ) -> PowerSyncDatabaseProtocol {
-    
-    return KotlinPowerSyncDatabaseImpl(
+    return openKotlinDBWithFactory(
         schema: schema,
         dbFilename: dbFilename,
+        logger: DatabaseLogger(logger)
+    )
+}
+
+public func OpenedPowerSyncDatabase(
+    schema: Schema,
+    pool: any SQLiteConnectionPoolProtocol,
+    identifier: String,
+    logger: (any LoggerProtocol) = DefaultLogger()
+) -> PowerSyncDatabaseProtocol {
+    return openKotlinDBWithPool(
+        schema: schema,
+        pool: pool,
+        identifier: identifier,
         logger: DatabaseLogger(logger)
     )
 }

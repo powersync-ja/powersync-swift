@@ -7,7 +7,7 @@ let packageName = "PowerSync"
 
 // Set this to the absolute path of your Kotlin SDK checkout if you want to use a local Kotlin
 // build. Also see docs/LocalBuild.md for details
-let localKotlinSdkOverride: String? = nil
+let localKotlinSdkOverride: String? = "/Users/stevenontong/Documents/platform_code/powersync/powersync-kotlin"
 
 // Set this to the absolute path of your powersync-sqlite-core checkout if you want to use a
 // local build of the core extension.
@@ -71,9 +71,15 @@ let package = Package(
             // Dynamic linking is particularly important for XCode previews.
             type: .dynamic,
             targets: ["PowerSync"]
+        ),
+        .library(
+            name: "PowerSyncGRDB",
+            targets: ["PowerSyncGRDB"]
         )
     ],
-    dependencies: conditionalDependencies,
+    dependencies: conditionalDependencies + [
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.0.0")
+    ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
@@ -84,9 +90,20 @@ let package = Package(
                 .product(name: "PowerSyncSQLiteCore", package: corePackageName)
             ]
         ),
+        .target(
+            name: "PowerSyncGRDB",
+            dependencies: [
+                .target(name: "PowerSync"),
+                .product(name: "GRDB", package: "GRDB.swift")
+            ]
+        ),
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]
+        ),
+        .testTarget(
+            name: "PowerSyncGRDBTests",
+            dependencies: ["PowerSync", "PowerSyncGRDB"]
         )
     ] + conditionalTargets
 )
