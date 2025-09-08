@@ -9,6 +9,10 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
         self.pool = pool
     }
 
+    func getPendingUpdates() -> Set<String> {
+        return pool.getPendingUpdates()
+    }
+
     func __closePool() async throws {
         do {
             try pool.close()

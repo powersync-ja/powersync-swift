@@ -3,6 +3,8 @@ import Foundation
 /// An implementation of a connection pool providing asynchronous access to a single writer and multiple readers.
 /// This is the underlying pool implementation on which the higher-level PowerSync Swift SDK is built on.
 public protocol SQLiteConnectionPoolProtocol {
+    func getPendingUpdates() -> Set<String>
+
     /// Calls the callback with a read-only connection temporarily leased from the pool.
     func read(
         onConnection: @Sendable @escaping (OpaquePointer) -> Void,

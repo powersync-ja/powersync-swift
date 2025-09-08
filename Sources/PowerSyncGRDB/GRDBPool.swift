@@ -82,13 +82,58 @@ func configurePowerSync(
     }
 }
 
-class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
+final class PowerSyncTransactionObserver: TransactionObserver {
+    let onChange: (_ tableName: String) -> Void
+
+    init(
+        onChange: @escaping (_ tableName: String) -> Void
+    ) {
+        self.onChange = onChange
+    }
+
+    func observes(eventsOfKind _: DatabaseEventKind) -> Bool {
+        // We want all the events for the PowerSync SDK
+        return true
+    }
+
+    func databaseDidChange(with event: DatabaseEvent) {
+        onChange(event.tableName)
+    }
+
+    func databaseDidCommit(_: GRDB.Database) {}
+
+    func databaseDidRollback(_: GRDB.Database) {}
+}
+
+final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
     let pool: DatabasePool
+    var pendingUpdates: Set<String>
+    private let pendingUpdatesQueue = DispatchQueue(
+        label: "co.powersync.pendingUpdatesQueue"
+    )
 
     init(
         pool: DatabasePool
     ) {
         self.pool = pool
+        self.pendingUpdates = Set()
+        pool.add(
+            transactionObserver: PowerSyncTransactionObserver { tableName in
+                // push the update
+                self.pendingUpdatesQueue.sync {
+                    self.pendingUpdates.insert(tableName)
+                }
+            },
+            extent: .databaseLifetime
+        )
+    }
+
+    func getPendingUpdates() -> Set<String> {
+        self.pendingUpdatesQueue.sync {
+            let copy = self.pendingUpdates
+            self.pendingUpdates.removeAll()
+            return copy
+        }
     }
 
     func read(
