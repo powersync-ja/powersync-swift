@@ -336,6 +336,16 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
             errorHandler: self.errorHandler,
             syncThrottle: self.syncThrottleDuration
         )
+
+        Task {
+            do {
+                try await attachmentsService.withContext { context in
+                    try await self.verifyAttachments(context: context)
+                }
+            } catch {
+                self.logger.error("Error verifying attachments: \(error.localizedDescription)", tag: logTag)
+            }
+        }
     }
 
     public func getLocalUri(_ filename: String) async -> String {
