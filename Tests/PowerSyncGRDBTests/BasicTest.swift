@@ -14,12 +14,15 @@ final class GRDBTests: XCTestCase {
         schema = Schema(tables: [
             Table(name: "users", columns: [
                 .text("name"),
-                .text("count")
             ])
         ])
 
         var config = Configuration()
-        configurePowerSync(&config)
+        configurePowerSync(
+            config: &config,
+            schema: schema
+        )
+
         let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let dbURL = documentsDir.appendingPathComponent("test.sqlite")
         pool = try DatabasePool(
@@ -45,40 +48,54 @@ final class GRDBTests: XCTestCase {
     }
 
     func testValidValues() async throws {
-        let result = try await database.get(
-            "SELECT powersync_rs_version() as r"
-        ) { cursor in
-            try cursor.getString(index: 0)
-        }
-        print(result)
+        // Create users with the PowerSync SDK
+        let initialUserName = "Bob"
 
         try await database.execute(
-            "INSERT INTO users(id, name, count) VALUES(uuid(), 'steven', 1)"
+            sql: "INSERT INTO users(id, name) VALUES(uuid(), ?)",
+            parameters: [initialUserName]
         )
 
-        let initialUsers = try await database.getAll(
+        // Fetch those users
+        let initialUserNames = try await database.getAll(
             "SELECT * FROM users"
         ) { cursor in
             try cursor.getString(name: "name")
         }
-        print("initial users \(initialUsers)")
 
-        // Now use a GRDB query
-        struct Users: Codable, Identifiable, FetchableRecord, PersistableRecord {
+        XCTAssertTrue(initialUserNames.first == initialUserName)
+
+        // Now define a GRDB struct for query purposes
+        struct User: Codable, Identifiable, FetchableRecord, PersistableRecord {
             var id: String
             var name: String
-            var count: Int
+
+            static var databaseTableName = "users"
 
             enum Columns {
                 static let name = Column(CodingKeys.name)
-                static let count = Column(CodingKeys.count)
             }
         }
 
-        let grdbUsers = try await pool.write { db in
-            try Users.fetchAll(db)
+        // Query the Users with GRDB, this should have the same result as with PowerSync
+        let grdbUserNames = try await pool.read { database in
+            try User.fetchAll(database)
         }
 
-        print(grdbUsers)
+        XCTAssertTrue(grdbUserNames.first?.name == initialUserName)
+
+        // Insert a user with GRDB
+        try await pool.write { database in
+            try User(
+                id: UUID().uuidString,
+                name: "another",
+            ).insert(database)
+        }
+
+        let grdbUserNames2 = try await pool.read { database in
+            try User.order(User.Columns.name.asc).fetchAll(database)
+        }
+        XCTAssert(grdbUserNames2.count == 2)
+        XCTAssert(grdbUserNames2[1].name == "another")
     }
 }
