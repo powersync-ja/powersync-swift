@@ -38,13 +38,14 @@ private enum PostgresFatalCodes {
 }
 
 @Observable
+@MainActor // _session is mutable, limiting to the MainActor satisfies Sendable constraints
 final class SupabaseConnector: PowerSyncBackendConnectorProtocol {
     let powerSyncEndpoint: String = Secrets.powerSyncEndpoint
     let client: SupabaseClient = .init(
         supabaseURL: Secrets.supabaseURL,
         supabaseKey: Secrets.supabaseAnonKey,
     )
-    var session: Session?
+    private(set) var session: Session?
     private var errorCode: String?
 
     @ObservationIgnored

@@ -2,47 +2,47 @@
 ///
 /// Supports all standard JSON types: string, number (integer and double),
 /// boolean, null, arrays, and nested objects.
-public enum JsonValue: Codable {
+public enum JsonValue: Codable, Sendable {
     /// A JSON string value.
     case string(String)
-    
+
     /// A JSON integer value.
     case int(Int)
-    
+
     /// A JSON double-precision floating-point value.
     case double(Double)
-    
+
     /// A JSON boolean value (`true` or `false`).
     case bool(Bool)
-    
+
     /// A JSON null value.
     case null
-    
+
     /// A JSON array containing a list of `JSONValue` elements.
     case array([JsonValue])
-    
+
     /// A JSON object containing key-value pairs where values are `JSONValue` instances.
     case object([String: JsonValue])
-    
+
     /// Converts the `JSONValue` into a native Swift representation.
     ///
     /// - Returns: A corresponding Swift type (`String`, `Int`, `Double`, `Bool`, `nil`, `[Any]`, or `[String: Any]`),
     ///            or `nil` if the value is `.null`.
     func toValue() -> Any? {
         switch self {
-        case .string(let value):
+        case let .string(value):
             return value
-        case .int(let value):
+        case let .int(value):
             return value
-        case .double(let value):
+        case let .double(value):
             return value
-        case .bool(let value):
+        case let .bool(value):
             return value
         case .null:
             return nil
-        case .array(let array):
+        case let .array(array):
             return array.map { $0.toValue() }
-        case .object(let dict):
+        case let .object(dict):
             var anyDict: [String: Any] = [:]
             for (key, value) in dict {
                 anyDict[key] = value.toValue()

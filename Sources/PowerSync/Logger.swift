@@ -3,15 +3,10 @@ import OSLog
 /// A log writer which prints to the standard output
 ///
 /// This writer uses `os.Logger` on iOS/macOS/tvOS/watchOS 14+ and falls back to `print` for earlier versions.
-public class PrintLogWriter: LogWriterProtocol {
+public final class PrintLogWriter: LogWriterProtocol {
     private let subsystem: String
     private let category: String
-    private lazy var logger: Any? = {
-        if #available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *) {
-            return Logger(subsystem: subsystem, category: category)
-        }
-        return nil
-    }()
+    private let logger: Sendable?
 
     /// Creates a new PrintLogWriter
     /// - Parameters:
@@ -22,6 +17,12 @@ public class PrintLogWriter: LogWriterProtocol {
     {
         self.subsystem = subsystem
         self.category = category
+
+        if #available(iOS 14.0, macOS 11.0, tvOS 14.0, watchOS 7.0, *) {
+            logger = Logger(subsystem: subsystem, category: category)
+        } else {
+            logger = nil
+        }
     }
 
     /// Logs a message with a given severity and optional tag.

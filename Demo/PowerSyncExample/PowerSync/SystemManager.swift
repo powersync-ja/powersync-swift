@@ -13,13 +13,16 @@ func getAttachmentsDirectoryPath() throws -> String {
 
 let logTag = "SystemManager"
 
+/// We use the MainActor SupabaseConnector synchronously here, this requires specifying that SystemManager runs on the MainActor
+/// We don't actually block the MainActor with anything
 @Observable
-class SystemManager {
+@MainActor
+final class SystemManager {
     let connector = SupabaseConnector()
     let schema = AppSchema
     let db: PowerSyncDatabaseProtocol
 
-    var attachments: AttachmentQueue?
+    let attachments: AttachmentQueue?
 
     init() {
         db = PowerSyncDatabase(
@@ -227,21 +230,21 @@ class SystemManager {
             try await attachments.deleteFile(
                 attachmentId: photoId
             ) { transaction, _ in
-                try self.deleteTodoInTX(
-                    id: todo.id,
-                    tx: transaction
+                try transaction.execute(
+                    sql: "DELETE FROM \(TODOS_TABLE) WHERE id = ?",
+                    parameters: [todo.id]
                 )
             }
         } else {
-            try await db.writeTransaction { transaction in
-                try self.deleteTodoInTX(
-                    id: todo.id,
-                    tx: transaction
+            _ = try await db.writeTransaction { transaction in
+                try transaction.execute(
+                    sql: "DELETE FROM \(TODOS_TABLE) WHERE id = ?",
+                    parameters: [todo.id]
                 )
             }
         }
     }
-    
+
     /// Searches across lists and todos using FTS.
     ///
     /// - Parameter searchTerm: The text to search for.
@@ -338,6 +341,4 @@ class SystemManager {
         }
         return "\(trimmedSearchTerm)*"
     }
-    
-    
 }

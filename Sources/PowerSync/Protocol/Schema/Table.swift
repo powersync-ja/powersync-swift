@@ -1,7 +1,7 @@
 import Foundation
 
 /// Shared protocol for both PowerSync-managed ``Table``s as well as ``RawTable``s managed by the user.
-public protocol BaseTableProtocol {
+public protocol BaseTableProtocol: Sendable {
     ///
     /// The synced table name, matching sync rules.
     ///
@@ -31,7 +31,7 @@ public protocol TableProtocol: BaseTableProtocol {
     ///
     var viewNameOverride: String? { get }
     var viewName: String { get }
-    
+
     /// Whether to add a hidden `_metadata` column that will ne abled for updates to
     /// attach custom information about writes.
     ///
@@ -39,12 +39,12 @@ public protocol TableProtocol: BaseTableProtocol {
     /// part of ``CrudEntry/opData``. Instead, it is reported as ``CrudEntry/metadata``,
     /// allowing ``PowerSyncBackendConnector``s to handle these updates specially.
     var trackMetadata: Bool { get }
-    
+
     /// When set to a non-`nil` value, track old values of columns for ``CrudEntry/previousValues``.
     ///
     /// See ``TrackPreviousValuesOptions`` for details
     var trackPreviousValues: TrackPreviousValuesOptions? { get }
-    
+
     /// Whether an `UPDATE` statement that doesn't change any values should be ignored entirely when
     /// creating CRUD entries.
     ///
@@ -56,17 +56,17 @@ public protocol TableProtocol: BaseTableProtocol {
 /// Options to include old values in ``CrudEntry/previousValues`` for update statements.
 ///
 /// These options are enabled by passing them to a non-local ``Table`` constructor.
-public struct TrackPreviousValuesOptions {
+public struct TrackPreviousValuesOptions: Sendable {
     /// A filter of column names for which updates should be tracked.
     ///
     /// When set to a non-`nil` value, columns not included in this list will not appear in
     /// ``CrudEntry/previousValues``. By default, all columns are included.
-    public let columnFilter: [String]?;
-    
+    public let columnFilter: [String]?
+
     /// Whether to only include old values when they were changed by an update, instead of always including
     /// all old values.
-    public let onlyWhenChanged: Bool;
-    
+    public let onlyWhenChanged: Bool
+
     public init(columnFilter: [String]? = nil, onlyWhenChanged: Bool = false) {
         self.columnFilter = columnFilter
         self.onlyWhenChanged = onlyWhenChanged
@@ -93,7 +93,7 @@ public struct Table: TableProtocol {
         viewNameOverride ?? name
     }
 
-    internal var internalName: String {
+    var internalName: String {
         localOnly ? "ps_data_local__\(name)" : "ps_data__\(name)"
     }
 
@@ -125,9 +125,9 @@ public struct Table: TableProtocol {
     }
 
     private func hasInvalidSqliteCharacters(_ string: String) -> Bool {
-         let range = NSRange(location: 0, length: string.utf16.count)
-         return invalidSqliteCharacters.firstMatch(in: string, options: [], range: range) != nil
-     }
+        let range = NSRange(location: 0, length: string.utf16.count)
+        return invalidSqliteCharacters.firstMatch(in: string, options: [], range: range) != nil
+    }
 
     ///
     /// Validate the table
@@ -136,12 +136,13 @@ public struct Table: TableProtocol {
         if columns.count > MAX_AMOUNT_OF_COLUMNS {
             throw TableError.tooManyColumns(tableName: name, count: columns.count)
         }
-        
+
         if let viewNameOverride = viewNameOverride,
-           hasInvalidSqliteCharacters(viewNameOverride) {
+           hasInvalidSqliteCharacters(viewNameOverride)
+        {
             throw TableError.invalidViewName(viewName: viewNameOverride)
         }
-        
+
         if localOnly {
             if trackPreviousValues != nil {
                 throw TableError.trackPreviousForLocalTable(tableName: name)

@@ -133,4 +133,50 @@ final class ConnectTests: XCTestCase {
 
         try await database.disconnectAndClear()
     }
+
+    func testSendableConnect() async throws {
+        /// This is just a basic sanity check to confirm that these protocols are
+        /// correctly defined as Sendable.
+        /// Declaring this struct as Sendable means all its
+        /// sub items should be sendable
+        struct SendableTest: Sendable {
+            let schema: Schema
+            let connectOptions: ConnectOptions
+        }
+
+        let testOptions = SendableTest(
+            schema: Schema(
+                tables: [
+                    Table(
+                        name: "users",
+                        columns: [
+                            Column(
+                                name: "name",
+                                type: .text
+                            )
+                        ]
+                    )
+                ]
+            ),
+            connectOptions: ConnectOptions(
+                crudThrottle: 1,
+                retryDelay: 1,
+                params: ["Name": .string("AName")],
+                clientConfiguration: SyncClientConfiguration(
+                    requestLogger: SyncRequestLoggerConfiguration(
+                        requestLevel: .all,
+                        logger: database.logger
+                    ))
+            )
+        )
+
+        try await database.updateSchema(
+            schema: testOptions.schema
+        )
+
+        try await database.connect(
+            connector: MockConnector(),
+            options: testOptions.connectOptions
+        )
+    }
 }

@@ -1,7 +1,7 @@
 import Foundation
 import PowerSyncKotlin
 
-public protocol IndexProtocol {
+public protocol IndexProtocol: Sendable {
     ///
     /// Descriptive name of the index.
     ///
@@ -15,7 +15,7 @@ public protocol IndexProtocol {
 public struct Index: IndexProtocol {
     public let name: String
     public let columns: [IndexedColumnProtocol]
-    
+
     public init(
         name: String,
         columns: [IndexedColumnProtocol]
@@ -23,14 +23,14 @@ public struct Index: IndexProtocol {
         self.name = name
         self.columns = columns
     }
-    
+
     public init(
         name: String,
         _ columns: IndexedColumnProtocol...
     ) {
         self.init(name: name, columns: columns)
     }
-    
+
     public static func ascending(
         name: String,
         columns: [String]
@@ -40,7 +40,7 @@ public struct Index: IndexProtocol {
             columns: columns.map { IndexedColumn.ascending($0) }
         )
     }
-    
+
     public static func ascending(
         name: String,
         column: String
