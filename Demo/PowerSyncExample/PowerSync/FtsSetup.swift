@@ -1,9 +1,3 @@
-//
-//  FullTextSearch.swift
-//  PowerSyncExample
-//
-//  Created by Joshua Brink on 2025/09/03.
-//
 import Foundation
 import PowerSync
 

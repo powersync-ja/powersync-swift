@@ -1,10 +1,3 @@
-//
-//  SearchResultRow.swift
-//  PowerSyncExample
-//
-//  Created by Joshua Brink on 2025/09/03.
-//
-
 import SwiftUI
 
 struct SearchResultRow: View {

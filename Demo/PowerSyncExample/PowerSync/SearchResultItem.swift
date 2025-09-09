@@ -1,10 +1,3 @@
-//
-//  SearchResultItem.swift
-//  PowerSyncExample
-//
-//  Created by Joshua Brink on 2025/09/03.
-//
-
 import Foundation
 
 enum SearchResultType {
