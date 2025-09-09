@@ -6,24 +6,33 @@ struct SearchResultRow: View {
     var body: some View {
         HStack {
 
-            Image(systemName: item.type == .list ? "list.bullet" : "checkmark.circle")
-                .foregroundColor(.secondary)
+            Image(
+                systemName: {
+                    switch item.content {
+                    case .list:
+                        return "list.bullet"
+                    case .todo:
+                        return "checkmark.circle"
+                    }
+                }()
+            )
+            .foregroundColor(.secondary)
+            
+            switch item.content {
+            case .list(let listContent):
+                Text(listContent.name)
 
-            if let list = item.listContent {
-                Text(list.name)
-            } else if let todo = item.todo {
+            case .todo(let todo):
                 Text(todo.description)
                     .strikethrough(todo.isComplete, color: .secondary)
                     .foregroundColor(todo.isComplete ? .secondary : .primary)
-            } else {
-                Text("Unknown item")
             }
 
             Spacer()
 
-             Image(systemName: "chevron.right")
-                 .font(.caption.weight(.bold))
-                 .foregroundColor(.secondary.opacity(0.5))
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundColor(.secondary.opacity(0.5))
         }
         .contentShape(Rectangle())
     }
@@ -31,20 +40,44 @@ struct SearchResultRow: View {
 
 #Preview {
     List {
-        SearchResultRow(item: SearchResultItem(
-            id: UUID().uuidString,
-            type: .list,
-            content: ListContent(id: UUID().uuidString, name: "Groceries", createdAt: "now", ownerId: "user1")
-        ))
-        SearchResultRow(item: SearchResultItem(
-            id: UUID().uuidString,
-            type: .todo,
-            content: Todo(id: UUID().uuidString, listId: "list1", description: "Buy milk", isComplete: false)
-        ))
-        SearchResultRow(item: SearchResultItem(
-            id: UUID().uuidString,
-            type: .todo,
-            content: Todo(id: UUID().uuidString, listId: "list1", description: "Walk the dog", isComplete: true)
-        ))
+        SearchResultRow(
+            item: SearchResultItem(
+                id: UUID().uuidString,
+                content: .list(
+                    ListContent(
+                        id: UUID().uuidString,
+                        name: "Groceries",
+                        createdAt: "now",
+                        ownerId: "user1"
+                    )
+                )
+            )
+        )
+        SearchResultRow(
+            item: SearchResultItem(
+                id: UUID().uuidString,
+                content: .todo(
+                    Todo(
+                        id: UUID().uuidString,
+                        listId: "list1",
+                        description: "Buy milk",
+                        isComplete: false
+                    )
+                )
+            )
+        )
+        SearchResultRow(
+            item: SearchResultItem(
+                id: UUID().uuidString,
+                content: .todo(
+                    Todo(
+                        id: UUID().uuidString,
+                        listId: "list1",
+                        description: "Walk the dog",
+                        isComplete: true
+                    )
+                )
+            )
+        )
     }
 }

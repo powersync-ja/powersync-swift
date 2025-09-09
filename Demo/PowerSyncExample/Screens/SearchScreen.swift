@@ -75,9 +75,9 @@ struct SearchScreen: View {
                 
                 self.searchResults = results.compactMap { item in
                     if let list = item as? ListContent {
-                        return SearchResultItem(id: list.id, type: .list, content: list)
+                        return SearchResultItem(id: list.id, content: .list(list))
                     } else if let todo = item as? Todo {
-                        return SearchResultItem(id: todo.id, type: .todo, content: todo)
+                        return SearchResultItem(id: todo.id, content: .todo(todo))
                     }
                     return nil
                 }

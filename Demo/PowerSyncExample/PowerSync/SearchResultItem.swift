@@ -1,29 +1,20 @@
 import Foundation
 
-enum SearchResultType {
-    case list
-    case todo
+enum SearchResultContent: Hashable {
+    case list(ListContent)
+    case todo(Todo)
 }
 
 struct SearchResultItem: Identifiable, Hashable {
     let id: String
-    let type: SearchResultType
-    let content: AnyHashable
-
-    var listContent: ListContent? {
-        content as? ListContent
-    }
-
-    var todo: Todo? {
-        content as? Todo
-    }
+    let content: SearchResultContent
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
-        hasher.combine(type)
+        hasher.combine(content)
     }
 
     static func == (lhs: SearchResultItem, rhs: SearchResultItem) -> Bool {
-        lhs.id == rhs.id && lhs.type == rhs.type
+        lhs.id == rhs.id && lhs.content == rhs.content
     }
 }
