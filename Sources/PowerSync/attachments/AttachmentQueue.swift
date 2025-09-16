@@ -10,6 +10,12 @@ public protocol AttachmentQueueProtocol: Sendable {
     var localStorage: any LocalStorageAdapter { get }
     var downloadAttachments: Bool { get }
 
+    /// Waits for automatically triggered initialization.
+    /// This ensures all attachment records have been verified before use.
+    /// The `startSync` method also performs this verification. This call is not
+    /// needed if `startSync` is called after creating the Attachment Queue.
+    func waitForInit() async throws
+
     /// Starts the attachment sync process
     func startSync() async throws
 
@@ -287,6 +293,9 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
 
     private let _getLocalUri: @Sendable (_ filename: String) async -> String
 
+    private let initializedSubject = PassthroughSubject<Result<Void, Error>, Never>()
+    private var initializationResult: Result<Void, Error>?
+
     /// Initializes the attachment queue
     /// - Parameters match the stored properties
     public init(
@@ -342,8 +351,37 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
                 try await attachmentsService.withContext { context in
                     try await self.verifyAttachments(context: context)
                 }
+                await self.setInitializedResult(.success(()))
             } catch {
                 self.logger.error("Error verifying attachments: \(error.localizedDescription)", tag: logTag)
+                await self.setInitializedResult(.failure(error))
+            }
+        }
+    }
+
+    /// Actor isolated method to set the initialization result
+    private func setInitializedResult(_ result: Result<Void, Error>) {
+        initializationResult = result
+        initializedSubject.send(result)
+    }
+
+    public func waitForInit() async throws {
+        if let isInitialized = initializationResult {
+            switch isInitialized {
+            case .success:
+                return
+            case let .failure(error):
+                throw error
+            }
+        }
+
+        // Wait for the result asynchronously
+        for try await result in initializedSubject.values {
+            switch result {
+            case .success:
+                return
+            case let .failure(error):
+                throw error
             }
         }
     }
