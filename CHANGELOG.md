@@ -1,8 +1,14 @@
 # Changelog
 
-## 1.5.1
+## 1.6.0 (unreleased)
 
 * Update core extension to 0.4.6 ([changelog](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.4.6))
+* Add `getCrudTransactions()`, returning an async sequence of transactions.
+* Compatibility with Swift 6.2 and XCode 26.
+
+## 1.5.1
+
+* Update core extension to 0.4.5 ([changelog](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.4.5))
 * Additional Swift 6 Strict Concurrency Checking declarations added for remaining protocols.
 * Fix issue in legacy sync client where local writes made offline could have their upload delayed until a keepalive event was received. This could also cause downloaded updates to be delayed even further until all uploads were completed.
 

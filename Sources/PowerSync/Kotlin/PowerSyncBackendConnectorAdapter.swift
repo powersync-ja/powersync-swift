@@ -1,9 +1,7 @@
 import OSLog
+import PowerSyncKotlin
 
-final class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector,
-    // We need to declare this since we declared KotlinPowerSyncBackendConnector as @unchecked Sendable
-    @unchecked Sendable
-{
+final class SwiftBackendConnectorBridge: KotlinSwiftBackendConnector, Sendable {
     let swiftBackendConnector: PowerSyncBackendConnectorProtocol
     let db: any PowerSyncDatabaseProtocol
     let logTag = "PowerSyncBackendConnector"
@@ -15,31 +13,25 @@ final class PowerSyncBackendConnectorAdapter: KotlinPowerSyncBackendConnector,
         self.swiftBackendConnector = swiftBackendConnector
         self.db = db
     }
-
-    override func __fetchCredentials() async throws -> KotlinPowerSyncCredentials? {
+    
+    func __fetchCredentials() async throws -> PowerSyncResult {
         do {
             let result = try await swiftBackendConnector.fetchCredentials()
-            return result?.kotlinCredentials
+            return PowerSyncResult.Success(value: result?.kotlinCredentials)
         } catch {
             db.logger.error("Error while fetching credentials", tag: logTag)
-            /// We can't use throwKotlinPowerSyncError here since the Kotlin connector
-            /// runs this in a Job - this seems to break the SKIEE error propagation.
-            /// returning nil here should still cause a retry
-            return nil
+            return PowerSyncResult.Failure(exception: error.toPowerSyncError())
         }
     }
-
-    override func __uploadData(database _: KotlinPowerSyncDatabase) async throws {
+    
+    func __uploadData() async throws -> PowerSyncResult {
         do {
             // Pass the Swift DB protocal to the connector
-            return try await swiftBackendConnector.uploadData(database: db)
+            try await swiftBackendConnector.uploadData(database: self.db)
+            return PowerSyncResult.Success(value: nil)
         } catch {
             db.logger.error("Error while uploading data: \(error)", tag: logTag)
-            // Relay the error to the Kotlin SDK
-            try throwKotlinPowerSyncError(
-                message: "Connector errored while uploading data: \(error.localizedDescription)",
-                cause: error.localizedDescription
-            )
+            return PowerSyncResult.Failure(exception: error.toPowerSyncError())
         }
     }
 }
