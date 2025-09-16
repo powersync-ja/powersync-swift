@@ -5,7 +5,7 @@ struct RootView: View {
     @Environment(SystemManager.self) var system
     
     @State private var navigationModel = NavigationModel()
-
+    
     var body: some View {
         NavigationStack(path: $navigationModel.path) {
             Group {
@@ -23,6 +23,8 @@ struct RootView: View {
                     SignInScreen()
                 case .signUp:
                     SignUpScreen()
+                case .search:
+                    SearchScreen()
                 }
             }
         }
