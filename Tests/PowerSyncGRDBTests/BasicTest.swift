@@ -255,4 +255,57 @@ final class GRDBTests: XCTestCase {
         await fulfillment(of: [expectation], timeout: 5)
         watchTask.cancel()
     }
+
+    func testGRDBUpdatesFromGRDB() async throws {
+        let expectation = XCTestExpectation(description: "Watch changes")
+
+        // Create an actor to handle concurrent mutations
+        actor ResultsStore {
+            private var results: Set<String> = []
+
+            func append(_ names: [String]) {
+                results.formUnion(names)
+            }
+
+            func getResults() -> Set<String> {
+                results
+            }
+
+            func count() -> Int {
+                results.count
+            }
+        }
+
+        let resultsStore = ResultsStore()
+
+        let watchTask = Task {
+            let observation = ValueObservation.tracking {
+                try User.order(User.Columns.name.asc).fetchAll($0)
+            }
+
+            for try await users in observation.values(in: pool) {
+                await resultsStore.append(users.map { $0.name })
+                if await resultsStore.count() == 2 {
+                    expectation.fulfill()
+                }
+            }
+        }
+
+        try await pool.write { database in
+            try User(
+                id: UUID().uuidString,
+                name: "one",
+            ).insert(database)
+        }
+
+        try await pool.write { database in
+            try User(
+                id: UUID().uuidString,
+                name: "two",
+            ).insert(database)
+        }
+
+        await fulfillment(of: [expectation], timeout: 5)
+        watchTask.cancel()
+    }
 }
