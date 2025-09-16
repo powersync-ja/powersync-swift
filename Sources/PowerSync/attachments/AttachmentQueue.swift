@@ -336,6 +336,16 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
             errorHandler: self.errorHandler,
             syncThrottle: self.syncThrottleDuration
         )
+
+        Task {
+            do {
+                try await attachmentsService.withContext { context in
+                    try await self.verifyAttachments(context: context)
+                }
+            } catch {
+                self.logger.error("Error verifying attachments: \(error.localizedDescription)", tag: logTag)
+            }
+        }
     }
 
     public func getLocalUri(_ filename: String) async -> String {
@@ -463,7 +473,15 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
                 continue
             }
 
-            if attachment.state == AttachmentState.queuedUpload {
+            let newLocalUri = await getLocalUri(attachment.filename)
+            let newExists = try await localStorage.fileExists(filePath: newLocalUri)
+            if newExists {
+                // The file exists but the localUri is broken, lets update it.
+                // E.g. this happens in simulators that change the path to the app's sandbox.
+                updates.append(attachment.with(
+                    localUri: newLocalUri
+                ))
+            } else if attachment.state == AttachmentState.queuedUpload || attachment.state == AttachmentState.archived {
                 // The file must have been removed from the local storage before upload was completed
                 updates.append(attachment.with(
                     state: .archived,
