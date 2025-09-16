@@ -3,6 +3,7 @@
 ## 1.6.0 (unreleased)
 
 * Update minimum MacOS target to v12
+* Update minimum iOS target to v15
 * [Attachment Helpers] Added automatic verification or records' `local_uri` values on `AttachmentQueue` initialization. 
 initialization can be awaited with `AttachmentQueue.waitForInit()`. `AttachmentQueue.startSync()` also performs this verification.
 `waitForInit()` is only recommended if `startSync` is not called directly after creating the queue.
