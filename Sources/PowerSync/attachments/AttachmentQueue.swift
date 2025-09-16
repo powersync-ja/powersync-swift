@@ -346,6 +346,8 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
             syncThrottle: self.syncThrottleDuration
         )
 
+        // Storing a reference to this task is non-trivial since we capture
+        // Self. Swift 6 Strict concurrency checking will complain about a nonisolated initializer
         Task {
             do {
                 try await attachmentsService.withContext { context in
