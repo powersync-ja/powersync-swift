@@ -11,8 +11,33 @@ struct User: Codable, Identifiable, FetchableRecord, PersistableRecord {
     static var databaseTableName = "users"
 
     enum Columns {
+        static let id = Column(CodingKeys.id)
         static let name = Column(CodingKeys.name)
     }
+}
+
+struct Pet: Codable, Identifiable, FetchableRecord, PersistableRecord {
+    var id: String
+    var name: String
+    var ownerId: String
+
+    static var databaseTableName = "pets"
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case ownerId = "owner_id"
+    }
+
+    enum Columns {
+        static let ownerId = Column(CodingKeys.ownerId)
+    }
+
+    static let user = belongsTo(
+        User.self,
+        key: "user",
+        using: ForeignKey([Columns.ownerId], to: [User.Columns.id])
+    )
 }
 
 final class GRDBTests: XCTestCase {
@@ -24,7 +49,11 @@ final class GRDBTests: XCTestCase {
         try await super.setUp()
         schema = Schema(tables: [
             Table(name: "users", columns: [
+                .text("name")
+            ]),
+            Table(name: "pets", columns: [
                 .text("name"),
+                .text("owner_id")
             ])
         ])
 
@@ -97,6 +126,43 @@ final class GRDBTests: XCTestCase {
         }
         XCTAssert(grdbUserNames2.count == 2)
         XCTAssert(grdbUserNames2[1].name == "another")
+    }
+
+    func testJoins() async throws {
+        // Create users with the PowerSync SDK
+        try await pool.write { database in
+            let userId = UUID().uuidString
+            try User(
+                id: userId,
+                name: "Bob"
+            ).insert(database)
+
+            try Pet(
+                id: UUID().uuidString,
+                name: "Fido",
+                ownerId: userId
+            ).insert(database)
+        }
+
+        struct PetWithUser: Decodable, FetchableRecord {
+            struct PartialUser: Decodable {
+                var name: String
+            }
+
+            var pet: Pet // The base record
+            var user: PartialUser // The partial associated record
+        }
+
+        let petsWithUsers = try await pool.read { db in
+            try Pet
+                .including(required: Pet.user)
+                .asRequest(of: PetWithUser.self)
+                .fetchAll(db)
+        }
+
+        XCTAssert(petsWithUsers.count == 1)
+        XCTAssert(petsWithUsers[0].pet.name == "Fido")
+        XCTAssert(petsWithUsers[0].user.name == "Bob")
     }
 
     func testPowerSyncUpdates() async throws {
