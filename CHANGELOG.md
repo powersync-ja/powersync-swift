@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.6.0 (unreleased)
+## 1.6.0
 
 * Update core extension to 0.4.6 ([changelog](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.4.6))
 * Add `getCrudTransactions()`, returning an async sequence of transactions.
