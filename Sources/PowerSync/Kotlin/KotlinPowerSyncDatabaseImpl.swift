@@ -75,8 +75,8 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         )
     }
     
-    func getCrudTransactions() -> CrudTransactions {
-        return CrudTransactions(db: kotlinDatabase)
+    func getCrudTransactions() -> any CrudTransactions {
+        return KotlinCrudTransactions(db: kotlinDatabase)
     }
 
     func getPowerSyncVersion() async throws -> String {
