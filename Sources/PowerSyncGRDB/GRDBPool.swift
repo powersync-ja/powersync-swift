@@ -41,7 +41,7 @@ struct PowerSyncSchemaSource: DatabaseSchemaSource {
     }
 }
 
-func configurePowerSync(
+public func configurePowerSync(
     config: inout Configuration,
     schema: Schema
 ) {
@@ -105,14 +105,14 @@ final class PowerSyncTransactionObserver: TransactionObserver {
     func databaseDidRollback(_: GRDB.Database) {}
 }
 
-final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
+public final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
     let pool: DatabasePool
     var pendingUpdates: Set<String>
     private let pendingUpdatesQueue = DispatchQueue(
         label: "co.powersync.pendingUpdatesQueue"
     )
 
-    init(
+    public init(
         pool: DatabasePool
     ) {
         self.pool = pool
@@ -128,7 +128,7 @@ final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         )
     }
 
-    func getPendingUpdates() -> Set<String> {
+    public func getPendingUpdates() -> Set<String> {
         self.pendingUpdatesQueue.sync {
             let copy = self.pendingUpdates
             self.pendingUpdates.removeAll()
@@ -136,7 +136,7 @@ final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         }
     }
 
-    func read(
+    public func read(
         onConnection: @Sendable @escaping (OpaquePointer) -> Void
     ) async throws {
         try await pool.read { database in
@@ -147,7 +147,7 @@ final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         }
     }
 
-    func write(
+    public func write(
         onConnection: @Sendable @escaping (OpaquePointer) -> Void
     ) async throws {
         // Don't start an explicit transaction
@@ -159,13 +159,13 @@ final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         }
     }
 
-    func withAllConnections(
+    public func withAllConnections(
         onConnection _: @escaping (OpaquePointer, [OpaquePointer]) -> Void
     ) async throws {
         // TODO:
     }
 
-    func close() throws {
+    public func close() throws {
         try pool.close()
     }
 }
