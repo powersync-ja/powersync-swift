@@ -38,8 +38,10 @@ struct SigninScreen: View {
                 VStack(spacing: 16) {
                     TextField("Email", text: $email)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
+                    #if os (iOS) || os (tvOS) || targetEnvironment(macCatalyst)
                         .autocapitalization(.none)
                         .keyboardType(.emailAddress)
+                    #endif
                         .focused($emailFieldFocused)
 
                     SecureField("Password", text: $password)

@@ -12,7 +12,7 @@ struct ListsTodosRequest: ValueObservationQueryable {
     func fetch(_ database: Database) throws -> [Todo] {
         try Todo
             .filter(Todo.Columns.listId == list.id)
-            .order(Todo.Columns.name)
+            .order(Todo.Columns.description)
             .order(Todo.Columns.isCompleted)
             .fetchAll(database)
     }
@@ -36,7 +36,7 @@ class TodoViewModel {
             try grdb.write { database in
                 try Todo(
                     id: UUID().uuidString,
-                    name: name,
+                    description: name,
                     listId: listId,
                     isCompleted: false
                 ).insert(database)

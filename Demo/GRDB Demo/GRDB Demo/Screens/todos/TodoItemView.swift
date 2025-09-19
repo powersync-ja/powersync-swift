@@ -16,7 +16,7 @@ struct TodoItemView: View {
     var body: some View {
         VStack {
             HStack {
-                Text(todo.name).font(.title)
+                Text(todo.description).font(.title)
                 Spacer()
                 Button {
                     try? viewModels.todoViewModel.toggleCompleted(todo: todo)

@@ -9,20 +9,27 @@ struct StatusIndicatorView<Content: View>: View {
     }
 
     @State var statusImageName: String = "wifi.slash"
-    @State private var showErrorAlert = false
+    @State var directionStatusImageName: String?
 
     let content: () -> Content
 
     var body: some View {
         content()
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button {
-                        if powerSync.currentStatus.anyError != nil {
-                            showErrorAlert = true
+                        if let error = powerSync.currentStatus.anyError {
+                            viewModels.errorViewModel.report("\(error)")
                         }
                     } label: {
-                        Image(systemName: statusImageName)
+                        ZStack {
+                            // Network status
+                            Image(systemName: statusImageName)
+                            // Upload/Download status
+                            if let name = directionStatusImageName {
+                                Image(systemName: name)
+                            }
+                        }
                     }
                     .contextMenu {
                         if powerSync.currentStatus.connected || powerSync.currentStatus.connecting {
@@ -43,13 +50,6 @@ struct StatusIndicatorView<Content: View>: View {
                     }
                 }
             }
-            .alert(isPresented: $showErrorAlert) {
-                Alert(
-                    title: Text("Error"),
-                    message: Text(String("\(powerSync.currentStatus.anyError ?? "Unknown error")")),
-                    dismissButton: .default(Text("OK"))
-                )
-            }
             .task {
                 do {
                     for try await status in powerSync.currentStatus.asFlow() {
@@ -61,6 +61,14 @@ struct StatusIndicatorView<Content: View>: View {
                             statusImageName = "wifi.exclamationmark"
                         } else {
                             statusImageName = "wifi.slash"
+                        }
+
+                        if status.downloading {
+                            directionStatusImageName = "chevron.down.2"
+                        } else if status.uploading {
+                            directionStatusImageName = "chevron.up.2"
+                        } else {
+                            directionStatusImageName = nil
                         }
                     }
                 } catch {

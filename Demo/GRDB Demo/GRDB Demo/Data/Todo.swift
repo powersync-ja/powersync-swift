@@ -6,7 +6,7 @@ import PowerSync
 let todosTable = Table(
     name: "todos",
     columns: [
-        .text("name"),
+        .text("description"),
         .text("list_id"),
         // Conversion should automatically be handled by GRDB
         .integer("completed"),
@@ -16,7 +16,7 @@ let todosTable = Table(
 
 struct Todo: Codable, Equatable, Identifiable, FetchableRecord, PersistableRecord {
     var id: String
-    var name: String
+    var description: String
     var listId: String
     var isCompleted: Bool
     var completedAt: Date?
@@ -25,7 +25,7 @@ struct Todo: Codable, Equatable, Identifiable, FetchableRecord, PersistableRecor
 
     enum CodingKeys: String, CodingKey {
         case id
-        case name
+        case description
         case listId = "list_id"
         case isCompleted = "completed"
         case completedAt = "completed_at"
@@ -33,7 +33,7 @@ struct Todo: Codable, Equatable, Identifiable, FetchableRecord, PersistableRecor
 
     enum Columns {
         static let id = Column(CodingKeys.id)
-        static let name = Column(CodingKeys.name)
+        static let description = Column(CodingKeys.description)
         static let listId = Column(CodingKeys.listId)
         static let isCompleted = Column(CodingKeys.isCompleted)
         static let completedAt = Column(CodingKeys.completedAt)
