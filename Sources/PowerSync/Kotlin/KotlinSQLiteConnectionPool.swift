@@ -1,0 +1,82 @@
+import PowerSyncKotlin
+
+final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
+    let pool: SQLiteConnectionPoolProtocol
+
+    init(
+        pool: SQLiteConnectionPoolProtocol
+    ) {
+        self.pool = pool
+    }
+
+    func getPendingUpdates() -> Set<String> {
+        return pool.getPendingUpdates()
+    }
+
+    func __closePool() async throws {
+        do {
+            try pool.close()
+        } catch {
+            try? PowerSyncKotlin.throwPowerSyncException(
+                exception: PowerSyncException(
+                    message: error.localizedDescription,
+                    cause: nil
+                )
+            )
+        }
+    }
+
+    func __leaseRead(callback: @escaping (Any) -> Void) async throws {
+        do {
+            try await pool.read { pointer in
+                callback(UInt(bitPattern: pointer))
+            }
+        } catch {
+            try? PowerSyncKotlin.throwPowerSyncException(
+                exception: PowerSyncException(
+                    message: error.localizedDescription,
+                    cause: nil
+                )
+            )
+        }
+    }
+
+    func __leaseWrite(callback: @escaping (Any) -> Void) async throws {
+        do {
+            try await pool.write { pointer in
+                callback(UInt(bitPattern: pointer))
+            }
+        } catch {
+            try? PowerSyncKotlin.throwPowerSyncException(
+                exception: PowerSyncException(
+                    message: error.localizedDescription,
+                    cause: nil
+                )
+            )
+        }
+    }
+
+    func __leaseAll(callback: @escaping (Any, [Any]) -> Void) async throws {
+        // TODO, actually use all connections
+        do {
+            try await pool.write { pointer in
+                callback(UInt(bitPattern: pointer), [])
+            }
+        } catch {
+            try? PowerSyncKotlin.throwPowerSyncException(
+                exception: PowerSyncException(
+                    message: error.localizedDescription,
+                    cause: nil
+                )
+            )
+        }
+    }
+}
+
+extension SQLiteConnectionPoolProtocol {
+    func toKotlin() -> PowerSyncKotlin.SwiftSQLiteConnectionPool {
+        return PowerSyncKotlin.SwiftSQLiteConnectionPool(
+            adapter: SwiftSQLiteConnectionPoolAdapter(pool: self)
+        )
+    }
+}
