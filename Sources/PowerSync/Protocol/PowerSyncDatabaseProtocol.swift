@@ -188,19 +188,24 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// data by transaction. One batch may contain data from multiple transactions,
     /// and a single transaction may be split over multiple batches.
     func getCrudBatch(limit: Int32) async throws -> CrudBatch?
-
-    /// Get the next recorded transaction to upload.
+    
+    /// Obtains an async iterator of completed transactions with local writes against the database.
     ///
-    /// Returns nil if there is no data to upload.
+    /// This is typically used from the ``PowerSyncBackendConnectorProtocol/uploadData(database:)`` callback.
+    /// Each entry emitted by teh returned flow is a full transaction containing all local writes made while that transaction was
+    /// active.
     ///
-    /// Use this from the `PowerSyncBackendConnector.uploadData` callback.
+    /// Unlike ``getNextCrudTransaction()``, which always returns the oldest transaction that hasn't been
+    /// ``CrudTransaction/complete()``d yet, this iterator can be used to upload multiple transactions.
+    /// Calling ``CrudTransaction/complete()`` will mark that and all prior transactions returned by this iterator as
+    /// completed.
     ///
-    /// Once the data have been successfully uploaded, call `CrudTransaction.complete` before
-    /// requesting the next transaction.
+    /// This can be used to upload multiple transactions in a single batch, e.g. with
     ///
-    /// Unlike `getCrudBatch`, this only returns data from a single transaction at a time.
-    /// All data for the transaction is loaded into memory.
-    func getNextCrudTransaction() async throws -> CrudTransaction?
+    /// ```Swift
+    ///
+    /// ```
+    func getCrudTransactions() -> any CrudTransactions
 
     /// Convenience method to get the current version of PowerSync.
     func getPowerSyncVersion() async throws -> String
@@ -226,6 +231,25 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
 }
 
 public extension PowerSyncDatabaseProtocol {
+    /// Get the next recorded transaction to upload.
+    ///
+    /// Returns nil if there is no data to upload.
+    ///
+    /// Use this from the `PowerSyncBackendConnector.uploadData` callback.
+    ///
+    /// Once the data have been successfully uploaded, call `CrudTransaction.complete` before
+    /// requesting the next transaction.
+    ///
+    /// Unlike `getCrudBatch`, this only returns data from a single transaction at a time.
+    /// All data for the transaction is loaded into memory.
+    func getNextCrudTransaction() async throws -> CrudTransaction? {
+        for try await transaction in self.getCrudTransactions() {
+            return transaction
+        }
+        
+        return nil
+    }
+    
     ///
     /// The connection is automatically re-opened if it fails for any reason.
     ///

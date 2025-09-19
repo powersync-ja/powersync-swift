@@ -1,5 +1,6 @@
 import PowerSyncKotlin
 
+typealias KotlinSwiftBackendConnector = PowerSyncKotlin.SwiftBackendConnector
 typealias KotlinPowerSyncBackendConnector = PowerSyncKotlin.PowerSyncBackendConnector
 typealias KotlinPowerSyncCredentials = PowerSyncKotlin.PowerSyncCredentials
 typealias KotlinPowerSyncDatabase = PowerSyncKotlin.PowerSyncDatabase
