@@ -173,6 +173,84 @@ final class AttachmentTests: XCTestCase {
         try await queue.clearQueue()
         try await queue.close()
     }
+
+    func testAttachmentInitVerification() async throws {
+        actor MockRemoteStorage: RemoteStorageAdapter {
+            func uploadFile(
+                fileData _: Data,
+                attachment _: Attachment
+            ) async throws {}
+
+            func downloadFile(attachment _: Attachment) async throws -> Data {
+                return Data([1, 2, 3])
+            }
+
+            func deleteFile(attachment _: Attachment) async throws {}
+        }
+
+        // Create an attachments record which has an invalid local_uri
+        let attachmentsDirectory = getAttachmentDirectory()
+
+        try FileManager.default.createDirectory(
+            at: URL(fileURLWithPath: attachmentsDirectory),
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+
+        let filename = "test.jpeg"
+
+        try Data("1".utf8).write(
+            to: URL(fileURLWithPath: attachmentsDirectory).appendingPathComponent(filename)
+        )
+        try await database.execute(
+            sql: """
+            INSERT OR REPLACE INTO 
+                attachments (id, timestamp, filename, local_uri, media_type, size, state, has_synced, meta_data) 
+            VALUES
+                (uuid(), ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            parameters: [
+                Date().ISO8601Format(),
+                filename,
+                // This is a broken local_uri
+                URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("not_attachments/test.jpeg").path,
+                "application/jpeg",
+                1,
+                AttachmentState.synced.rawValue,
+                1,
+                ""
+            ]
+        )
+
+        let mockedRemote = MockRemoteStorage()
+
+        let queue = AttachmentQueue(
+            db: database,
+            remoteStorage: mockedRemote,
+            attachmentsDirectory: attachmentsDirectory,
+            watchAttachments: { [database = database!] in try database.watch(options: WatchOptions(
+                sql: "SELECT photo_id FROM users WHERE photo_id IS NOT  NULL",
+                mapper: { cursor in try WatchedAttachmentItem(
+                    id: cursor.getString(name: "photo_id"),
+                    fileExtension: "jpg"
+                ) }
+            )) }
+        )
+
+        try await queue.waitForInit()
+
+        // the attachment should have been corrected in the init
+        let attachments = try await queue.attachmentsService.withContext { context in
+            try await context.getAttachments()
+        }
+
+        guard let firstAttachment = attachments.first else {
+            XCTFail("Could not find the attachment record")
+            return
+        }
+
+        XCTAssert(firstAttachment.localUri == URL(fileURLWithPath: attachmentsDirectory).appendingPathComponent(filename).path)
+    }
 }
 
 public enum WaitForMatchError: Error {
