@@ -24,3 +24,11 @@ public extension CrudTransaction {
         )
     }
 }
+
+/// A sequence of crud transactions in a PowerSync database.
+///
+/// For details, see ``PowerSyncDatabaseProtocol/getCrudTransactions()``.
+public protocol CrudTransactions: AsyncSequence where Element: CrudTransaction, AsyncIterator: CrudTransactionsIterator {}
+
+/// The iterator returned by ``CrudTransactions``.
+public protocol CrudTransactionsIterator: AsyncIteratorProtocol where Element: CrudTransaction {}

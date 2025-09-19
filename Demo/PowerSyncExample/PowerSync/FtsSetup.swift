@@ -159,10 +159,11 @@ func configureFts(db: PowerSyncDatabaseProtocol, schema: Schema) async throws {
     // --- Execute all generated SQL statements ---
 
     if !allSqlStatements.isEmpty {
+        let resultingStatements: [String] = allSqlStatements
         do {
             print("[FTS] Executing \(allSqlStatements.count) SQL statements in a transaction...")
             _ = try await db.writeTransaction { transaction in
-                for sql in allSqlStatements {
+                for sql in resultingStatements {
                     print("[FTS] Executing SQL:\n\(sql)")
                     _ = try transaction.execute(sql: sql, parameters: [])
                 }
