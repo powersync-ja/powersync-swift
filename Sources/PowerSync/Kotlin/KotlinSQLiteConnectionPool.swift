@@ -1,7 +1,18 @@
 import PowerSyncKotlin
 
+class KotlinLeaseAdapter: PowerSyncKotlin.SwiftLeaseAdapter {
+    let pointer: UnsafeMutableRawPointer
+
+    init(
+        lease: SQLiteConnectionLease
+    ) {
+        pointer = UnsafeMutableRawPointer(lease.pointer)
+    }
+}
+
 final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
     let pool: SQLiteConnectionPoolProtocol
+    var updateTrackingTask: Task<Void, Never>?
 
     init(
         pool: SQLiteConnectionPoolProtocol
@@ -9,12 +20,22 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
         self.pool = pool
     }
 
-    func getPendingUpdates() -> Set<String> {
-        return pool.getPendingUpdates()
+    func linkUpdates(callback: any KotlinSuspendFunction1) {
+        updateTrackingTask = Task {
+            do {
+                for try await updates in pool.tableUpdates {
+                    _ = try await callback.invoke(p1: updates)
+                }
+            } catch {
+                // none of these calls should actually throw
+            }
+        }
     }
 
     func __closePool() async throws {
         do {
+            updateTrackingTask?.cancel()
+            updateTrackingTask = nil
             try pool.close()
         } catch {
             try? PowerSyncKotlin.throwPowerSyncException(
@@ -26,10 +47,22 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
         }
     }
 
-    func __leaseRead(callback: @escaping (Any) -> Void) async throws {
+    func __leaseRead(callback: any LeaseCallback) async throws {
         do {
-            try await pool.read { pointer in
-                callback(UInt(bitPattern: pointer))
+            var errorToThrow: Error?
+            try await pool.read { lease in
+                do {
+                    try callback.execute(
+                        lease: KotlinLeaseAdapter(
+                            lease: lease
+                        )
+                    )
+                } catch {
+                    errorToThrow = error
+                }
+            }
+            if let errorToThrow {
+                throw errorToThrow
             }
         } catch {
             try? PowerSyncKotlin.throwPowerSyncException(
@@ -41,10 +74,22 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
         }
     }
 
-    func __leaseWrite(callback: @escaping (Any) -> Void) async throws {
+    func __leaseWrite(callback: any LeaseCallback) async throws {
         do {
-            try await pool.write { pointer in
-                callback(UInt(bitPattern: pointer))
+            var errorToThrow: Error?
+            try await pool.write { lease in
+                do {
+                    try callback.execute(
+                        lease: KotlinLeaseAdapter(
+                            lease: lease
+                        )
+                    )
+                } catch {
+                    errorToThrow = error
+                }
+            }
+            if let errorToThrow {
+                throw errorToThrow
             }
         } catch {
             try? PowerSyncKotlin.throwPowerSyncException(
@@ -56,11 +101,16 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
         }
     }
 
-    func __leaseAll(callback: @escaping (Any, [Any]) -> Void) async throws {
+    func __leaseAll(callback: any AllLeaseCallback) async throws {
         // TODO, actually use all connections
         do {
-            try await pool.write { pointer in
-                callback(UInt(bitPattern: pointer), [])
+            try await pool.write { lease in
+                try? callback.execute(
+                    writeLease: KotlinLeaseAdapter(
+                        lease: lease
+                    ),
+                    readLeases: []
+                )
             }
         } catch {
             try? PowerSyncKotlin.throwPowerSyncException(

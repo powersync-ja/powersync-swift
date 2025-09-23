@@ -58,8 +58,8 @@ final class GRDBTests: XCTestCase {
         ])
 
         var config = Configuration()
-        configurePowerSync(
-            config: &config,
+
+        config.configurePowerSync(
             schema: schema
         )
 
@@ -300,7 +300,6 @@ final class GRDBTests: XCTestCase {
             }
 
             for try await users in observation.values(in: pool) {
-                print("users \(users)")
                 await resultsStore.append(users.map { $0.name })
                 if await resultsStore.count() == 2 {
                     expectation.fulfill()

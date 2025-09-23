@@ -33,9 +33,7 @@ func openDatabase()
         .appendingPathComponent("test.sqlite")
 
     var config = Configuration()
-
-    configurePowerSync(
-        config: &config,
+    config.configurePowerSync(
         schema: schema
     )
 
