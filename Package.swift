@@ -78,7 +78,7 @@ let package = Package(
         )
     ],
     dependencies: conditionalDependencies + [
-        .package(url: "https://github.com/groue/GRDB.swift.git", branch: "dev/persistable-views")
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.7.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.

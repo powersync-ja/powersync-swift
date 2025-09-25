@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/groue/GRDB.swift.git",
       "state" : {
-        "branch" : "dev/persistable-views",
-        "revision" : "3e1a711d3fedfcab2af0e52ddae03497b665e5fb"
+        "revision" : "c5d02eac3241dd980fa42e5644afd2e7e3f63401",
+        "version" : "7.7.0"
       }
     },
     {
