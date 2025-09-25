@@ -10,6 +10,12 @@ public protocol AttachmentQueueProtocol: Sendable {
     var localStorage: any LocalStorageAdapter { get }
     var downloadAttachments: Bool { get }
 
+    /// Waits for automatically triggered initialization.
+    /// This ensures all attachment records have been verified before use.
+    /// The `startSync` method also performs this verification. This call is not
+    /// needed if `startSync` is called after creating the Attachment Queue.
+    func waitForInit() async throws
+
     /// Starts the attachment sync process
     func startSync() async throws
 
@@ -287,6 +293,9 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
 
     private let _getLocalUri: @Sendable (_ filename: String) async -> String
 
+    private let initializedSubject = PassthroughSubject<Result<Void, Error>, Never>()
+    private var initializationResult: Result<Void, Error>?
+
     /// Initializes the attachment queue
     /// - Parameters match the stored properties
     public init(
@@ -336,6 +345,47 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
             errorHandler: self.errorHandler,
             syncThrottle: self.syncThrottleDuration
         )
+
+        // Storing a reference to this task is non-trivial since we capture
+        // Self. Swift 6 Strict concurrency checking will complain about a nonisolated initializer
+        Task {
+            do {
+                try await attachmentsService.withContext { context in
+                    try await self.verifyAttachments(context: context)
+                }
+                await self.setInitializedResult(.success(()))
+            } catch {
+                self.logger.error("Error verifying attachments: \(error.localizedDescription)", tag: logTag)
+                await self.setInitializedResult(.failure(error))
+            }
+        }
+    }
+
+    /// Actor isolated method to set the initialization result
+    private func setInitializedResult(_ result: Result<Void, Error>) {
+        initializationResult = result
+        initializedSubject.send(result)
+    }
+
+    public func waitForInit() async throws {
+        if let isInitialized = initializationResult {
+            switch isInitialized {
+            case .success:
+                return
+            case let .failure(error):
+                throw error
+            }
+        }
+
+        // Wait for the result asynchronously
+        for try await result in initializedSubject.values {
+            switch result {
+            case .success:
+                return
+            case let .failure(error):
+                throw error
+            }
+        }
     }
 
     public func getLocalUri(_ filename: String) async -> String {
@@ -463,7 +513,15 @@ public actor AttachmentQueue: AttachmentQueueProtocol {
                 continue
             }
 
-            if attachment.state == AttachmentState.queuedUpload {
+            let newLocalUri = await getLocalUri(attachment.filename)
+            let newExists = try await localStorage.fileExists(filePath: newLocalUri)
+            if newExists {
+                // The file exists but the localUri is broken, lets update it.
+                // E.g. this happens in simulators that change the path to the app's sandbox.
+                updates.append(attachment.with(
+                    localUri: newLocalUri
+                ))
+            } else if attachment.state == AttachmentState.queuedUpload || attachment.state == AttachmentState.archived {
                 // The file must have been removed from the local storage before upload was completed
                 updates.append(attachment.with(
                     state: .archived,

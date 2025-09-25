@@ -42,8 +42,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
-            no such table: usersfail
+            SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
             """)
         }
     }
@@ -85,8 +84,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
-            no such table: usersfail
+            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
             """)
         }
     }
@@ -131,8 +129,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
-            no such table: usersfail
+            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
             """)
         }
     }
@@ -197,8 +194,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            error while compiling: SELECT id, name, email FROM usersfail WHERE id = ?
-            no such table: usersfail
+            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
             """)
         }
     }
@@ -281,8 +277,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            error while compiling: EXPLAIN SELECT name FROM usersfail ORDER BY id
-            no such table: usersfail
+            SqliteException(1): SQL logic error, no such table: usersfail for SQL: EXPLAIN SELECT name FROM usersfail ORDER BY id
             """)
         }
     }
@@ -371,8 +366,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
-            no such table: usersfail
+            SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
             """)
         }
     }
@@ -392,8 +386,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            error while compiling: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
-            no such table: usersfail
+            SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
             """)
         }
 
@@ -436,8 +429,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            error while compiling: SELECT COUNT(*) FROM usersfail
-            no such table: usersfail
+            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT COUNT(*) FROM usersfail
             """)
         }
     }

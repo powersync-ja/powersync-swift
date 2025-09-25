@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.0
+
+* Update core extension to 0.4.6 ([changelog](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.4.6))
+* Add `getCrudTransactions()`, returning an async sequence of transactions.
+* Compatibility with Swift 6.2 and XCode 26.
+* Update minimum MacOS target to v12
+* Update minimum iOS target to v15
+* [Attachment Helpers] Added automatic verification or records' `local_uri` values on `AttachmentQueue` initialization. 
+initialization can be awaited with `AttachmentQueue.waitForInit()`. `AttachmentQueue.startSync()` also performs this verification.
+`waitForInit()` is only recommended if `startSync` is not called directly after creating the queue.
+
 ## 1.5.1
 
 * Update core extension to 0.4.5 ([changelog](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.4.5))

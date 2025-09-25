@@ -32,8 +32,8 @@ if let kotlinSdkPath = localKotlinSdkOverride {
     // Not using a local build, so download from releases
     conditionalTargets.append(.binaryTarget(
         name: "PowerSyncKotlin",
-        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.5.1/PowersyncKotlinRelease.zip",
-        checksum: "3a2de1863d2844d49cebf4428d0ab49956ba384dcab9f3cc2ddbc7836013c434"
+        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.6.0/PowersyncKotlinRelease.zip",
+        checksum: "4f70331c11e30625eecf4ebcebe7b562e2e0165774890d2a43480ebc3a9081cc"
     ))
 }
 
@@ -45,15 +45,15 @@ if let corePath = localCoreExtension {
     // Not using a local build, so download from releases
     conditionalDependencies.append(.package(
         url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
-        exact: "0.4.5"
+        exact: "0.4.6"
     ))
 }
 
 let package = Package(
     name: packageName,
     platforms: [
-        .iOS(.v13),
-        .macOS(.v10_15),
+        .iOS(.v15),
+        .macOS(.v12),
         .watchOS(.v9)
     ],
     products: [

@@ -41,10 +41,9 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         connector: PowerSyncBackendConnectorProtocol,
         options: ConnectOptions?
     ) async throws {
-        let connectorAdapter = PowerSyncBackendConnectorAdapter(
-            swiftBackendConnector: connector,
-            db: self
-        )
+        let connectorAdapter = swiftBackendConnectorToPowerSyncConnector(connector: SwiftBackendConnectorBridge(
+            swiftBackendConnector: connector, db: self
+        ))
 
         let resolvedOptions = options ?? ConnectOptions()
         try await kotlinDatabase.connect(
@@ -68,14 +67,9 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
             batch: base
         )
     }
-
-    func getNextCrudTransaction() async throws -> CrudTransaction? {
-        guard let base = try await kotlinDatabase.getNextCrudTransaction() else {
-            return nil
-        }
-        return try KotlinCrudTransaction(
-            transaction: base
-        )
+    
+    func getCrudTransactions() -> any CrudTransactions {
+        return KotlinCrudTransactions(db: kotlinDatabase)
     }
 
     func getPowerSyncVersion() async throws -> String {
