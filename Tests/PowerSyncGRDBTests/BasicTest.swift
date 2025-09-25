@@ -321,6 +321,18 @@ final class GRDBTests: XCTestCase {
         watchTask.cancel()
     }
 
+    func testShouldThrowErrorsFromPowerSync() async throws {
+        do {
+            try await database.execute(
+                sql: "INSERT INTO non_existent_table(id, name) VALUES(uuid(), ?)",
+                parameters: ["one"]
+            )
+            XCTFail("Should throw error")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("non_existent_table")) // Expected
+        }
+    }
+
     func testGRDBUpdatesFromGRDB() async throws {
         let expectation = XCTestExpectation(description: "Watch changes")
 

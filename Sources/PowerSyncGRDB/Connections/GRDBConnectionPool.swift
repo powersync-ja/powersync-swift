@@ -37,55 +37,9 @@ public final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         tableUpdatesContinuation = tempContinuation
     }
 
-    public func read(
-        onConnection: @Sendable @escaping (SQLiteConnectionLease) -> Void
-    ) async throws {
-        try await pool.read { database in
-            try onConnection(
-                GRDBConnectionLease(database: database)
-            )
-        }
-    }
-
-    public func write(
-        onConnection: @Sendable @escaping (SQLiteConnectionLease) -> Void
-    ) async throws {
-        // Don't start an explicit transaction, we do this internally
-        let updateBroker = UpdateBroker()
-        try await pool.writeWithoutTransaction { database in
-
-            let brokerPointer = Unmanaged.passUnretained(updateBroker).toOpaque()
-
-            /// GRDB only registers an update hook if it detects a requirement for one.
-            /// It also removes its own update hook if no longer needed.
-            /// We use the SQLite connection pointer directly, which sidesteps GRDB.
-            /// We can register our own temporary update hook here.
-            let previousParamPointer = sqlite3_update_hook(
-                database.sqliteConnection,
-                { brokerPointer, _, _, tableNameCString, _ in
-                    let broker = Unmanaged<UpdateBroker>.fromOpaque(brokerPointer!).takeUnretainedValue()
-                    broker.updates.insert(String(cString: tableNameCString!))
-                },
-                brokerPointer
-            )
-
-            // This should not be present
-            assert(previousParamPointer == nil, "A pre-existing update hook was already registered and has been overwritten.")
-
-            defer {
-                // Deregister our temporary hook
-                sqlite3_update_hook(database.sqliteConnection, nil, nil)
-            }
-
-            try onConnection(
-                GRDBConnectionLease(database: database)
-            )
-        }
-
-        // Notify GRDB consumers of updates
-        // Seems like we need to do this in a write transaction
+    public func processPowerSyncUpdates(_ updates: Set<String>) async throws {
         try await pool.write { database in
-            for table in updateBroker.updates {
+            for table in updates {
                 try database.notifyChanges(in: Table(table))
                 if table.hasPrefix("ps_data__") {
                     let stripped = String(table.dropFirst("ps_data__".count))
@@ -96,15 +50,33 @@ public final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
                 }
             }
         }
-        guard let pushUpdates = tableUpdatesContinuation else {
-            return
+        // Pass the updates to the output stream
+        tableUpdatesContinuation?.yield(updates)
+    }
+
+    public func read(
+        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> Void
+    ) async throws {
+        try await pool.read { database in
+            try onConnection(
+                GRDBConnectionLease(database: database)
+            )
         }
-        // Notify the PowerSync SDK consumers of updates
-        pushUpdates.yield(updateBroker.updates)
+    }
+
+    public func write(
+        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> Void
+    ) async throws {
+        // Don't start an explicit transaction, we do this internally
+        try await pool.writeWithoutTransaction { database in
+            try onConnection(
+                GRDBConnectionLease(database: database)
+            )
+        }
     }
 
     public func withAllConnections(
-        onConnection _: @escaping (SQLiteConnectionLease, [SQLiteConnectionLease]) -> Void
+        onConnection _: @escaping (SQLiteConnectionLease, [SQLiteConnectionLease]) throws -> Void
     ) async throws {
         // TODO:
     }

@@ -20,7 +20,7 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
         self.pool = pool
     }
 
-    func linkUpdates(callback: any KotlinSuspendFunction1) {
+    func linkExternalUpdates(callback: any KotlinSuspendFunction1) {
         updateTrackingTask = Task {
             do {
                 for try await updates in pool.tableUpdates {
@@ -32,86 +32,63 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
         }
     }
 
-    func __closePool() async throws {
-        do {
+    func __processPowerSyncUpdates(updates: Set<String>) async throws {
+        return try await wrapExceptions {
+            try await pool.processPowerSyncUpdates(updates)
+        }
+    }
+
+    func __dispose() async throws {
+        return try await wrapExceptions {
             updateTrackingTask?.cancel()
             updateTrackingTask = nil
-            try pool.close()
-        } catch {
-            try? PowerSyncKotlin.throwPowerSyncException(
-                exception: PowerSyncException(
-                    message: error.localizedDescription,
-                    cause: nil
-                )
-            )
         }
     }
 
     func __leaseRead(callback: any LeaseCallback) async throws {
-        do {
-            var errorToThrow: Error?
+        return try await wrapExceptions {
             try await pool.read { lease in
-                do {
-                    try callback.execute(
-                        lease: KotlinLeaseAdapter(
-                            lease: lease
-                        )
+                try callback.execute(
+                    lease: KotlinLeaseAdapter(
+                        lease: lease
                     )
-                } catch {
-                    errorToThrow = error
-                }
-            }
-            if let errorToThrow {
-                throw errorToThrow
-            }
-        } catch {
-            try? PowerSyncKotlin.throwPowerSyncException(
-                exception: PowerSyncException(
-                    message: error.localizedDescription,
-                    cause: nil
                 )
-            )
+            }
         }
     }
 
     func __leaseWrite(callback: any LeaseCallback) async throws {
-        do {
-            var errorToThrow: Error?
+        return try await wrapExceptions {
             try await pool.write { lease in
-                do {
-                    try callback.execute(
-                        lease: KotlinLeaseAdapter(
-                            lease: lease
-                        )
+                try callback.execute(
+                    lease: KotlinLeaseAdapter(
+                        lease: lease
                     )
-                } catch {
-                    errorToThrow = error
-                }
-            }
-            if let errorToThrow {
-                throw errorToThrow
-            }
-        } catch {
-            try? PowerSyncKotlin.throwPowerSyncException(
-                exception: PowerSyncException(
-                    message: error.localizedDescription,
-                    cause: nil
                 )
-            )
+            }
         }
     }
 
     func __leaseAll(callback: any AllLeaseCallback) async throws {
-        // TODO, actually use all connections
-        do {
+        // FIXME, actually use all connections
+        // We currently only use this for schema updates
+        return try await wrapExceptions {
             try await pool.write { lease in
-                try? callback.execute(
+                try callback.execute(
                     writeLease: KotlinLeaseAdapter(
                         lease: lease
                     ),
                     readLeases: []
                 )
             }
+        }
+    }
+
+    private func wrapExceptions<Result>(
+        _ callback: () async throws -> Result
+    ) async throws -> Result {
+        do {
+            return try await callback()
         } catch {
             try? PowerSyncKotlin.throwPowerSyncException(
                 exception: PowerSyncException(
@@ -119,6 +96,8 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
                     cause: nil
                 )
             )
+            // Won't reach here
+            throw error
         }
     }
 }

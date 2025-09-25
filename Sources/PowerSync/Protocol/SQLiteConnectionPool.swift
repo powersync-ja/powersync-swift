@@ -1,6 +1,8 @@
 import Foundation
 
+/// A lease representing a temporarily borrowed SQLite connection from the pool.
 public protocol SQLiteConnectionLease {
+    /// Pointer to the underlying SQLite connection.
     var pointer: OpaquePointer { get }
 }
 
@@ -9,14 +11,18 @@ public protocol SQLiteConnectionLease {
 public protocol SQLiteConnectionPoolProtocol {
     var tableUpdates: AsyncStream<Set<String>> { get }
 
+    /// Processes updates from PowerSync, notifying any active leases of changes
+    /// (made by PowerSync) to tracked tables.
+    func processPowerSyncUpdates(_ updates: Set<String>) async throws
+
     /// Calls the callback with a read-only connection temporarily leased from the pool.
     func read(
-        onConnection: @Sendable @escaping (SQLiteConnectionLease) -> Void,
+        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> Void,
     ) async throws
 
     /// Calls the callback with a read-write connection temporarily leased from the pool.
     func write(
-        onConnection: @Sendable @escaping (SQLiteConnectionLease) -> Void,
+        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> Void,
     ) async throws
 
     /// Invokes the callback with all connections leased from the pool.
@@ -24,7 +30,7 @@ public protocol SQLiteConnectionPoolProtocol {
         onConnection: @Sendable @escaping (
             _ writer: SQLiteConnectionLease,
             _ readers: [SQLiteConnectionLease]
-        ) -> Void,
+        ) throws -> Void,
     ) async throws
 
     /// Closes the connection pool and associated resources.
