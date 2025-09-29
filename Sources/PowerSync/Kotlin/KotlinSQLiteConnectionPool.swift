@@ -32,12 +32,6 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
         }
     }
 
-    func __processPowerSyncUpdates(updates: Set<String>) async throws {
-        return try await wrapExceptions {
-            try await pool.processPowerSyncUpdates(updates)
-        }
-    }
-
     func __dispose() async throws {
         return try await wrapExceptions {
             updateTrackingTask?.cancel()

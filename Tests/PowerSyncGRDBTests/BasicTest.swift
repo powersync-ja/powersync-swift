@@ -70,11 +70,9 @@ final class GRDBTests: XCTestCase {
             configuration: config
         )
 
-        database = OpenedPowerSyncDatabase(
+        database = openPowerSyncWithGRDB(
+            pool: pool,
             schema: schema,
-            pool: GRDBConnectionPool(
-                pool: pool
-            ),
             identifier: "test"
         )
 

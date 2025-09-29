@@ -8,11 +8,13 @@ _[PowerSync](https://www.powersync.com) is a sync engine for building local-firs
 
 This is the PowerSync SDK for Swift clients. The SDK reference is available [here](https://docs.powersync.com/client-sdk-references/swift), API references are [documented here](https://powersync-ja.github.io/powersync-swift/documentation/powersync/).
 
-## Structure: Packages
+## Available Products
 
-- [Sources](./Sources/)
+The SDK provides two main products:
 
-  - This is the Swift SDK implementation.
+- **PowerSync**: Core SDK with SQLite support for data synchronization.
+- **PowerSyncDynamic**: Forced dynamically linked version of `PowerSync` - useful for XCode previews.
+- **PowerSyncGRDB [ALPHA]**: GRDB integration allowing PowerSync to work with GRDB databases. This product is currently in an alpha release.
 
 ## Demo Apps / Example Projects
 
@@ -38,6 +40,11 @@ Add
                     name: "PowerSync",
                     package: "powersync-swift"
                 ),
+                // Optional: Add if using GRDB
+                .product(
+                    name: "PowerSyncGRDB",
+                    package: "powersync-swift"
+                )
             ]
         )
     ]
@@ -47,26 +54,56 @@ to your `Package.swift` file.
 
 ## Usage
 
-Create a PowerSync client
+### Basic PowerSync Setup
 
 ```swift
 import PowerSync
 
-let powersync = PowerSyncDatabase(
-    schema: Schema(
-        tables: [
-            Table(
-                name: "users",
-                columns: [
-                    .text("count"),
-                    .integer("is_active"),
-                    .real("weight"),
-                    .text("description")
-                ]
-            )
-        ]
-    ),
+let mySchema = Schema(
+    tables: [
+        Table(
+            name: "users",
+            columns: [
+                .text("count"),
+                .integer("is_active"),
+                .real("weight"),
+                .text("description")
+            ]
+        )
+    ]
+)
+
+let powerSync = PowerSyncDatabase(
+    schema: mySchema,
     logger: DefaultLogger(minSeverity: .debug)
+)
+```
+
+### GRDB Integration
+
+If you're using [GRDB.swift](https://github.com/groue/GRDB.swift) by [Gwendal Roué](https://github.com/groue), you can integrate PowerSync with your existing database. Special thanks to Gwendal for their help in developing this integration.
+
+**⚠️ Note:** The GRDB integration is currently in **alpha** release and the API may change significantly. While functional, it should be used with caution in production environments.
+
+```swift
+import PowerSync
+import PowerSyncGRDB
+import GRDB
+
+// Configure GRDB with PowerSync support
+var config = Configuration()
+config.configurePowerSync(schema: mySchema)
+
+// Create database with PowerSync enabled
+let dbPool = try DatabasePool(
+    path: dbPath,
+    configuration: config
+)
+
+let powerSync = try openPowerSyncWithGRDB(
+    pool: dbPool,
+    schema: mySchema,
+    identifier: "app-db"
 )
 ```
 

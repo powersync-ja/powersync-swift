@@ -12,7 +12,7 @@ import SQLite3
 /// - Provides async streams of table updates for replication.
 /// - Bridges GRDB's managed connections to PowerSync's lease abstraction.
 /// - Allows both read and write access to raw SQLite connections.
-public final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
+final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
     let pool: DatabasePool
 
     public private(set) var tableUpdates: AsyncStream<Set<String>>
@@ -41,13 +41,6 @@ public final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         try await pool.write { database in
             for table in updates {
                 try database.notifyChanges(in: Table(table))
-                if table.hasPrefix("ps_data__") {
-                    let stripped = String(table.dropFirst("ps_data__".count))
-                    try database.notifyChanges(in: Table(stripped))
-                } else if table.hasPrefix("ps_data_local__") {
-                    let stripped = String(table.dropFirst("ps_data_local__".count))
-                    try database.notifyChanges(in: Table(stripped))
-                }
             }
         }
         // Pass the updates to the output stream
@@ -69,16 +62,31 @@ public final class GRDBConnectionPool: SQLiteConnectionPoolProtocol {
     ) async throws {
         // Don't start an explicit transaction, we do this internally
         try await pool.writeWithoutTransaction { database in
-            try onConnection(
-                GRDBConnectionLease(database: database)
-            )
+            guard let pointer = database.sqliteConnection else {
+                throw PowerSyncGRDBError.connectionUnavailable
+            }
+
+            try withSession(
+                db: pointer,
+            ) {
+                try onConnection(
+                    GRDBConnectionLease(database: database)
+                )
+            } onComplete: { _, changes in
+                self.tableUpdatesContinuation?.yield(changes)
+            }
         }
     }
 
     public func withAllConnections(
-        onConnection _: @escaping (SQLiteConnectionLease, [SQLiteConnectionLease]) throws -> Void
+        onConnection: @Sendable @escaping (SQLiteConnectionLease, [SQLiteConnectionLease]) throws -> Void
     ) async throws {
-        // TODO:
+        // FIXME, we currently don't support updating the schema
+        try await pool.write { database in
+            let lease = try GRDBConnectionLease(database: database)
+            try onConnection(lease, [])
+        }
+        pool.invalidateReadOnlyConnections()
     }
 
     public func close() throws {
