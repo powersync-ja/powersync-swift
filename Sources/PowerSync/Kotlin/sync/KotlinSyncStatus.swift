@@ -5,7 +5,7 @@ import PowerSyncKotlin
 final class KotlinSyncStatus: KotlinSyncStatusDataProtocol, SyncStatus {
     private let baseStatus: PowerSyncKotlin.SyncStatus
 
-    var base: any PowerSyncKotlin.SyncStatusData {
+    var base: PowerSyncKotlin.SyncStatusData {
         baseStatus
     }
 

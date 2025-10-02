@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.1 (unreleased)
+
+* Update Kotlin SDK to 1.7.0.
+
 ## 1.6.0
 
 * Update core extension to 0.4.6 ([changelog](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.4.6))
