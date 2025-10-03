@@ -3,6 +3,7 @@
 ## 1.6.1 (unreleased)
 
 * Update Kotlin SDK to 1.7.0.
+* Added Alpha `PowerSyncGRDB` product which supports sharing GRDB `DatabasePool`s with PowerSync and application logic.
 
 ## 1.6.0
 
