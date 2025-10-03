@@ -27,7 +27,7 @@ public extension Configuration {
         prepareDatabase { database in
             #if os(watchOS)
                 // Use static initialization on watchOS
-                let initResult = sqlite3_powersync_init_static(database.sqliteConnection, nil)
+                let initResult = sqlite3_powersync_init(database.sqliteConnection, nil, nil)
                 if initResult != SQLITE_OK {
                     throw PowerSyncGRDBError.extensionLoadFailed("Could not initialize PowerSync statically")
                 }
