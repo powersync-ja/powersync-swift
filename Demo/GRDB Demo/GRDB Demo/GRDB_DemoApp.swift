@@ -44,11 +44,9 @@ func openDatabase()
         fatalError("Could not open database")
     }
 
-    let powerSync = OpenedPowerSyncDatabase(
+    let powerSync = openPowerSyncWithGRDB(
+        pool: grdb,
         schema: schema,
-        pool: GRDBConnectionPool(
-            pool: grdb
-        ),
         identifier: "test"
     )
 

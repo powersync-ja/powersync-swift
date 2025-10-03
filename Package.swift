@@ -7,7 +7,7 @@ let packageName = "PowerSync"
 
 // Set this to the absolute path of your Kotlin SDK checkout if you want to use a local Kotlin
 // build. Also see docs/LocalBuild.md for details
-let localKotlinSdkOverride: String? = "/Users/stevenontong/Documents/platform_code/powersync/powersync-kotlin"
+let localKotlinSdkOverride: String? = "/Users/stevenontong/Documents/platform_code/powersync/powersync-kotlin/internal"
 
 // Set this to the absolute path of your powersync-sqlite-core checkout if you want to use a
 // local build of the core extension.

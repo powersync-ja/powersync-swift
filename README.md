@@ -22,6 +22,8 @@ The easiest way to test the PowerSync Swift SDK is to run our demo application.
 
 - [Demo/PowerSyncExample](./Demo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector.
 
+- [Demo/GRDB Demo](./Demo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector and GRDB connections.
+
 ## Installation
 
 Add
@@ -103,9 +105,16 @@ let dbPool = try DatabasePool(
 let powerSync = try openPowerSyncWithGRDB(
     pool: dbPool,
     schema: mySchema,
-    identifier: "app-db"
+    identifier: "app-db.sqlite"
 )
 ```
+
+Feel free to use the `DatabasePool` for view logic and the `PowerSyncDatabase` for PowerSync operations.
+
+#### Limitations
+
+- Updating the PowerSync schema, with `updateSchema`, is not currently fully supported with GRDB connections.
+- This integration requires currently statically linking PowerSync and GRDB.
 
 ## Underlying Kotlin Dependency
 
