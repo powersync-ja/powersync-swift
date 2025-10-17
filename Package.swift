@@ -7,11 +7,13 @@ let packageName = "PowerSync"
 
 // Set this to the absolute path of your Kotlin SDK checkout if you want to use a local Kotlin
 // build. Also see docs/LocalBuild.md for details
-let localKotlinSdkOverride: String? = nil
+let localKotlinSdkOverride: String? = "/Users/simon/src/powersync-kotlin"
 
 // Set this to the absolute path of your powersync-sqlite-core checkout if you want to use a
 // local build of the core extension.
 let localCoreExtension: String? = nil
+
+let encryption = true
 
 // Our target and dependency setup is different when a local Kotlin SDK is used. Without the local
 // SDK, we have no package dependency on Kotlin and download the XCFramework from Kotlin releases as
@@ -22,10 +24,16 @@ var conditionalDependencies: [Package.Dependency] = []
 var conditionalTargets: [Target] = []
 var kotlinTargetDependency = Target.Dependency.target(name: "PowerSyncKotlin")
 
+if encryption {
+    conditionalDependencies.append(.package(url: "https://github.com/sqlcipher/SQLCipher.swift.git", from: "4.10.0"))
+} else {
+    conditionalDependencies.append(.package(url: "https://github.com/sbooth/CSQLite.git", from: "3.50.4"))
+}
+
 if let kotlinSdkPath = localKotlinSdkOverride {
     // We can't depend on local XCFrameworks outside of this project's root, so there's a Package.swift
     // in the PowerSyncKotlin project pointing towards a local build.
-    conditionalDependencies.append(.package(path: "\(kotlinSdkPath)/PowerSyncKotlin"))
+    conditionalDependencies.append(.package(path: "\(kotlinSdkPath)/internal/PowerSyncKotlin"))
 
     kotlinTargetDependency = .product(name: "PowerSyncKotlin", package: "PowerSyncKotlin")
 } else {
@@ -81,7 +89,10 @@ let package = Package(
             name: packageName,
             dependencies: [
                 kotlinTargetDependency,
-                .product(name: "PowerSyncSQLiteCore", package: corePackageName)
+                .product(name: "PowerSyncSQLiteCore", package: corePackageName),
+                encryption ?
+                    .product(name: "SQLCipher", package: "SQLCipher.swift") :
+                    .product(name: "CSQLite", package: "CSQLite"),
             ]
         ),
         .testTarget(
