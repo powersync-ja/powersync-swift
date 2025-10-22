@@ -21,10 +21,11 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
     }
 
     func linkExternalUpdates(callback: any KotlinSuspendFunction1) {
-        updateTrackingTask = Task {
+        let sendableCallback = SendableSuspendFunction1(callback)
+        updateTrackingTask = Task { [pool] in
             do {
                 for try await updates in pool.tableUpdates {
-                    _ = try await callback.invoke(p1: updates)
+                    _ = try await sendableCallback.invoke(p1: updates)
                 }
             } catch {
                 // none of these calls should actually throw
@@ -41,8 +42,9 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
 
     func __leaseRead(callback: any LeaseCallback) async throws {
         return try await wrapExceptions {
+            let sendableCallback = SendableLeaseCallback(callback)
             try await pool.read { lease in
-                try callback.execute(
+                try sendableCallback.execute(
                     lease: KotlinLeaseAdapter(
                         lease: lease
                     )
@@ -53,8 +55,9 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
 
     func __leaseWrite(callback: any LeaseCallback) async throws {
         return try await wrapExceptions {
+            let sendableCallback = SendableLeaseCallback(callback)
             try await pool.write { lease in
-                try callback.execute(
+                try sendableCallback.execute(
                     lease: KotlinLeaseAdapter(
                         lease: lease
                     )
@@ -67,8 +70,9 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
         // FIXME, actually use all connections
         // We currently only use this for schema updates
         return try await wrapExceptions {
+            let sendableCallback = SendableAllLeaseCallback(callback)
             try await pool.write { lease in
-                try callback.execute(
+                try sendableCallback.execute(
                     writeLease: KotlinLeaseAdapter(
                         lease: lease
                     ),

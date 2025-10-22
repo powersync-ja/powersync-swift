@@ -1,5 +1,10 @@
 import Foundation
 
+public struct WithSessionResult<ResultType: Sendable>: Sendable {
+    public let blockResult: Result<ResultType, Error>
+    public let affectedTables: Set<String>
+}
+
 /// Executes an action within a SQLite database connection session and handles its result.
 ///
 /// The Raw SQLite connection is only available in some niche scenarios.
@@ -31,11 +36,9 @@ import Foundation
 public func withSession<ReturnType>(
     db: OpaquePointer,
     action: @escaping () throws -> ReturnType,
-    onComplete: @escaping (Result<ReturnType, Error>, Set<String>) -> Void,
-) throws {
+) throws -> WithSessionResult<ReturnType> {
     return try kotlinWithSession(
         db: db,
         action: action,
-        onComplete: onComplete,
     )
 }

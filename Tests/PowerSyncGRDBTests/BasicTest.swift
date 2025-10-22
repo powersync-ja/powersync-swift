@@ -8,7 +8,7 @@ struct User: Codable, Identifiable, FetchableRecord, PersistableRecord {
     var id: String
     var name: String
 
-    static var databaseTableName = "users"
+    static let databaseTableName = "users"
 
     enum Columns {
         static let id = Column(CodingKeys.id)
@@ -21,7 +21,7 @@ struct Pet: Codable, Identifiable, FetchableRecord, PersistableRecord {
     var name: String
     var ownerId: String
 
-    static var databaseTableName = "pets"
+    static let databaseTableName = "pets"
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -185,7 +185,12 @@ final class GRDBTests: XCTestCase {
 
         let resultsStore = ResultsStore()
 
-        let watchTask = Task {
+        let watchTask = Task { [database] in
+            guard let database = database else {
+                XCTFail("Database is nil")
+                return
+            }
+
             let stream = try database.watch(
                 options: WatchOptions(
                     sql: "SELECT name FROM users ORDER BY id",
@@ -236,7 +241,11 @@ final class GRDBTests: XCTestCase {
 
         let resultsStore = ResultsStore()
 
-        let watchTask = Task {
+        let watchTask = Task { [database] in
+            guard let database = database else {
+                XCTFail("Database is nil")
+                return
+            }
             let stream = try database.watch(
                 options: WatchOptions(
                     sql: "SELECT name FROM users ORDER BY id",
@@ -292,7 +301,11 @@ final class GRDBTests: XCTestCase {
 
         let resultsStore = ResultsStore()
 
-        let watchTask = Task {
+        let watchTask = Task { [pool] in
+            guard let pool = pool else {
+                XCTFail("Database pool is nil")
+                return
+            }
             let observation = ValueObservation.tracking {
                 try User.order(User.Columns.name.asc).fetchAll($0)
             }
@@ -353,7 +366,12 @@ final class GRDBTests: XCTestCase {
 
         let resultsStore = ResultsStore()
 
-        let watchTask = Task {
+        let watchTask = Task { [pool] in
+            guard let pool = pool else {
+                XCTFail("Database pool is nil")
+                return
+            }
+
             let observation = ValueObservation.tracking {
                 try User.order(User.Columns.name.asc).fetchAll($0)
             }

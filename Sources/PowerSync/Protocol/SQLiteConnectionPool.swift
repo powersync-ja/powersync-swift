@@ -8,7 +8,7 @@ public protocol SQLiteConnectionLease {
 
 /// An implementation of a connection pool providing asynchronous access to a single writer and multiple readers.
 /// This is the underlying pool implementation on which the higher-level PowerSync Swift SDK is built on.
-public protocol SQLiteConnectionPoolProtocol {
+public protocol SQLiteConnectionPoolProtocol: Sendable {
     var tableUpdates: AsyncStream<Set<String>> { get }
 
     /// Calls the callback with a read-only connection temporarily leased from the pool.
@@ -30,5 +30,5 @@ public protocol SQLiteConnectionPoolProtocol {
     ) async throws
 
     /// Closes the connection pool and associated resources.
-    func close() throws
+    func close() async throws
 }
