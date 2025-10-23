@@ -18,7 +18,7 @@ final class ConnectTests: XCTestCase {
             ),
         ])
 
-        database = openKotlinDBWithFactory(
+        database = openKotlinDBDefault(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(DefaultLogger())

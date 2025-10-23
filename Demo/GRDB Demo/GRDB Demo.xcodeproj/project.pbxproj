@@ -41,6 +41,16 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BEED7BE72E9007A5007C187A /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -135,6 +145,7 @@
 				BE1EABA22E7B075D00D0A0A7 /* Frameworks */,
 				BE1EABA32E7B075D00D0A0A7 /* Resources */,
 				BE1EABEE2E7C26DD00D0A0A7 /* Embed Frameworks */,
+				BEED7BE72E9007A5007C187A /* Embed Watch Content */,
 			);
 			buildRules = (
 			);

@@ -37,16 +37,6 @@ actor GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         tableUpdatesContinuation = tempContinuation
     }
 
-    func processPowerSyncUpdates(_ updates: Set<String>) async throws {
-        try await pool.write { database in
-            for table in updates {
-                try database.notifyChanges(in: Table(table))
-            }
-        }
-        // Pass the updates to the output stream
-        tableUpdatesContinuation?.yield(updates)
-    }
-
     func read(
         onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> Void
     ) async throws {
@@ -66,15 +56,25 @@ actor GRDBConnectionPool: SQLiteConnectionPoolProtocol {
                 throw PowerSyncGRDBError.connectionUnavailable
             }
 
-            return try withSession(
+            let sessionResult = try withSession(
                 db: pointer,
             ) {
                 try onConnection(
                     GRDBConnectionLease(database: database)
                 )
             }
+           
+            return sessionResult
         }
+        // Notify PowerSync of these changes
         tableUpdatesContinuation?.yield(result.affectedTables)
+        // Notify GRDB, this needs to be a write (transaction)
+        try await  pool.write { database in
+            // Notify GRDB about these changes
+            for table in result.affectedTables {
+                try database.notifyChanges(in: Table(table))
+            }
+        }
     }
 
     func withAllConnections(

@@ -67,7 +67,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
             batch: base
         )
     }
-    
+
     func getCrudTransactions() -> any CrudTransactions {
         return KotlinCrudTransactions(db: kotlinDatabase)
     }
@@ -388,7 +388,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     }
 }
 
-func openKotlinDBWithFactory(
+func openKotlinDBDefault(
     schema: Schema,
     dbFilename: String,
     logger: DatabaseLogger

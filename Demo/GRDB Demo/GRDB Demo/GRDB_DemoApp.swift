@@ -4,7 +4,6 @@ import PowerSync
 import PowerSyncGRDB
 import SwiftUI
 
-@Observable
 class Databases {
     let grdb: DatabasePool
     let powerSync: PowerSyncDatabaseProtocol
@@ -37,23 +36,25 @@ func openDatabase()
         schema: schema
     )
 
-    guard let grdb = try? DatabasePool(
-        path: dbUrl.path,
-        configuration: config
-    ) else {
-        fatalError("Could not open database")
+    do {
+        let grdb = try DatabasePool(
+            path: dbUrl.path,
+            configuration: config
+        )
+
+        let powerSync = openPowerSyncWithGRDB(
+            pool: grdb,
+            schema: schema,
+            identifier: "test.sqlite"
+        )
+
+        return Databases(
+            grdb: grdb,
+            powerSync: powerSync
+        )
+    } catch {
+        fatalError("Could not open database: \(error)")
     }
-
-    let powerSync = openPowerSyncWithGRDB(
-        pool: grdb,
-        schema: schema,
-        identifier: "test"
-    )
-
-    return Databases(
-        grdb: grdb,
-        powerSync: powerSync
-    )
 }
 
 @main

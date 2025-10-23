@@ -19,7 +19,7 @@ final class CrudTests: XCTestCase {
             ),
         ])
 
-        database = openKotlinDBWithFactory(
+        database = openKotlinDBDefault(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(DefaultLogger())
@@ -199,7 +199,7 @@ final class CrudTests: XCTestCase {
         let finalValidationBatch = try await database.getCrudBatch(limit: 100)
         XCTAssertNil(finalValidationBatch)
     }
-    
+
     func testCrudTransactions() async throws {
         func insertInTransaction(size: Int) async throws {
             try await database.writeTransaction { tx in
@@ -211,30 +211,30 @@ final class CrudTests: XCTestCase {
                 }
             }
         }
-        
+
         // Before inserting any data, the iterator should be empty.
         for try await _ in database.getCrudTransactions() {
             XCTFail("Unexpected transaction")
         }
-        
+
         try await insertInTransaction(size: 5)
         try await insertInTransaction(size: 10)
         try await insertInTransaction(size: 15)
-        
+
         var batch = [CrudEntry]()
         var lastTx: CrudTransaction? = nil
         for try await tx in database.getCrudTransactions() {
             batch.append(contentsOf: tx.crud)
             lastTx = tx
-            
-            if (batch.count >= 10) {
+
+            if batch.count >= 10 {
                 break
             }
         }
-        
+
         XCTAssertEqual(batch.count, 15)
         try await lastTx!.complete()
-        
+
         let finalTx = try await database.getNextCrudTransaction()
         XCTAssertEqual(finalTx!.crud.count, 15)
     }

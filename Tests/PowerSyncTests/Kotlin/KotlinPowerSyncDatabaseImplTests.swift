@@ -71,7 +71,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
     func testGetError() async throws {
         do {
-            let _ = try await database.get(
+            _ = try await database.get(
                 sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
                 parameters: ["1"]
             ) { cursor in
@@ -116,7 +116,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
     func testGetOptionalError() async throws {
         do {
-            let _ = try await database.getOptional(
+            _ = try await database.getOptional(
                 sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
                 parameters: ["1"]
             ) { cursor in
@@ -140,7 +140,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             parameters: ["1", "Test User", "test@example.com"]
         )
         do {
-            let _ = try await database.getOptional(
+            _ = try await database.getOptional(
                 sql: "SELECT id, name, email FROM users WHERE id = ?",
                 parameters: ["1"]
             ) { _ throws in
@@ -181,7 +181,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
     func testGetAllError() async throws {
         do {
-            let _ = try await database.getAll(
+            _ = try await database.getAll(
                 sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
                 parameters: ["1"]
             ) { cursor in
@@ -505,7 +505,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let testWriter = TestLogWriterAdapter()
         let logger = DefaultLogger(minSeverity: LogSeverity.debug, writers: [testWriter])
 
-        let db2 = openKotlinDBWithFactory(
+        let db2 = openKotlinDBDefault(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(logger)
@@ -526,7 +526,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let testWriter = TestLogWriterAdapter()
         let logger = DefaultLogger(minSeverity: LogSeverity.error, writers: [testWriter])
 
-        let db2 = openKotlinDBWithFactory(
+        let db2 = openKotlinDBDefault(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(logger)
