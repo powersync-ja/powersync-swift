@@ -1,6 +1,15 @@
 {
   "pins" : [
     {
+      "identity" : "csqlite",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sbooth/CSQLite.git",
+      "state" : {
+        "revision" : "b1161e6c73fa68c25292f6bb697293d6c679f919",
+        "version" : "3.50.4"
+      }
+    },
+    {
       "identity" : "powersync-sqlite-core-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",

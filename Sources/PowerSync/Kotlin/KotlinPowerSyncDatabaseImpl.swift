@@ -15,7 +15,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         dbFilename: String,
         logger: DatabaseLogger
     ) {
-        let factory = PowerSyncKotlin.DatabaseDriverFactory()
+        let factory = sqlite3DatabaseFactory(initialStatements: [])
         kotlinDatabase = PowerSyncDatabase(
             factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),
