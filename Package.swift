@@ -1,4 +1,4 @@
-// swift-tools-version: 5.7
+// swift-tools-version: 6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -18,14 +18,20 @@ let localCoreExtension: String? = nil
 // a binary target.
 // With a local SDK, we point to a `Package.swift` within the Kotlin SDK containing a target pointing
 // towards a local framework build
-var conditionalDependencies: [Package.Dependency] = []
+var conditionalDependencies: [Package.Dependency] = [
+    .package(
+        url: "https://github.com/sbooth/CSQLite.git",
+        from: "3.50.4",
+        traits: ["ENABLE_SESSION"]
+    )
+]
 var conditionalTargets: [Target] = []
 var kotlinTargetDependency = Target.Dependency.target(name: "PowerSyncKotlin")
 
 if let kotlinSdkPath = localKotlinSdkOverride {
     // We can't depend on local XCFrameworks outside of this project's root, so there's a Package.swift
     // in the PowerSyncKotlin project pointing towards a local build.
-    conditionalDependencies.append(.package(path: "\(kotlinSdkPath)/PowerSyncKotlin"))
+    conditionalDependencies.append(.package(path: "\(kotlinSdkPath)/internal/PowerSyncKotlin"))
 
     kotlinTargetDependency = .product(name: "PowerSyncKotlin", package: "PowerSyncKotlin")
 } else {
@@ -81,7 +87,8 @@ let package = Package(
             name: packageName,
             dependencies: [
                 kotlinTargetDependency,
-                .product(name: "PowerSyncSQLiteCore", package: corePackageName)
+                .product(name: "PowerSyncSQLiteCore", package: corePackageName),
+                .product(name: "CSQLite", package: "CSQLite")
             ]
         ),
         .testTarget(
