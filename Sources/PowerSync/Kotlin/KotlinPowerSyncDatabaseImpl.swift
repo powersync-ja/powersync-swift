@@ -89,10 +89,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         try await kotlinDatabase.disconnect()
     }
 
-    func disconnectAndClear(clearLocal: Bool = true) async throws {
+    func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws {
         try await kotlinDatabase.disconnectAndClear(
             clearLocal: clearLocal,
-            soft: false
+            soft: soft
         )
     }
 

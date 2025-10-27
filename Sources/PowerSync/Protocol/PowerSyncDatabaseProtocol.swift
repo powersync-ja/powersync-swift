@@ -308,8 +308,16 @@ public extension PowerSyncDatabaseProtocol {
         )
     }
 
-    func disconnectAndClear(clearLocal: Bool = true, soft: Bool = false) async throws {
-        try await disconnectAndClear(clearLocal: clearLocal, soft: soft)
+    func disconnectAndClear() async throws {
+        try await disconnectAndClear(clearLocal: true, soft: false)
+    }
+    
+    func disconnectAndClear(clearLocal: Bool) async throws {
+        try await disconnectAndClear(clearLocal: clearLocal, soft: false)
+    }
+    
+    func disconnectAndClear(soft: Bool) async throws {
+        try await disconnectAndClear(clearLocal: true, soft: soft)
     }
 
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
