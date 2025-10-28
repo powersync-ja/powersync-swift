@@ -25,7 +25,7 @@ var conditionalDependencies: [Package.Dependency] = [
         traits: [
             .defaults,
             // CSQLite uses THREADSAFE=0 by default, which breaks PowerSync because we're using SQLite on
-            // multiple threads (it can lead to race conditions when closing connecting sharing resources
+            // multiple threads (it can lead to race conditions when closing connections sharing resources
             // like shared memory, causing crashes).
             // THREADSAFE=2 overrides the default, and is safe to use as long as a single SQLite connection
             // is not shared between threads.
