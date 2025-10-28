@@ -22,7 +22,22 @@ var conditionalDependencies: [Package.Dependency] = [
     .package(
         url: "https://github.com/sbooth/CSQLite.git",
         from: "3.50.4",
-        traits: ["ENABLE_SESSION"]
+        traits: [
+            .defaults,
+            // CSQLite uses THREADSAFE=0 by default, which breaks PowerSync because we're using SQLite on
+            // multiple threads (it can lead to race conditions when closing connecting sharing resources
+            // like shared memory, causing crashes).
+            // THREADSAFE=2 overrides the default, and is safe to use as long as a single SQLite connection
+            // is not shared between threads.
+            // TODO: Technically, we should not use .defaults because there's a logical conflict between
+            // the threadsafe options. Instead, we should spell out all defaults again and remove that
+            // thread-safety option.
+            // However, despite the docs explicitly saying something else, it looks like there's no way to
+            // disable default traits anyway (XCode compiles sqlite3.c with the default option even without
+            // .defaults being included here).
+            "THREADSAFE_2",
+            "ENABLE_SESSION"
+        ]
     )
 ]
 var conditionalTargets: [Target] = []
