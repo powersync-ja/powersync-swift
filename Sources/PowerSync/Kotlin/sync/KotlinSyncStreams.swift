@@ -22,8 +22,8 @@ protocol HasKotlinStreamDescription {
 }
 
 extension HasKotlinStreamDescription {
-    var kotlinParameters: [String: Any?]? {
-        self.stream.kotlinParameters
+    var kotlinDescription: any PowerSyncKotlin.SyncStreamDescription {
+        self.stream.inner
     }
 }
 
