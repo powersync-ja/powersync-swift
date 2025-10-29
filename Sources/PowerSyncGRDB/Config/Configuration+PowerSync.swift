@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 import PowerSync
 import SQLite3
-import CSQLite
+import SQLCipher
 
 public extension Configuration {
     /// Configures GRDB to work with PowerSync by registering required extensions and schema sources.

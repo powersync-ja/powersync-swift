@@ -75,6 +75,10 @@ actor GRDBConnectionPool: SQLiteConnectionPoolProtocol {
                 try database.notifyChanges(in: Table(table))
             }
         }
+
+        if case .failure(let error) = result.blockResult {
+            throw error
+        }
     }
 
     func withAllConnections(

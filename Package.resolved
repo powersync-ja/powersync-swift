@@ -1,15 +1,6 @@
 {
-  "originHash" : "5fb9d75ebc419b20c046f3e982168b26c1977a575859515e1c79df3a34d6aec4",
+  "originHash" : "1547a031c0ecbbaab0fa533f54fbbbc7215881529928d0ad6ca6873e71e7415c",
   "pins" : [
-    {
-      "identity" : "csqlite",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/sbooth/CSQLite.git",
-      "state" : {
-        "revision" : "b1161e6c73fa68c25292f6bb697293d6c679f919",
-        "version" : "3.50.4"
-      }
-    },
     {
       "identity" : "grdb.swift",
       "kind" : "remoteSourceControl",
@@ -26,6 +17,15 @@
       "state" : {
         "revision" : "9801f4aa0923c7f33fa479a01e643d00e7764f0b",
         "version" : "0.4.8"
+      }
+    },
+    {
+      "identity" : "sqlcipher.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sqlcipher/SQLCipher.swift.git",
+      "state" : {
+        "revision" : "247b042574b4838c7eefdb95d6a250a843dcf1ad",
+        "version" : "4.11.0"
       }
     }
   ],

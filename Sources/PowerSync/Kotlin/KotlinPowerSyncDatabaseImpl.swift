@@ -1,4 +1,4 @@
-import CSQLite
+import SQLCipher
 import Foundation
 import PowerSyncKotlin
 

@@ -18,26 +18,27 @@ let localCoreExtension: String? = nil
 // With a local SDK, we point to a `Package.swift` within the Kotlin SDK containing a target pointing
 // towards a local framework build
 var conditionalDependencies: [Package.Dependency] = [
-    .package(
-        url: "https://github.com/sbooth/CSQLite.git",
-        from: "3.50.4",
-        traits: [
-            .defaults,
-            // CSQLite uses THREADSAFE=0 by default, which breaks PowerSync because we're using SQLite on
-            // multiple threads (it can lead to race conditions when closing connections sharing resources
-            // like shared memory, causing crashes).
-            // THREADSAFE=2 overrides the default, and is safe to use as long as a single SQLite connection
-            // is not shared between threads.
-            // TODO: Technically, we should not use .defaults because there's a logical conflict between
-            // the threadsafe options. Instead, we should spell out all defaults again and remove that
-            // thread-safety option.
-            // However, despite the docs explicitly saying something else, it looks like there's no way to
-            // disable default traits anyway (XCode compiles sqlite3.c with the default option even without
-            // .defaults being included here).
-            "THREADSAFE_2",
-            "ENABLE_SESSION"
-        ]
-    )
+    // .package(
+    //     url: "https://github.com/sbooth/CSQLite.git",
+    //     from: "3.50.4",
+    //     traits: [
+    //         .defaults,
+    //         // CSQLite uses THREADSAFE=0 by default, which breaks PowerSync because we're using SQLite on
+    //         // multiple threads (it can lead to race conditions when closing connections sharing resources
+    //         // like shared memory, causing crashes).
+    //         // THREADSAFE=2 overrides the default, and is safe to use as long as a single SQLite connection
+    //         // is not shared between threads.
+    //         // TODO: Technically, we should not use .defaults because there's a logical conflict between
+    //         // the threadsafe options. Instead, we should spell out all defaults again and remove that
+    //         // thread-safety option.
+    //         // However, despite the docs explicitly saying something else, it looks like there's no way to
+    //         // disable default traits anyway (XCode compiles sqlite3.c with the default option even without
+    //         // .defaults being included here).
+    //         "THREADSAFE_2",
+    //         "ENABLE_SESSION"
+    //     ]
+    // )
+    .package(url: "https://github.com/sqlcipher/SQLCipher.swift.git", from: "4.10.0")
 ]
 var conditionalTargets: [Target] = []
 var kotlinTargetDependency = Target.Dependency.target(name: "PowerSyncKotlin")
@@ -108,7 +109,8 @@ let package = Package(
             dependencies: [
                 kotlinTargetDependency,
                 .product(name: "PowerSyncSQLiteCore", package: corePackageName),
-                .product(name: "CSQLite", package: "CSQLite")
+                // .product(name: "CSQLite", package: "CSQLite")
+                .product(name: "SQLCipher", package: "SQLCipher.swift") 
             ]
         ),
         .target(
