@@ -8,7 +8,6 @@ struct HomeScreen: View {
     
     
     var body: some View {
-        
         ListView()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

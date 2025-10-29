@@ -81,27 +81,14 @@ public struct ConnectOptions: Sendable {
     ///   - retryDelay: Delay TimeInterval between retry attempts in milliseconds. Defaults to `5` seconds.
     ///   - params: Custom sync parameters to send to the server. Defaults to an empty dictionary.
     ///   - clientConfiguration: Configuration for the HTTP client used to connect to PowerSync.
+    ///   - newClientImplementation: Whether to use a new sync client implemented in Rust. Currently defaults to
+    ///   `false`, but we encourage users to try it out.
     public init(
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
-        clientConfiguration: SyncClientConfiguration? = nil
-    ) {
-        self.crudThrottle = crudThrottle
-        self.retryDelay = retryDelay
-        self.params = params
-        newClientImplementation = false
-        self.clientConfiguration = clientConfiguration
-    }
-
-    /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
-    @_spi(PowerSyncExperimental)
-    public init(
-        crudThrottle: TimeInterval = 1,
-        retryDelay: TimeInterval = 5,
-        params: JsonParam = [:],
+        clientConfiguration: SyncClientConfiguration? = nil,
         newClientImplementation: Bool = false,
-        clientConfiguration: SyncClientConfiguration? = nil
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
