@@ -78,11 +78,12 @@ final class SystemManager {
                 options: ConnectOptions(
                     clientConfiguration: SyncClientConfiguration(
                         requestLogger: SyncRequestLoggerConfiguration(
-                            requestLevel: .headers
+                            requestLevel: .all
                         ) { message in
                             self.db.logger.debug(message, tag: "SyncRequest")
                         }
-                    )
+                    ),
+                    newClientImplementation: true,
                 )
             )
             try await attachments?.startSync()

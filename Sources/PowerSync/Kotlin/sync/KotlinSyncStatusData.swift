@@ -72,6 +72,24 @@ extension KotlinSyncStatusDataProtocol {
             )
         )
     }
+    
+    var syncStreams: [SyncStreamStatus]? {
+        return base.syncStreams?.map(mapSyncStreamStatus)
+    }
+
+    func forStream(stream: SyncStreamDescription) -> SyncStreamStatus? {
+        var rawStatus: Optional<PowerSyncKotlin.SyncStreamStatus>
+        if let kotlinStream = stream as? any HasKotlinStreamDescription {
+            // Fast path: Reuse Kotlin stream object for lookup.
+            rawStatus = base.forStream(stream: kotlinStream.kotlinDescription)
+        } else {
+            // Custom stream description, we have to convert parameters to a Kotlin map.
+            let parameters = stream.parameters?.mapValues { $0.toValue() }
+            rawStatus = syncStatusForStream(status: base, name: stream.name, parameters: parameters)
+        }
+        
+        return rawStatus.map(mapSyncStreamStatus)
+    }
 
     private func mapPriorityStatus(_ status: PowerSyncKotlin.PriorityStatusEntry) -> PriorityStatusEntry {
         var lastSyncedAt: Date?

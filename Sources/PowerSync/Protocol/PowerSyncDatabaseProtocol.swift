@@ -81,27 +81,14 @@ public struct ConnectOptions: Sendable {
     ///   - retryDelay: Delay TimeInterval between retry attempts in milliseconds. Defaults to `5` seconds.
     ///   - params: Custom sync parameters to send to the server. Defaults to an empty dictionary.
     ///   - clientConfiguration: Configuration for the HTTP client used to connect to PowerSync.
+    ///   - newClientImplementation: Whether to use a new sync client implemented in Rust. Currently defaults to
+    ///   `false`, but we encourage users to try it out.
     public init(
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
-        clientConfiguration: SyncClientConfiguration? = nil
-    ) {
-        self.crudThrottle = crudThrottle
-        self.retryDelay = retryDelay
-        self.params = params
-        newClientImplementation = false
-        self.clientConfiguration = clientConfiguration
-    }
-
-    /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
-    @_spi(PowerSyncExperimental)
-    public init(
-        crudThrottle: TimeInterval = 1,
-        retryDelay: TimeInterval = 5,
-        params: JsonParam = [:],
+        clientConfiguration: SyncClientConfiguration? = nil,
         newClientImplementation: Bool = false,
-        clientConfiguration: SyncClientConfiguration? = nil
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
@@ -230,6 +217,11 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// Using soft clears is recommended where it's not a security issue that old data could be reconstructed from
     /// the database.
     func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws
+    
+    /// Create a ``SyncStream`` instance for the given name and parameters.
+    ///
+    /// Use ``SyncStream/subscribe`` on the returned instance to subscribe to the stream.
+    func syncStream(name: String, params: JsonParam?) -> any SyncStream
 
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.
