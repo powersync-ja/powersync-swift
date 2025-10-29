@@ -624,4 +624,20 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(result[0], JoinOutput(name: "Test User", description: "task 1", comment: "comment 1"))
         XCTAssertEqual(result[1], JoinOutput(name: "Test User", description: "task 2", comment: "comment 2"))
     }
+    
+    func testSubscriptionsUpdateStateWhileOffline() async throws {
+        var streams = database.currentStatus.asFlow().makeAsyncIterator()
+        let initialStatus = await streams.next(); // Ignore initial
+        XCTAssertEqual(initialStatus?.syncStreams?.count, 0)
+        
+        // Subscribing while offline should add the stream to the subscriptions reported in the status.
+        let subscription = try await database.syncStream(name: "foo", params: ["foo": JsonValue.string("bar")]).subscribe()
+        let updatedStatus = await streams.next();
+        
+        XCTAssertEqual(updatedStatus?.syncStreams?.count, 1)
+        let status = updatedStatus?.forStream(stream: subscription)
+        XCTAssertNotNil(status)
+        
+        XCTAssertNil(status?.progress)
+    }
 }

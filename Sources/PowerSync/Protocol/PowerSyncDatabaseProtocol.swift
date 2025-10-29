@@ -230,6 +230,11 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// Using soft clears is recommended where it's not a security issue that old data could be reconstructed from
     /// the database.
     func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws
+    
+    /// Create a ``SyncStream`` instance for the given name and parameters.
+    ///
+    /// Use ``SyncStream/subscribe`` on the returned instance to subscribe to the stream.
+    func syncStream(name: String, params: JsonParam?) -> any SyncStream
 
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.
