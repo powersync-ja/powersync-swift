@@ -18,6 +18,9 @@ let localCoreExtension: String? = nil
 // With a local SDK, we point to a `Package.swift` within the Kotlin SDK containing a target pointing
 // towards a local framework build
 var conditionalDependencies: [Package.Dependency] = [
+    // We can't currently build with GRDB using this package
+    // We could use traits for this
+
     // .package(
     //     url: "https://github.com/sbooth/CSQLite.git",
     //     from: "3.50.4",
@@ -38,6 +41,8 @@ var conditionalDependencies: [Package.Dependency] = [
     //         "ENABLE_SESSION"
     //     ]
     // )
+
+    // Using SQLCipher here since GRDB doesn't compile with CSQLite
     .package(url: "https://github.com/sqlcipher/SQLCipher.swift.git", from: "4.10.0")
 ]
 var conditionalTargets: [Target] = []

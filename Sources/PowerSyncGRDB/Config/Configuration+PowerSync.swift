@@ -2,7 +2,6 @@ import Foundation
 import GRDB
 import PowerSync
 import SQLite3
-import SQLCipher
 
 public extension Configuration {
     /// Configures GRDB to work with PowerSync by registering required extensions and schema sources.
@@ -24,15 +23,6 @@ public extension Configuration {
     mutating func configurePowerSync(
         schema: Schema
     ) {
-
-        // This is a bit of a hack. We need to initialize CSQLite before we can use it.
-        // This needs to happen before the GRDB pool is created. 
-        // Typically the config will be created before the GRDB pool is created, so we need to do this here.
-        let rc = sqlite3_initialize()
-        if rc != 0 {
-            fatalError("Call to sqlite3_initialize() failed with \(rc)")
-        }
-        
         // Register the PowerSync core extension
         prepareDatabase { database in
             #if os(watchOS)
