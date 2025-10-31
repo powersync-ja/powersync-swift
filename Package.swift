@@ -12,41 +12,25 @@ let localKotlinSdkOverride: String? = nil
 // local build of the core extension.
 let localCoreExtension: String? = nil
 
+// Currently encryption is required for GRDB integration
+let encryption = true
+
 // Our target and dependency setup is different when a local Kotlin SDK is used. Without the local
 // SDK, we have no package dependency on Kotlin and download the XCFramework from Kotlin releases as
 // a binary target.
 // With a local SDK, we point to a `Package.swift` within the Kotlin SDK containing a target pointing
 // towards a local framework build
 var conditionalDependencies: [Package.Dependency] = [
-    // We can't currently build with GRDB using this package
-    // We could use traits for this
-
-    // .package(
-    //     url: "https://github.com/sbooth/CSQLite.git",
-    //     from: "3.50.4",
-    //     traits: [
-    //         .defaults,
-    //         // CSQLite uses THREADSAFE=0 by default, which breaks PowerSync because we're using SQLite on
-    //         // multiple threads (it can lead to race conditions when closing connections sharing resources
-    //         // like shared memory, causing crashes).
-    //         // THREADSAFE=2 overrides the default, and is safe to use as long as a single SQLite connection
-    //         // is not shared between threads.
-    //         // TODO: Technically, we should not use .defaults because there's a logical conflict between
-    //         // the threadsafe options. Instead, we should spell out all defaults again and remove that
-    //         // thread-safety option.
-    //         // However, despite the docs explicitly saying something else, it looks like there's no way to
-    //         // disable default traits anyway (XCode compiles sqlite3.c with the default option even without
-    //         // .defaults being included here).
-    //         "THREADSAFE_2",
-    //         "ENABLE_SESSION"
-    //     ]
-    // )
-
-    // Using SQLCipher here since GRDB doesn't compile with CSQLite
-    .package(url: "https://github.com/sqlcipher/SQLCipher.swift.git", from: "4.10.0")
 ]
+
 var conditionalTargets: [Target] = []
 var kotlinTargetDependency = Target.Dependency.target(name: "PowerSyncKotlin")
+
+if encryption {
+    conditionalDependencies.append(.package(url: "https://github.com/sqlcipher/SQLCipher.swift.git", from: "4.10.0"))
+} else {
+    conditionalDependencies.append(.package(url: "https://github.com/sbooth/CSQLite.git", from: "3.50.4"))
+}
 
 if let kotlinSdkPath = localKotlinSdkOverride {
     // We can't depend on local XCFrameworks outside of this project's root, so there's a Package.swift
@@ -114,8 +98,9 @@ let package = Package(
             dependencies: [
                 kotlinTargetDependency,
                 .product(name: "PowerSyncSQLiteCore", package: corePackageName),
-                // .product(name: "CSQLite", package: "CSQLite")
-                .product(name: "SQLCipher", package: "SQLCipher.swift") 
+                encryption ?
+                    .product(name: "SQLCipher", package: "SQLCipher.swift") :
+                    .product(name: "CSQLite", package: "CSQLite")
             ]
         ),
         .target(
@@ -123,6 +108,7 @@ let package = Package(
             dependencies: [
                 .target(name: "PowerSync"),
                 .product(name: "GRDB", package: "GRDB.swift")
+              
             ]
         ),
         .testTarget(

@@ -393,14 +393,15 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
 func openKotlinDBDefault(
     schema: Schema,
     dbFilename: String,
-    logger: DatabaseLogger
+    logger: DatabaseLogger,
+    initialStatements: [String] = []
 ) -> PowerSyncDatabaseProtocol {
     let rc = sqlite3_initialize()
     if rc != 0 {
         fatalError("Call to sqlite3_initialize() failed with \(rc)")
     }
 
-    let factory = sqlite3DatabaseFactory(initialStatements: [])
+    let factory = sqlite3DatabaseFactory(initialStatements: initialStatements)
     return KotlinPowerSyncDatabaseImpl(
         kotlinDatabase: PowerSyncDatabase(
             factory: factory,
