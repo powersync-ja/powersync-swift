@@ -25,37 +25,35 @@ public extension Configuration {
     ) {
         // Register the PowerSync core extension
         prepareDatabase { database in
-            #if os(watchOS)
-                // Use static initialization on watchOS
+            let initResult = sqlite3_powersync_init(database.sqliteConnection, nil, nil)
+            if initResult != SQLITE_OK {
+                throw PowerSyncGRDBError.extensionLoadFailed("Could not initialize PowerSync")
+            }
+            guard let extensionPath = try resolvePowerSyncLoadableExtensionPath() else {
+                // We get the extension path for non WatchOS platforms.
+                // The Kotlin registration for automatically loading the extension does not seem to work.
+                // We explicitly initialize the extension here.
                 let initResult = sqlite3_powersync_init(database.sqliteConnection, nil, nil)
                 if initResult != SQLITE_OK {
                     throw PowerSyncGRDBError.extensionLoadFailed("Could not initialize PowerSync statically")
                 }
-            #else
-                // Dynamic loading on other platforms
-                guard let bundle = Bundle(identifier: "co.powersync.sqlitecore") else {
-                    throw PowerSyncGRDBError.coreBundleNotFound
+                return
+            }
+            let extensionLoadResult = sqlite3_enable_load_extension(database.sqliteConnection, 1)
+            if extensionLoadResult != SQLITE_OK {
+                throw PowerSyncGRDBError.extensionLoadFailed("Could not enable extension loading")
+            }
+            var errorMsg: UnsafeMutablePointer<Int8>?
+            let loadResult = sqlite3_load_extension(database.sqliteConnection, extensionPath, "sqlite3_powersync_init", &errorMsg)
+            if loadResult != SQLITE_OK {
+                if let errorMsg = errorMsg {
+                    let message = String(cString: errorMsg)
+                    sqlite3_free(errorMsg)
+                    throw PowerSyncGRDBError.extensionLoadFailed(message)
+                } else {
+                    throw PowerSyncGRDBError.unknownExtensionLoadError
                 }
-
-                // Construct the full path to the shared library inside the bundle
-                let fullPath = bundle.bundlePath + "/powersync-sqlite-core"
-
-                let extensionLoadResult = sqlite3_enable_load_extension(database.sqliteConnection, 1)
-                if extensionLoadResult != SQLITE_OK {
-                    throw PowerSyncGRDBError.extensionLoadFailed("Could not enable extension loading")
-                }
-                var errorMsg: UnsafeMutablePointer<Int8>?
-                let loadResult = sqlite3_load_extension(database.sqliteConnection, fullPath, "sqlite3_powersync_init", &errorMsg)
-                if loadResult != SQLITE_OK {
-                    if let errorMsg = errorMsg {
-                        let message = String(cString: errorMsg)
-                        sqlite3_free(errorMsg)
-                        throw PowerSyncGRDBError.extensionLoadFailed(message)
-                    } else {
-                        throw PowerSyncGRDBError.unknownExtensionLoadError
-                    }
-                }
-            #endif
+            }
         }
 
         // Supply the PowerSync views as a SchemaSource

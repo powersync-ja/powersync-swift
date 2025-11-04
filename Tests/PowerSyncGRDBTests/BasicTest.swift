@@ -63,7 +63,16 @@ final class GRDBTests: XCTestCase {
             schema: schema
         )
 
-        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            throw XCTestError(
+                .failureWhileWaiting,
+                userInfo: [NSLocalizedDescriptionKey: "Could not access documents directory"]
+            )
+        }
+
+        // Ensure the documents directory exists
+        try FileManager.default.createDirectory(at: documentsDir, withIntermediateDirectories: true, attributes: nil)
+
         let dbURL = documentsDir.appendingPathComponent("test.sqlite")
         pool = try DatabasePool(
             path: dbURL.path,
@@ -80,8 +89,10 @@ final class GRDBTests: XCTestCase {
     }
 
     override func tearDown() async throws {
-        try await database.disconnectAndClear()
+        try? await database?.disconnectAndClear()
         database = nil
+        try? pool?.close()
+        pool = nil
         try await super.tearDown()
     }
 
