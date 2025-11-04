@@ -13,23 +13,6 @@
 		BE1EAC4F2E7C461800D0A0A7 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = BE1EAC4E2E7C461800D0A0A7 /* Supabase */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
-		BE1EABB32E7B075E00D0A0A7 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = BE1EAB9D2E7B075D00D0A0A7 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = BE1EABA42E7B075D00D0A0A7;
-			remoteInfo = "GRDB Demo";
-		};
-		BE1EABBD2E7B075E00D0A0A7 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = BE1EAB9D2E7B075D00D0A0A7 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = BE1EABA42E7B075D00D0A0A7;
-			remoteInfo = "GRDB Demo";
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXCopyFilesBuildPhase section */
 		BE1EABEE2E7C26DD00D0A0A7 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -55,8 +38,6 @@
 
 /* Begin PBXFileReference section */
 		BE1EABA52E7B075D00D0A0A7 /* GRDB Demo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "GRDB Demo.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		BE1EABB22E7B075E00D0A0A7 /* GRDB DemoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "GRDB DemoTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		BE1EABBC2E7B075E00D0A0A7 /* GRDB DemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "GRDB DemoUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -89,20 +70,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BE1EABAF2E7B075E00D0A0A7 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		BE1EABB92E7B075E00D0A0A7 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -121,8 +88,6 @@
 			isa = PBXGroup;
 			children = (
 				BE1EABA52E7B075D00D0A0A7 /* GRDB Demo.app */,
-				BE1EABB22E7B075E00D0A0A7 /* GRDB DemoTests.xctest */,
-				BE1EABBC2E7B075E00D0A0A7 /* GRDB DemoUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -165,52 +130,6 @@
 			productReference = BE1EABA52E7B075D00D0A0A7 /* GRDB Demo.app */;
 			productType = "com.apple.product-type.application";
 		};
-		BE1EABB12E7B075E00D0A0A7 /* GRDB DemoTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = BE1EABC92E7B075E00D0A0A7 /* Build configuration list for PBXNativeTarget "GRDB DemoTests" */;
-			buildPhases = (
-				BE1EABAE2E7B075E00D0A0A7 /* Sources */,
-				BE1EABAF2E7B075E00D0A0A7 /* Frameworks */,
-				BE1EABB02E7B075E00D0A0A7 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				BE1EABB42E7B075E00D0A0A7 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				BE1EABB52E7B075E00D0A0A7 /* GRDB DemoTests */,
-			);
-			name = "GRDB DemoTests";
-			packageProductDependencies = (
-			);
-			productName = "GRDB DemoTests";
-			productReference = BE1EABB22E7B075E00D0A0A7 /* GRDB DemoTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		BE1EABBB2E7B075E00D0A0A7 /* GRDB DemoUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = BE1EABCC2E7B075E00D0A0A7 /* Build configuration list for PBXNativeTarget "GRDB DemoUITests" */;
-			buildPhases = (
-				BE1EABB82E7B075E00D0A0A7 /* Sources */,
-				BE1EABB92E7B075E00D0A0A7 /* Frameworks */,
-				BE1EABBA2E7B075E00D0A0A7 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				BE1EABBE2E7B075E00D0A0A7 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				BE1EABBF2E7B075E00D0A0A7 /* GRDB DemoUITests */,
-			);
-			name = "GRDB DemoUITests";
-			packageProductDependencies = (
-			);
-			productName = "GRDB DemoUITests";
-			productReference = BE1EABBC2E7B075E00D0A0A7 /* GRDB DemoUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -223,14 +142,6 @@
 				TargetAttributes = {
 					BE1EABA42E7B075D00D0A0A7 = {
 						CreatedOnToolsVersion = 26.0;
-					};
-					BE1EABB12E7B075E00D0A0A7 = {
-						CreatedOnToolsVersion = 26.0;
-						TestTargetID = BE1EABA42E7B075D00D0A0A7;
-					};
-					BE1EABBB2E7B075E00D0A0A7 = {
-						CreatedOnToolsVersion = 26.0;
-						TestTargetID = BE1EABA42E7B075D00D0A0A7;
 					};
 				};
 			};
@@ -254,28 +165,12 @@
 			projectRoot = "";
 			targets = (
 				BE1EABA42E7B075D00D0A0A7 /* GRDB Demo */,
-				BE1EABB12E7B075E00D0A0A7 /* GRDB DemoTests */,
-				BE1EABBB2E7B075E00D0A0A7 /* GRDB DemoUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		BE1EABA32E7B075D00D0A0A7 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		BE1EABB02E7B075E00D0A0A7 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		BE1EABBA2E7B075E00D0A0A7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -292,34 +187,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BE1EABAE2E7B075E00D0A0A7 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		BE1EABB82E7B075E00D0A0A7 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		BE1EABB42E7B075E00D0A0A7 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = BE1EABA42E7B075D00D0A0A7 /* GRDB Demo */;
-			targetProxy = BE1EABB32E7B075E00D0A0A7 /* PBXContainerItemProxy */;
-		};
-		BE1EABBE2E7B075E00D0A0A7 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = BE1EABA42E7B075D00D0A0A7 /* GRDB Demo */;
-			targetProxy = BE1EABBD2E7B075E00D0A0A7 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		BE1EABC42E7B075E00D0A0A7 /* Debug */ = {
@@ -546,108 +414,6 @@
 			};
 			name = Release;
 		};
-		BE1EABCA2E7B075E00D0A0A7 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = ZGT7463CVJ;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MACOSX_DEPLOYMENT_TARGET = 15.6;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "JourneyApps.GRDB-DemoTests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GRDB Demo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GRDB Demo";
-				XROS_DEPLOYMENT_TARGET = 26.0;
-			};
-			name = Debug;
-		};
-		BE1EABCB2E7B075E00D0A0A7 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = ZGT7463CVJ;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MACOSX_DEPLOYMENT_TARGET = 15.6;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "JourneyApps.GRDB-DemoTests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GRDB Demo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GRDB Demo";
-				XROS_DEPLOYMENT_TARGET = 26.0;
-			};
-			name = Release;
-		};
-		BE1EABCD2E7B075E00D0A0A7 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = ZGT7463CVJ;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MACOSX_DEPLOYMENT_TARGET = 15.6;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "JourneyApps.GRDB-DemoUITests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = "GRDB Demo";
-				XROS_DEPLOYMENT_TARGET = 26.0;
-			};
-			name = Debug;
-		};
-		BE1EABCE2E7B075E00D0A0A7 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = ZGT7463CVJ;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MACOSX_DEPLOYMENT_TARGET = 15.6;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "JourneyApps.GRDB-DemoUITests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = "GRDB Demo";
-				XROS_DEPLOYMENT_TARGET = 26.0;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -665,24 +431,6 @@
 			buildConfigurations = (
 				BE1EABC72E7B075E00D0A0A7 /* Debug */,
 				BE1EABC82E7B075E00D0A0A7 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		BE1EABC92E7B075E00D0A0A7 /* Build configuration list for PBXNativeTarget "GRDB DemoTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				BE1EABCA2E7B075E00D0A0A7 /* Debug */,
-				BE1EABCB2E7B075E00D0A0A7 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		BE1EABCC2E7B075E00D0A0A7 /* Build configuration list for PBXNativeTarget "GRDB DemoUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				BE1EABCD2E7B075E00D0A0A7 /* Debug */,
-				BE1EABCE2E7B075E00D0A0A7 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
