@@ -25,10 +25,6 @@ public extension Configuration {
     ) {
         // Register the PowerSync core extension
         prepareDatabase { database in
-            let initResult = sqlite3_powersync_init(database.sqliteConnection, nil, nil)
-            if initResult != SQLITE_OK {
-                throw PowerSyncGRDBError.extensionLoadFailed("Could not initialize PowerSync")
-            }
             guard let extensionPath = try resolvePowerSyncLoadableExtensionPath() else {
                 // We get the extension path for non WatchOS platforms.
                 // The Kotlin registration for automatically loading the extension does not seem to work.
