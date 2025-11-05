@@ -18,7 +18,7 @@ final class ConnectTests: XCTestCase {
             ),
         ])
 
-        database = KotlinPowerSyncDatabaseImpl(
+        database = openKotlinDBDefault(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(DefaultLogger())

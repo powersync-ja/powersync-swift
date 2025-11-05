@@ -1,6 +1,15 @@
 {
   "pins" : [
     {
+      "identity" : "grdb.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/groue/GRDB.swift.git",
+      "state" : {
+        "revision" : "c5d02eac3241dd980fa42e5644afd2e7e3f63401",
+        "version" : "7.7.0"
+      }
+    },
+    {
       "identity" : "powersync-sqlite-core-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
