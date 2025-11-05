@@ -118,7 +118,7 @@ Feel free to use the `DatabasePool` for view logic and the `PowerSyncDatabase` f
 
 ## Underlying Kotlin Dependency
 
-The PowerSync Swift SDK makes use of the [PowerSync Kotlin Multiplatform SDK](https://github.com/powersync-ja/powersync-kotlin) and the API tool [SKIE](https://skie.touchlab.co/) under the hood to implement the Swift package.
+The PowerSync Swift SDK makes use of the [PowerSync Kotlin SDK](https://github.com/powersync-ja/powersync-kotlin) and the API tool [SKIE](https://skie.touchlab.co/) under the hood to implement the Swift package.
 However, this dependency is resolved internally and all public APIs are written entirely in Swift.
 
 For more details, see the [Swift SDK reference](https://docs.powersync.com/client-sdk-references/swift) and generated [API references](https://powersync-ja.github.io/powersync-swift/documentation/powersync/).
