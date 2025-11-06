@@ -188,7 +188,7 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// data by transaction. One batch may contain data from multiple transactions,
     /// and a single transaction may be split over multiple batches.
     func getCrudBatch(limit: Int32) async throws -> CrudBatch?
-    
+
     /// Obtains an async iterator of completed transactions with local writes against the database.
     ///
     /// This is typically used from the ``PowerSyncBackendConnectorProtocol/uploadData(database:)`` callback.
@@ -228,6 +228,17 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     ///
     /// Once close is called, this database cannot be used again - a new one must be constructed.
     func close() async throws
+
+    /// Close the database, releasing resources.
+    /// Also disconnects any active connection.
+    ///
+    /// Once close is called, this database cannot be used again - a new one must be constructed.
+    ///
+    /// - Parameter deleteDatabase: Set to true to delete the SQLite database files. Defaults to `false`.
+    ///
+    /// - Throws: An error if a database file exists but could not be deleted. Files that don't exist are ignored.
+    ///   This includes the main database file and any WAL mode files (.wal, .shm, .journal).
+    func close(deleteDatabase: Bool) async throws
 }
 
 public extension PowerSyncDatabaseProtocol {
@@ -243,13 +254,13 @@ public extension PowerSyncDatabaseProtocol {
     /// Unlike `getCrudBatch`, this only returns data from a single transaction at a time.
     /// All data for the transaction is loaded into memory.
     func getNextCrudTransaction() async throws -> CrudTransaction? {
-        for try await transaction in self.getCrudTransactions() {
+        for try await transaction in getCrudTransactions() {
             return transaction
         }
-        
+
         return nil
     }
-    
+
     ///
     /// The connection is automatically re-opened if it fails for any reason.
     ///
