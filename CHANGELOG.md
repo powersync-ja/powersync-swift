@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.6.1 (unreleased)
+## 1.7.0
 
 * Update Kotlin SDK to 1.7.0.
 * Add `close(deleteDatabase:)` method to `PowerSyncDatabaseProtocol` for deleting SQLite database files when closing the database. This includes the main database file and all WAL mode files (.wal, .shm, .journal). Files that don't exist are ignored, but an error is thrown if a file exists but cannot be deleted.
@@ -14,6 +14,9 @@ try await database.close(deleteDatabase: false)
 // or simply
 try await database.close()
 ```
+* Add `PowerSyncDataTypeConvertible` protocol for casting query parameters to SQLite supported types.
+* [Internal] Removed unnecessary `Task` creation in Attachment helper `FileManagerStorageAdapter`.
+
 ## 1.6.0
 
 * Update core extension to 0.4.6 ([changelog](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.4.6))

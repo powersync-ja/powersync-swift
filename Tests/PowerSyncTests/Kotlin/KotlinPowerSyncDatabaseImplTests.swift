@@ -1,5 +1,5 @@
-@testable import PowerSync
 import struct Foundation.UUID
+@testable import PowerSync
 import XCTest
 
 final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
@@ -164,11 +164,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             parameters: [uuid, "Test User", "test@example.com"]
         )
 
-        let _ = try await database.getOptional(
+        _ = try await database.getOptional(
             sql: "SELECT id, name, email FROM users WHERE id = ?",
             parameters: [uuid]
         ) { cursor throws in
-           try (
+            try (
                 cursor.getString(name: "id"),
                 cursor.getString(name: "name"),
                 cursor.getString(name: "email")
@@ -719,8 +719,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     }
 }
 
-
-extension UUID: @retroactive PowerSyncDataTypeConvertible {
+extension UUID: PowerSyncDataTypeConvertible {
     public var psDataType: PowerSyncDataType? {
         .string(uuidString)
     }
