@@ -98,10 +98,10 @@ final class KotlinTransactionContext: Transaction, KotlinConnectionContextProtoc
 func mapParameters(_ parameters: [Any?]?) -> [Any] {
     parameters?.map { item in
         switch item {
-            case .none: NSNull()
-            case let item as PowerSyncDataTypeConvertible:
-                item.psDataType?.unwrap() ?? NSNull()
-            default: item
+        case .none: NSNull()
+        case let item as PowerSyncDataTypeConvertible:
+            item.psDataType?.unwrap() ?? NSNull()
+        default: item as Any
         }
     } ?? []
 }
