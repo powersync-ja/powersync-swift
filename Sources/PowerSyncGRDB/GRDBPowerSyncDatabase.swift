@@ -21,7 +21,7 @@ import PowerSync
 ///
 /// // Configure GRDB with PowerSync support
 /// var config = Configuration()
-/// config.configurePowerSync(schema: schema)
+/// try config.configurePowerSync(schema: schema)
 ///
 /// // Create the database pool
 /// let dbPool = try DatabasePool(path: "path/to/db", configuration: config)

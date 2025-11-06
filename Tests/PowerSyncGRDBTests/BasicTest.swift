@@ -59,7 +59,7 @@ final class GRDBTests: XCTestCase {
 
         var config = Configuration()
 
-        config.configurePowerSync(
+        try config.configurePowerSync(
             schema: schema
         )
 

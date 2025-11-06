@@ -55,7 +55,8 @@
 ///
 /// - Returns: The file system path to the PowerSync SQLite extension, or `nil` on watchOS
 ///   (where the extension is statically loaded and doesn't require a path)
-/// - Throws: An error if the extension path cannot be resolved on platforms that require it
+/// - Throws: An error if the extension path cannot be resolved on platforms that require it or
+///   if the extension could not be registered on watchOS.
 public func resolvePowerSyncLoadableExtensionPath() throws -> String? {
     return try kotlinResolvePowerSyncLoadableExtensionPath()
 }
