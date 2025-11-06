@@ -114,7 +114,7 @@ Feel free to use the `DatabasePool` for view logic and the `PowerSyncDatabase` f
 #### Limitations
 
 - Updating the PowerSync schema, with `updateSchema`, is not currently fully supported with GRDB connections.
-- This integration requires currently statically linking PowerSync and GRDB.
+- This integration currently requires statically linking PowerSync and GRDB.
 
 ## Underlying Kotlin Dependency
 
