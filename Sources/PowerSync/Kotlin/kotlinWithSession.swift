@@ -4,11 +4,14 @@ func kotlinWithSession<ReturnType>(
     db: OpaquePointer,
     action: @escaping () throws -> ReturnType,
 ) throws -> WithSessionResult<ReturnType> {
+    var innerResult: ReturnType?
     let baseResult = try withSession(
         db: UnsafeMutableRawPointer(db),
         block: {
             do {
-                return try PowerSyncResult.Success(value: action())
+                innerResult = try action()
+                // We'll use the innerResult closure above to return the result
+                return PowerSyncResult.Success(value: nil)
             } catch {
                 return PowerSyncResult.Failure(exception: error.toPowerSyncError())
             }
@@ -16,20 +19,17 @@ func kotlinWithSession<ReturnType>(
     )
 
     var outputResult: Result<ReturnType, Error>
-    switch baseResult.blockResult {
-    case let success as PowerSyncResult.Success:
-        do {
-            let casted = try safeCast(success.value, to: ReturnType.self)
-            outputResult = .success(casted)
-        } catch {
-            outputResult = .failure(error)
-        }
-
-    case let failure as PowerSyncResult.Failure:
+    if let failure = baseResult.blockResult as? PowerSyncResult.Failure {
         outputResult = .failure(failure.exception.asError())
-
-    default:
-        outputResult = .failure(PowerSyncError.operationFailed(message: "Unknown error encountered when processing session"))
+    } else if let result = innerResult {
+        outputResult = .success(result)
+    } else {
+        // The return type is not nullable, so we should have a result
+        outputResult = .failure(
+            PowerSyncError.operationFailed(
+                message: "Unknown error encountered when processing session",
+            )
+        )
     }
 
     return WithSessionResult(
