@@ -71,12 +71,12 @@ final class SwiftSQLiteConnectionPoolAdapter: PowerSyncKotlin.SwiftPoolAdapter {
         // We currently only use this for schema updates
         return try await wrapExceptions {
             let sendableCallback = SendableAllLeaseCallback(callback)
-            try await pool.write { lease in
+            try await pool.withAllConnections { writer, readers in
                 try sendableCallback.execute(
                     writeLease: KotlinLeaseAdapter(
-                        lease: lease
+                        lease: writer
                     ),
-                    readLeases: []
+                    readLeases: readers.map { KotlinLeaseAdapter(lease: $0) }
                 )
             }
         }

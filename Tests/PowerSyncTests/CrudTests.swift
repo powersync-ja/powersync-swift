@@ -238,4 +238,19 @@ final class CrudTests: XCTestCase {
         let finalTx = try await database.getNextCrudTransaction()
         XCTAssertEqual(finalTx!.crud.count, 15)
     }
+    
+    func testSoftClear() async throws {
+        try await database.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["test"]);
+        try await database.execute(sql: "INSERT INTO ps_buckets (name, last_applied_op) VALUES (?, ?)", parameters: ["bkt", 10])
+        
+        // Doing a soft-clear should delete data but keep the bucket around.
+        try await database.disconnectAndClear(soft: true)
+        let entries = try await database.getAll("SELECT name FROM ps_buckets", mapper: { cursor in try cursor.getString(index: 0) })
+        XCTAssertEqual(entries.count, 1)
+        
+        // Doing a default clear also deletes buckets.
+        try await database.disconnectAndClear();
+        let newEntries = try await database.getAll("SELECT name FROM ps_buckets", mapper: { cursor in try cursor.getString(index: 0) })
+        XCTAssertEqual(newEntries.count, 0)
+    }
 }

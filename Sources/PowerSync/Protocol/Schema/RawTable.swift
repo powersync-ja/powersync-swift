@@ -24,11 +24,15 @@ public struct RawTable: BaseTableProtocol {
 
     /// The statement to run when the sync client has to delete a row.
     public let delete: PendingStatement
+    
+    /// An optional statement to run when the database is cleared.
+    public let clear: String?
 
-    public init(name: String, put: PendingStatement, delete: PendingStatement) {
+    public init(name: String, put: PendingStatement, delete: PendingStatement, clear: String? = nil) {
         self.name = name
         self.put = put
         self.delete = delete
+        self.clear = clear
     }
 }
 

@@ -1,3 +1,4 @@
+import SQLCipher
 import Foundation
 import PowerSyncKotlin
 
@@ -80,9 +81,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         try await kotlinDatabase.disconnect()
     }
 
-    func disconnectAndClear(clearLocal: Bool = true) async throws {
+    func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws {
         try await kotlinDatabase.disconnectAndClear(
-            clearLocal: clearLocal
+            clearLocal: clearLocal,
+            soft: soft
         )
     }
 
@@ -391,11 +393,18 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
 func openKotlinDBDefault(
     schema: Schema,
     dbFilename: String,
-    logger: DatabaseLogger
+    logger: DatabaseLogger,
+    initialStatements: [String] = []
 ) -> PowerSyncDatabaseProtocol {
+    let rc = sqlite3_initialize()
+    if rc != 0 {
+        fatalError("Call to sqlite3_initialize() failed with \(rc)")
+    }
+
+    let factory = sqlite3DatabaseFactory(initialStatements: initialStatements)
     return KotlinPowerSyncDatabaseImpl(
         kotlinDatabase: PowerSyncDatabase(
-            factory: PowerSyncKotlin.DatabaseDriverFactory(),
+            factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),
             dbFilename: dbFilename,
             logger: logger.kLogger

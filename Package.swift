@@ -1,4 +1,4 @@
-// swift-tools-version: 5.7
+// swift-tools-version: 6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -7,33 +7,43 @@ let packageName = "PowerSync"
 
 // Set this to the absolute path of your Kotlin SDK checkout if you want to use a local Kotlin
 // build. Also see docs/LocalBuild.md for details
-let localKotlinSdkOverride: String? = "/Users/stevenontong/Documents/platform_code/powersync/powersync-kotlin/internal"
-
+let localKotlinSdkOverride: String? = nil
 // Set this to the absolute path of your powersync-sqlite-core checkout if you want to use a
 // local build of the core extension.
 let localCoreExtension: String? = nil
+
+// Currently encryption is required for GRDB integration
+let encryption = true
 
 // Our target and dependency setup is different when a local Kotlin SDK is used. Without the local
 // SDK, we have no package dependency on Kotlin and download the XCFramework from Kotlin releases as
 // a binary target.
 // With a local SDK, we point to a `Package.swift` within the Kotlin SDK containing a target pointing
 // towards a local framework build
-var conditionalDependencies: [Package.Dependency] = []
+var conditionalDependencies: [Package.Dependency] = [
+]
+
 var conditionalTargets: [Target] = []
 var kotlinTargetDependency = Target.Dependency.target(name: "PowerSyncKotlin")
+
+if encryption {
+    conditionalDependencies.append(.package(url: "https://github.com/sqlcipher/SQLCipher.swift.git", from: "4.10.0"))
+} else {
+    conditionalDependencies.append(.package(url: "https://github.com/sbooth/CSQLite.git", from: "3.50.4"))
+}
 
 if let kotlinSdkPath = localKotlinSdkOverride {
     // We can't depend on local XCFrameworks outside of this project's root, so there's a Package.swift
     // in the PowerSyncKotlin project pointing towards a local build.
-    conditionalDependencies.append(.package(path: "\(kotlinSdkPath)/PowerSyncKotlin"))
+    conditionalDependencies.append(.package(path: "\(kotlinSdkPath)/internal/PowerSyncKotlin"))
 
     kotlinTargetDependency = .product(name: "PowerSyncKotlin", package: "PowerSyncKotlin")
 } else {
     // Not using a local build, so download from releases
     conditionalTargets.append(.binaryTarget(
         name: "PowerSyncKotlin",
-        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.7.0/PowersyncKotlinRelease.zip",
-        checksum: "836ac106c26a184c10373c862745d9af195737ad01505bb965f197797aa88535"
+        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.8.0/PowersyncKotlinRelease.zip",
+        checksum: "31ac7c5e11d747e11bceb0b34f30438d37033e700c621b0a468aa308d887587f"
     ))
 }
 
@@ -45,7 +55,7 @@ if let corePath = localCoreExtension {
     // Not using a local build, so download from releases
     conditionalDependencies.append(.package(
         url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
-        exact: "0.4.6"
+        exact: "0.4.8"
     ))
 }
 
@@ -87,7 +97,10 @@ let package = Package(
             name: packageName,
             dependencies: [
                 kotlinTargetDependency,
-                .product(name: "PowerSyncSQLiteCore", package: corePackageName)
+                .product(name: "PowerSyncSQLiteCore", package: corePackageName),
+                encryption ?
+                    .product(name: "SQLCipher", package: "SQLCipher.swift") :
+                    .product(name: "CSQLite", package: "CSQLite")
             ]
         ),
         .target(
@@ -95,6 +108,7 @@ let package = Package(
             dependencies: [
                 .target(name: "PowerSync"),
                 .product(name: "GRDB", package: "GRDB.swift")
+              
             ]
         ),
         .testTarget(

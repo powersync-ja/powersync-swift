@@ -216,12 +216,20 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     func disconnect() async throws
 
     /// Disconnect and clear the database.
-    /// Use this when logging out.
-    /// The database can still be queried after this is called, but the tables
-    /// would be empty.
     ///
-    /// - Parameter clearLocal: Set to false to preserve data in local-only tables. Defaults to `true`.
-    func disconnectAndClear(clearLocal: Bool) async throws
+    /// Clearing the database is useful when a user logs out, to ensure another user logging in later would not see
+    /// previous data.
+    ///
+    /// The database can still be queried after this is called, but the tables would be empty.
+    ///
+    /// To perserve data in local-only tables, set `clearLocal` to `false`.
+    ///
+    /// A `soft` clear deletes publicly visible data, but keeps internal copies of data synced in the database. This
+    /// usually means that if the same user logs out and back in again, the first sync is very fast because all internal
+    /// data is still available. When a different user logs in, no old data would be visible at any point.
+    /// Using soft clears is recommended where it's not a security issue that old data could be reconstructed from
+    /// the database.
+    func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws
 
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.
@@ -290,7 +298,15 @@ public extension PowerSyncDatabaseProtocol {
     }
 
     func disconnectAndClear() async throws {
-        try await disconnectAndClear(clearLocal: true)
+        try await disconnectAndClear(clearLocal: true, soft: false)
+    }
+    
+    func disconnectAndClear(clearLocal: Bool) async throws {
+        try await disconnectAndClear(clearLocal: clearLocal, soft: false)
+    }
+    
+    func disconnectAndClear(soft: Bool) async throws {
+        try await disconnectAndClear(clearLocal: true, soft: soft)
     }
 
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
