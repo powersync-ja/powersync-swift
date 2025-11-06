@@ -33,7 +33,7 @@ func openDatabase()
 
     do {
         var config = Configuration()
-        config.configurePowerSync(
+        try config.configurePowerSync(
             schema: schema
         )
         let grdb = try DatabasePool(
