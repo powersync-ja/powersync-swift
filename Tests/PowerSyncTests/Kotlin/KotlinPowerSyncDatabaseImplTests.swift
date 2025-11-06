@@ -71,7 +71,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
     func testGetError() async throws {
         do {
-            let _ = try await database.get(
+            _ = try await database.get(
                 sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
                 parameters: ["1"]
             ) { cursor in
@@ -116,7 +116,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
     func testGetOptionalError() async throws {
         do {
-            let _ = try await database.getOptional(
+            _ = try await database.getOptional(
                 sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
                 parameters: ["1"]
             ) { cursor in
@@ -140,7 +140,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             parameters: ["1", "Test User", "test@example.com"]
         )
         do {
-            let _ = try await database.getOptional(
+            _ = try await database.getOptional(
                 sql: "SELECT id, name, email FROM users WHERE id = ?",
                 parameters: ["1"]
             ) { _ throws in
@@ -181,7 +181,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
     func testGetAllError() async throws {
         do {
-            let _ = try await database.getAll(
+            _ = try await database.getAll(
                 sql: "SELECT id, name, email FROM usersfail WHERE id = ?",
                 parameters: ["1"]
             ) { cursor in
@@ -623,5 +623,78 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(result.count, 2)
         XCTAssertEqual(result[0], JoinOutput(name: "Test User", description: "task 1", comment: "comment 1"))
         XCTAssertEqual(result[1], JoinOutput(name: "Test User", description: "task 2", comment: "comment 2"))
+    }
+
+    func testCloseWithDeleteDatabase() async throws {
+        let fileManager = FileManager.default
+        let testDbFilename = "test_delete_\(UUID().uuidString).db"
+
+        // Get the database directory using the helper function
+        let databaseDirectory = try appleDefaultDatabaseDirectory()
+
+        // Create a database with a real file
+        let testDatabase = PowerSyncDatabase(
+            schema: schema,
+            dbFilename: testDbFilename,
+            logger: DatabaseLogger(DefaultLogger())
+        )
+
+        // Perform some operations to ensure the database file is created
+        try await testDatabase.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "Test User", "test@example.com"]
+        )
+
+        // Verify the database file exists
+        let dbFile = databaseDirectory.appendingPathComponent(testDbFilename)
+        XCTAssertTrue(fileManager.fileExists(atPath: dbFile.path), "Database file should exist")
+
+        // Close with deleteDatabase: true
+        try await testDatabase.close(deleteDatabase: true)
+
+        // Verify the database file and related files are deleted
+        XCTAssertFalse(fileManager.fileExists(atPath: dbFile.path), "Database file should be deleted")
+
+        let walFile = databaseDirectory.appendingPathComponent("\(testDbFilename)-wal")
+        let shmFile = databaseDirectory.appendingPathComponent("\(testDbFilename)-shm")
+        let journalFile = databaseDirectory.appendingPathComponent("\(testDbFilename)-journal")
+
+        XCTAssertFalse(fileManager.fileExists(atPath: walFile.path), "WAL file should be deleted")
+        XCTAssertFalse(fileManager.fileExists(atPath: shmFile.path), "SHM file should be deleted")
+        XCTAssertFalse(fileManager.fileExists(atPath: journalFile.path), "Journal file should be deleted")
+    }
+
+    func testCloseWithoutDeleteDatabase() async throws {
+        let fileManager = FileManager.default
+        let testDbFilename = "test_no_delete_\(UUID().uuidString).db"
+
+        // Get the database directory using the helper function
+        let databaseDirectory = try appleDefaultDatabaseDirectory()
+
+        // Create a database with a real file
+        let testDatabase = PowerSyncDatabase(
+            schema: schema,
+            dbFilename: testDbFilename,
+            logger: DatabaseLogger(DefaultLogger())
+        )
+
+        // Perform some operations to ensure the database file is created
+        try await testDatabase.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "Test User", "test@example.com"]
+        )
+
+        // Verify the database file exists
+        let dbFile = databaseDirectory.appendingPathComponent(testDbFilename)
+        XCTAssertTrue(fileManager.fileExists(atPath: dbFile.path), "Database file should exist")
+
+        // Close with deleteDatabase: false (default)
+        try await testDatabase.close()
+
+        // Verify the database file still exists
+        XCTAssertTrue(fileManager.fileExists(atPath: dbFile.path), "Database file should still exist after close without delete")
+
+        // Clean up: delete all SQLite files using the helper function
+        try deleteSQLiteFiles(dbFilename: testDbFilename, in: databaseDirectory)
     }
 }
