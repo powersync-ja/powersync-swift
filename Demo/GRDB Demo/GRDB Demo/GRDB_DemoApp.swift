@@ -31,12 +31,11 @@ func openDatabase()
         ).first!
         .appendingPathComponent("test.sqlite")
 
-    var config = Configuration()
-    config.configurePowerSync(
-        schema: schema
-    )
-
     do {
+        var config = Configuration()
+        config.configurePowerSync(
+            schema: schema
+        )
         let grdb = try DatabasePool(
             path: dbUrl.path,
             configuration: config

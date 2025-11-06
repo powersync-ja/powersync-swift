@@ -15,17 +15,25 @@ public extension Configuration {
     /// Example usage:
     /// ```swift
     /// var config = Configuration()
-    /// config.configurePowerSync(schema: mySchema)
+    /// try config.configurePowerSync(schema: mySchema)
     /// let dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
     /// ```
     ///
     /// - Parameter schema: The PowerSync `Schema` describing your sync views.
+    /// - Throws: An error if the PowerSync extension path cannot be resolved,
+    ///   if extension loading cannot be enabled, or if the PowerSync extension
+    ///   fails to load or initialize.
     mutating func configurePowerSync(
         schema: Schema
-    ) {
+    ) throws {
+        // Handles the case on WatchOS where the extension is statically loaded.
+        // We need to register the extension before SQLite connections are established.
+        // This should only throw on non-WatchOS platforms if the extension path cannot be resolved. So we catch and ignore the error.
+        let extensionPath = try resolvePowerSyncLoadableExtensionPath()
+
         // Register the PowerSync core extension
         prepareDatabase { database in
-            guard let extensionPath = try resolvePowerSyncLoadableExtensionPath() else {
+            guard let extensionPath = extensionPath else {
                 // We get the extension path for non WatchOS platforms.
                 // The Kotlin registration for automatically loading the extension does not seem to work.
                 // We explicitly initialize the extension here.

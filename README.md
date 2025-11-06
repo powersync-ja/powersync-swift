@@ -94,7 +94,7 @@ import GRDB
 
 // Configure GRDB with PowerSync support
 var config = Configuration()
-config.configurePowerSync(schema: mySchema)
+try config.configurePowerSync(schema: mySchema)
 
 // Create database with PowerSync enabled
 let dbPool = try DatabasePool(
