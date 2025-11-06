@@ -13,7 +13,7 @@ public enum PowerSyncDataType {
 
 /// Types conforming to this protocol will be
 /// mapped to the specified ``PowerSyncDataType``
-/// before use by the PowerSync Kotlin Multiplatform SDK
+/// before use by SQLite
 public protocol PowerSyncDataTypeConvertible {
     var psDataType: PowerSyncDataType? { get }
 }
