@@ -1,4 +1,5 @@
 @testable import PowerSync
+import struct Foundation.UUID
 import XCTest
 
 final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
@@ -153,6 +154,25 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, "cursor error")
+        }
+    }
+
+    func testCustomDataTypeConvertible() async throws {
+        let uuid = UUID()
+        try await database.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: [uuid, "Test User", "test@example.com"]
+        )
+
+        let _ = try await database.getOptional(
+            sql: "SELECT id, name, email FROM users WHERE id = ?",
+            parameters: [uuid]
+        ) { cursor throws in
+           try (
+                cursor.getString(name: "id"),
+                cursor.getString(name: "name"),
+                cursor.getString(name: "email")
+            )
         }
     }
 
@@ -696,5 +716,12 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         // Clean up: delete all SQLite files using the helper function
         try deleteSQLiteFiles(dbFilename: testDbFilename, in: databaseDirectory)
+    }
+}
+
+
+extension UUID: @retroactive PowerSyncDataTypeConvertible {
+    public var psDataType: PowerSyncDataType? {
+        .string(uuidString)
     }
 }
