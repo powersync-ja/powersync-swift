@@ -63,20 +63,20 @@ actor GRDBConnectionPool: SQLiteConnectionPoolProtocol {
                     GRDBConnectionLease(database: database)
                 )
             }
-           
+
             return sessionResult
         }
         // Notify PowerSync of these changes
         tableUpdatesContinuation?.yield(result.affectedTables)
         // Notify GRDB, this needs to be a write (transaction)
-        try await  pool.write { database in
+        try await pool.write { database in
             // Notify GRDB about these changes
             for table in result.affectedTables {
                 try database.notifyChanges(in: Table(table))
             }
         }
 
-        if case .failure(let error) = result.blockResult {
+        if case let .failure(error) = result.blockResult {
             throw error
         }
     }
@@ -85,7 +85,7 @@ actor GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         onConnection: @Sendable @escaping (SQLiteConnectionLease, [SQLiteConnectionLease]) throws -> Void
     ) async throws {
         // FIXME, we currently don't support updating the schema
-        try await pool.write { database in
+        try await pool.writeWithoutTransaction { database in
             let lease = try GRDBConnectionLease(database: database)
             try onConnection(lease, [])
         }
