@@ -18,28 +18,7 @@ let localCoreExtension: String? = nil
 // a binary target.
 // With a local SDK, we point to a `Package.swift` within the Kotlin SDK containing a target pointing
 // towards a local framework build
-var conditionalDependencies: [Package.Dependency] = [
-    .package(
-        url: "https://github.com/sbooth/CSQLite.git",
-        from: "3.50.4",
-        traits: [
-            .defaults,
-            // CSQLite uses THREADSAFE=0 by default, which breaks PowerSync because we're using SQLite on
-            // multiple threads (it can lead to race conditions when closing connections sharing resources
-            // like shared memory, causing crashes).
-            // THREADSAFE=2 overrides the default, and is safe to use as long as a single SQLite connection
-            // is not shared between threads.
-            // TODO: Technically, we should not use .defaults because there's a logical conflict between
-            // the threadsafe options. Instead, we should spell out all defaults again and remove that
-            // thread-safety option.
-            // However, despite the docs explicitly saying something else, it looks like there's no way to
-            // disable default traits anyway (XCode compiles sqlite3.c with the default option even without
-            // .defaults being included here).
-            "THREADSAFE_2",
-            "ENABLE_SESSION"
-        ]
-    )
-]
+var conditionalDependencies: [Package.Dependency] = []
 var conditionalTargets: [Target] = []
 var kotlinTargetDependency = Target.Dependency.target(name: "PowerSyncKotlin")
 
@@ -53,8 +32,8 @@ if let kotlinSdkPath = localKotlinSdkOverride {
     // Not using a local build, so download from releases
     conditionalTargets.append(.binaryTarget(
         name: "PowerSyncKotlin",
-        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.8.0/PowersyncKotlinRelease.zip",
-        checksum: "31ac7c5e11d747e11bceb0b34f30438d37033e700c621b0a468aa308d887587f"
+        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.9.0/PowersyncKotlinRelease.zip",
+        checksum: "6d9847391ab2bbbca1f6a7abe163f0682ddca4a559ef5a1d2567b3e62e7d9979"
     ))
 }
 
@@ -66,7 +45,7 @@ if let corePath = localCoreExtension {
     // Not using a local build, so download from releases
     conditionalDependencies.append(.package(
         url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
-        exact: "0.4.8"
+        exact: "0.4.10"
     ))
 }
 
@@ -94,7 +73,9 @@ let package = Package(
             targets: ["PowerSync"]
         )
     ],
-    dependencies: conditionalDependencies,
+    dependencies: conditionalDependencies + [
+        .package(path: "/Users/simon/src/CSQLite")
+    ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.

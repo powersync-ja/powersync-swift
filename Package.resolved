@@ -1,22 +1,13 @@
 {
-  "originHash" : "82539474c4bcedf04818c668b504533c49309a0dd3669f4ec2fb8e77b64439b3",
+  "originHash" : "07cca32b599d2d8e93fb0f48a44643e0cac92225db615070dba76b849ec0ded7",
   "pins" : [
-    {
-      "identity" : "csqlite",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/sbooth/CSQLite.git",
-      "state" : {
-        "revision" : "b1161e6c73fa68c25292f6bb697293d6c679f919",
-        "version" : "3.50.4"
-      }
-    },
     {
       "identity" : "powersync-sqlite-core-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
       "state" : {
-        "revision" : "9801f4aa0923c7f33fa479a01e643d00e7764f0b",
-        "version" : "0.4.8"
+        "revision" : "9743740980cd488a11f50cffe62ed34a9739a135",
+        "version" : "0.4.10"
       }
     }
   ],
