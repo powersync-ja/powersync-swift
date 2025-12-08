@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -30,11 +30,13 @@ if let kotlinSdkPath = localKotlinSdkOverride {
     kotlinTargetDependency = .product(name: "PowerSyncKotlin", package: "PowerSyncKotlin")
 } else {
     // Not using a local build, so download from releases
-    conditionalTargets.append(.binaryTarget(
-        name: "PowerSyncKotlin",
-        url: "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.9.0/PowersyncKotlinRelease.zip",
-        checksum: "6d9847391ab2bbbca1f6a7abe163f0682ddca4a559ef5a1d2567b3e62e7d9979"
-    ))
+    conditionalTargets.append(
+        .binaryTarget(
+            name: "PowerSyncKotlin",
+            url:
+            "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.9.0/PowersyncKotlinRelease.zip",
+            checksum: "6d9847391ab2bbbca1f6a7abe163f0682ddca4a559ef5a1d2567b3e62e7d9979"
+        ))
 }
 
 var corePackageName = "powersync-sqlite-core-swift"
@@ -43,10 +45,11 @@ if let corePath = localCoreExtension {
     corePackageName = "powersync-sqlite-core"
 } else {
     // Not using a local build, so download from releases
-    conditionalDependencies.append(.package(
-        url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
-        exact: "0.4.10"
-    ))
+    conditionalDependencies.append(
+        .package(
+            url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
+            exact: "0.4.10"
+        ))
 }
 
 let package = Package(
@@ -54,7 +57,7 @@ let package = Package(
     platforms: [
         .iOS(.v15),
         .macOS(.v12),
-        .watchOS(.v9)
+        .watchOS(.v9),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
@@ -71,10 +74,10 @@ let package = Package(
             // Dynamic linking is particularly important for XCode previews.
             type: .dynamic,
             targets: ["PowerSync"]
-        )
+        ),
     ],
     dependencies: conditionalDependencies + [
-        .package(path: "/Users/simon/src/CSQLite")
+        .package(url: "git@github.com:powersync-ja/CSQLite.git", revision: "init")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -84,12 +87,12 @@ let package = Package(
             dependencies: [
                 kotlinTargetDependency,
                 .product(name: "PowerSyncSQLiteCore", package: corePackageName),
-                .product(name: "CSQLite", package: "CSQLite")
+                .product(name: "CSQLite", package: "CSQLite"),
             ]
         ),
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]
-        )
+        ),
     ] + conditionalTargets
 )
