@@ -90,7 +90,7 @@ public struct ConnectOptions: Sendable {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
-        newClientImplementation = false
+        newClientImplementation = true
         self.clientConfiguration = clientConfiguration
     }
 
@@ -100,7 +100,7 @@ public struct ConnectOptions: Sendable {
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
-        newClientImplementation: Bool = false,
+        newClientImplementation: Bool = true,
         clientConfiguration: SyncClientConfiguration? = nil
     ) {
         self.crudThrottle = crudThrottle
@@ -311,11 +311,11 @@ public extension PowerSyncDatabaseProtocol {
     func disconnectAndClear() async throws {
         try await disconnectAndClear(clearLocal: true, soft: false)
     }
-    
+
     func disconnectAndClear(clearLocal: Bool) async throws {
         try await disconnectAndClear(clearLocal: clearLocal, soft: false)
     }
-    
+
     func disconnectAndClear(soft: Bool) async throws {
         try await disconnectAndClear(clearLocal: true, soft: soft)
     }

@@ -1,4 +1,4 @@
-@testable import PowerSync
+@testable @_spi(PowerSyncExperimental) import PowerSync
 import XCTest
 
 final class ConnectTests: XCTestCase {
@@ -116,6 +116,11 @@ final class ConnectTests: XCTestCase {
         try await database.connect(
             connector: TestConnector(url: fakeUrl),
             options: ConnectOptions(
+                /// Note that currently, HTTP logs are only supported with the old client implementation
+                /// which uses HTTP streams.
+                /// The new client implementation uses a WebSocket connection instead.
+                /// Which we don't get logs for currently.
+                newClientImplementation: false,
                 clientConfiguration: SyncClientConfiguration(
                     requestLogger: SyncRequestLoggerConfiguration(
                         requestLevel: .all
