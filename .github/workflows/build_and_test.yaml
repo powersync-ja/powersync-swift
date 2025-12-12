@@ -14,25 +14,14 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
+
+      - name: Test with strict concurrency
+        run: |
+          swift build -Xswiftc -strict-concurrency=complete
+          swift test -Xswiftc -strict-concurrency=complete
+
       - name: Build and Test
         run: |
           xcodebuild test -scheme PowerSync-Package -destination "platform=iOS Simulator,name=iPhone 16"
           xcodebuild test -scheme PowerSync-Package -destination "platform=macOS,arch=arm64,name=My Mac"
           xcodebuild test -scheme PowerSync-Package -destination "platform=watchOS Simulator,arch=arm64,name=Apple Watch Ultra 2 (49mm)"
-
-  buildSwift6:
-    name: Build and test with Swift 6
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up XCode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-      - name: Use Swift 6
-        run: |
-          sed -i '' 's|^// swift-tools-version:.*$|// swift-tools-version:6.1|' Package.swift
-      - name: Build and Test
-        run: |
-          swift build -Xswiftc -strict-concurrency=complete
-          swift test -Xswiftc -strict-concurrency=complete

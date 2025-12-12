@@ -1,5 +1,6 @@
 import Foundation
 import PowerSyncKotlin
+import CSQLite
 
 final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     // `PowerSyncKotlin.PowerSyncDatabase` cannot be marked as Sendable
@@ -16,7 +17,12 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         dbFilename: String,
         logger: DatabaseLogger
     ) {
-        let factory = PowerSyncKotlin.DatabaseDriverFactory()
+        let rc = sqlite3_initialize();
+        if (rc != 0) {
+            fatalError("Call to sqlite3_initialize() failed with \(rc)")
+        }
+        
+        let factory = sqlite3DatabaseFactory(initialStatements: [])
         kotlinDatabase = PowerSyncDatabase(
             factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),
@@ -89,9 +95,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         try await kotlinDatabase.disconnect()
     }
 
-    func disconnectAndClear(clearLocal: Bool = true) async throws {
+    func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws {
         try await kotlinDatabase.disconnectAndClear(
-            clearLocal: clearLocal
+            clearLocal: clearLocal,
+            soft: soft
         )
     }
 
