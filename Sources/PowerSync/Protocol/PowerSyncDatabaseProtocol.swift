@@ -95,7 +95,11 @@ public struct ConnectOptions: Sendable {
     }
 
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
-    @_spi(PowerSyncExperimental)
+    @available(
+        *,
+        deprecated,
+        message: "Specifying the newClientImplementation flag is no longer needed. It is now enabled by default. The use of the old client is deprecated and will be removed in a future version."
+    )
     public init(
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,

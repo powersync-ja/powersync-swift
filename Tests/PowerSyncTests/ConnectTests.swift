@@ -1,4 +1,4 @@
-@testable @_spi(PowerSyncExperimental) import PowerSync
+@testable import PowerSync
 import XCTest
 
 final class ConnectTests: XCTestCase {
