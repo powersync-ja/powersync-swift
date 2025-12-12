@@ -77,7 +77,7 @@ let package = Package(
         ),
     ],
     dependencies: conditionalDependencies + [
-        .package(url: "git@github.com:powersync-ja/CSQLite.git", revision: "init")
+        .package(url: "git@github.com:powersync-ja/CSQLite.git", revision: "3.51.1")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
