@@ -50,7 +50,7 @@ enum KotlinAdapter {
                 name: table.name,
                 put: translateStatement(table.put),
                 delete: translateStatement(table.delete),
-                clear: table.clear,
+                clear: table.clear
             );
         }
         

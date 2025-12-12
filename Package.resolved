@@ -1,6 +1,14 @@
 {
-  "originHash" : "b4fa79e5a90b91cdc3279611b8f3e24faa521cbd12185e9002013aa958561945",
   "pins" : [
+    {
+      "identity" : "csqlite",
+      "kind" : "remoteSourceControl",
+      "location" : "git@github.com:powersync-ja/CSQLite.git",
+      "state" : {
+        "branch" : "init",
+        "revision" : "b77a2814107d919d75035a2b057305326bf13a1e"
+      }
+    },
     {
       "identity" : "grdb.swift",
       "kind" : "remoteSourceControl",
@@ -15,8 +23,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
       "state" : {
-        "revision" : "9801f4aa0923c7f33fa479a01e643d00e7764f0b",
-        "version" : "0.4.8"
+        "revision" : "9743740980cd488a11f50cffe62ed34a9739a135",
+        "version" : "0.4.10"
       }
     },
     {
@@ -29,5 +37,5 @@
       }
     }
   ],
-  "version" : 3
+  "version" : 2
 }
