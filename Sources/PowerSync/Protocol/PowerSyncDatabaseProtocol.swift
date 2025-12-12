@@ -90,17 +90,21 @@ public struct ConnectOptions: Sendable {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
-        newClientImplementation = false
+        newClientImplementation = true
         self.clientConfiguration = clientConfiguration
     }
 
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
-    @_spi(PowerSyncExperimental)
+    @available(
+        *,
+        deprecated,
+        message: "Specifying the newClientImplementation flag is no longer needed. It is now enabled by default. The use of the old client is deprecated and will be removed in a future version."
+    )
     public init(
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
-        newClientImplementation: Bool = false,
+        newClientImplementation: Bool = true,
         clientConfiguration: SyncClientConfiguration? = nil
     ) {
         self.crudThrottle = crudThrottle
@@ -311,11 +315,11 @@ public extension PowerSyncDatabaseProtocol {
     func disconnectAndClear() async throws {
         try await disconnectAndClear(clearLocal: true, soft: false)
     }
-    
+
     func disconnectAndClear(clearLocal: Bool) async throws {
         try await disconnectAndClear(clearLocal: clearLocal, soft: false)
     }
-    
+
     func disconnectAndClear(soft: Bool) async throws {
         try await disconnectAndClear(clearLocal: true, soft: soft)
     }
