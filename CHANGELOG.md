@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.8.0 (unreleased)
+## 1.8.0
 
 * Enable the `newClientImplementation` by default. This should improve performance and memory usage.
 * **Potential Breaking Change** The `newClientImplementation` now uses WebSockets to connect to the PowerSync service. These WebSockets connections do not log events to `SyncClientConfiguration->requestLogger`.
