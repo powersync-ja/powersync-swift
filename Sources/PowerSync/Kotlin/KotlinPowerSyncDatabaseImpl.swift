@@ -1,3 +1,4 @@
+import CSQLite
 import Foundation
 import PowerSyncKotlin
 
@@ -9,13 +10,18 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
     private let encoder = JSONEncoder()
     let currentStatus: SyncStatus
+    private let dbFilename: String
 
     init(
         kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase,
+        dbFilename: String,
         logger: DatabaseLogger
     ) {
         self.logger = logger
         self.kotlinDatabase = kotlinDatabase
+        // We currently use the dbFilename to delete the database files when the database is closed
+        // The kotlin PowerSyncdatabase.identifier currently prepends `null` to the dbFilename (for the directory).
+        self.dbFilename = dbFilename
         currentStatus = KotlinSyncStatus(
             baseStatus: kotlinDatabase.currentStatus
         )
@@ -80,9 +86,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         try await kotlinDatabase.disconnect()
     }
 
-    func disconnectAndClear(clearLocal: Bool = true) async throws {
+    func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws {
         try await kotlinDatabase.disconnectAndClear(
-            clearLocal: clearLocal
+            clearLocal: clearLocal,
+            soft: soft
         )
     }
 
@@ -316,6 +323,21 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         try await kotlinDatabase.close()
     }
 
+    func close(deleteDatabase: Bool = false) async throws {
+        // Close the SQLite connections
+        try await close()
+
+        if deleteDatabase {
+            try await self.deleteDatabase()
+        }
+    }
+
+    private func deleteDatabase() async throws {
+        // We can use the supplied dbLocation when we support that in future
+        let directory = try appleDefaultDatabaseDirectory()
+        try deleteSQLiteFiles(dbFilename: dbFilename, in: directory)
+    }
+
     /// Tries to convert Kotlin PowerSyncExceptions to Swift Exceptions
     private func wrapPowerSyncException<R: Sendable>(
         handler: () async throws -> R)
@@ -391,15 +413,22 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
 func openKotlinDBDefault(
     schema: Schema,
     dbFilename: String,
-    logger: DatabaseLogger
+    logger: DatabaseLogger,
 ) -> PowerSyncDatabaseProtocol {
+    let rc = sqlite3_initialize()
+    if rc != 0 {
+        fatalError("Call to sqlite3_initialize() failed with \(rc)")
+    }
+
+    let factory = sqlite3DatabaseFactory(initialStatements: [])
     return KotlinPowerSyncDatabaseImpl(
         kotlinDatabase: PowerSyncDatabase(
-            factory: PowerSyncKotlin.DatabaseDriverFactory(),
+            factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),
             dbFilename: dbFilename,
             logger: logger.kLogger
         ),
+        dbFilename: dbFilename,
         logger: logger
     )
 }
@@ -417,6 +446,7 @@ func openKotlinDBWithPool(
             schema: KotlinAdapter.Schema.toKotlin(schema),
             logger: logger.kLogger
         ),
+        dbFilename: identifier,
         logger: logger
     )
 }
@@ -473,5 +503,48 @@ func wrapTransactionContext(
                 exception: error.toPowerSyncError()
             )
         }
+    }
+}
+
+/// This returns the default directory in which we store SQLite database files.
+func appleDefaultDatabaseDirectory() throws -> URL {
+    let fileManager = FileManager.default
+
+    // Get the application support directory
+    guard let documentsDirectory = fileManager.urls(
+        for: .applicationSupportDirectory,
+        in: .userDomainMask
+    ).first else {
+        throw PowerSyncError.operationFailed(message: "Unable to find application support directory")
+    }
+
+    return documentsDirectory.appendingPathComponent("databases")
+}
+
+/// Deletes all SQLite files for a given database filename in the specified directory.
+/// This includes the main database file and WAL mode files (.wal, .shm, and .journal if present).
+/// Throws an error if a file exists but could not be deleted. Files that don't exist are ignored.
+func deleteSQLiteFiles(dbFilename: String, in directory: URL) throws {
+    let fileManager = FileManager.default
+
+    // SQLite files to delete:
+    // 1. Main database file: dbFilename
+    // 2. WAL file: dbFilename-wal
+    // 3. SHM file: dbFilename-shm
+    // 4. Journal file: dbFilename-journal (for rollback journal mode, though WAL mode typically doesn't use it)
+
+    let filesToDelete = [
+        dbFilename,
+        "\(dbFilename)-wal",
+        "\(dbFilename)-shm",
+        "\(dbFilename)-journal"
+    ]
+
+    for filename in filesToDelete {
+        let fileURL = directory.appendingPathComponent(filename)
+        if fileManager.fileExists(atPath: fileURL.path) {
+            try fileManager.removeItem(at: fileURL)
+        }
+        // If file doesn't exist, we ignore it and continue
     }
 }

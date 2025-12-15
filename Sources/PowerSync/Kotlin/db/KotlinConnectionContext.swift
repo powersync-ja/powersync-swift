@@ -97,6 +97,11 @@ final class KotlinTransactionContext: Transaction, KotlinConnectionContextProtoc
 // Allows nil values to be passed to the Kotlin [Any] params
 func mapParameters(_ parameters: [Any?]?) -> [Any] {
     parameters?.map { item in
-        item ?? NSNull()
+        switch item {
+        case .none: NSNull()
+        case let item as PowerSyncDataTypeConvertible:
+            item.psDataType?.unwrap() ?? NSNull()
+        default: item as Any
+        }
     } ?? []
 }

@@ -90,17 +90,21 @@ public struct ConnectOptions: Sendable {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
-        newClientImplementation = false
+        newClientImplementation = true
         self.clientConfiguration = clientConfiguration
     }
 
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
-    @_spi(PowerSyncExperimental)
+    @available(
+        *,
+        deprecated,
+        message: "Specifying the newClientImplementation flag is no longer needed. It is now enabled by default. The use of the old client is deprecated and will be removed in a future version."
+    )
     public init(
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
-        newClientImplementation: Bool = false,
+        newClientImplementation: Bool = true,
         clientConfiguration: SyncClientConfiguration? = nil
     ) {
         self.crudThrottle = crudThrottle
@@ -188,7 +192,7 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// data by transaction. One batch may contain data from multiple transactions,
     /// and a single transaction may be split over multiple batches.
     func getCrudBatch(limit: Int32) async throws -> CrudBatch?
-    
+
     /// Obtains an async iterator of completed transactions with local writes against the database.
     ///
     /// This is typically used from the ``PowerSyncBackendConnectorProtocol/uploadData(database:)`` callback.
@@ -216,18 +220,37 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     func disconnect() async throws
 
     /// Disconnect and clear the database.
-    /// Use this when logging out.
-    /// The database can still be queried after this is called, but the tables
-    /// would be empty.
     ///
-    /// - Parameter clearLocal: Set to false to preserve data in local-only tables. Defaults to `true`.
-    func disconnectAndClear(clearLocal: Bool) async throws
+    /// Clearing the database is useful when a user logs out, to ensure another user logging in later would not see
+    /// previous data.
+    ///
+    /// The database can still be queried after this is called, but the tables would be empty.
+    ///
+    /// To perserve data in local-only tables, set `clearLocal` to `false`.
+    ///
+    /// A `soft` clear deletes publicly visible data, but keeps internal copies of data synced in the database. This
+    /// usually means that if the same user logs out and back in again, the first sync is very fast because all internal
+    /// data is still available. When a different user logs in, no old data would be visible at any point.
+    /// Using soft clears is recommended where it's not a security issue that old data could be reconstructed from
+    /// the database.
+    func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws
 
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.
     ///
     /// Once close is called, this database cannot be used again - a new one must be constructed.
     func close() async throws
+
+    /// Close the database, releasing resources.
+    /// Also disconnects any active connection.
+    ///
+    /// Once close is called, this database cannot be used again - a new one must be constructed.
+    ///
+    /// - Parameter deleteDatabase: Set to true to delete the SQLite database files. Defaults to `false`.
+    ///
+    /// - Throws: An error if a database file exists but could not be deleted. Files that don't exist are ignored.
+    ///   This includes the main database file and any WAL mode files (.wal, .shm, .journal).
+    func close(deleteDatabase: Bool) async throws
 }
 
 public extension PowerSyncDatabaseProtocol {
@@ -243,13 +266,13 @@ public extension PowerSyncDatabaseProtocol {
     /// Unlike `getCrudBatch`, this only returns data from a single transaction at a time.
     /// All data for the transaction is loaded into memory.
     func getNextCrudTransaction() async throws -> CrudTransaction? {
-        for try await transaction in self.getCrudTransactions() {
+        for try await transaction in getCrudTransactions() {
             return transaction
         }
-        
+
         return nil
     }
-    
+
     ///
     /// The connection is automatically re-opened if it fails for any reason.
     ///
@@ -290,7 +313,15 @@ public extension PowerSyncDatabaseProtocol {
     }
 
     func disconnectAndClear() async throws {
-        try await disconnectAndClear(clearLocal: true)
+        try await disconnectAndClear(clearLocal: true, soft: false)
+    }
+
+    func disconnectAndClear(clearLocal: Bool) async throws {
+        try await disconnectAndClear(clearLocal: clearLocal, soft: false)
+    }
+
+    func disconnectAndClear(soft: Bool) async throws {
+        try await disconnectAndClear(clearLocal: true, soft: soft)
     }
 
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {

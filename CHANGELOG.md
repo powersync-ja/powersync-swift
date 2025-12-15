@@ -1,9 +1,31 @@
 # Changelog
 
-## 1.6.1 (unreleased)
+## 1.8.0 (unreleased)
+
+* Enable the `newClientImplementation` by default. This should improve performance and memory usage.
+* **Potential Breaking Change** The `newClientImplementation` now uses WebSockets to connect to the PowerSync service. These WebSockets connections do not log events to `SyncClientConfiguration->requestLogger`.
+* Add the `soft` flag to `disconnectAndClear()` which keeps an internal copy of synced data in the database, allowing faster re-sync if a compatible token is used in the next connect() call
+* Added Alpha `PowerSyncGRDB` product which supports sharing GRDB `DatabasePool`s with PowerSync and application logic.
+* Update PowerSync SQLite core to 0.4.10
+* Update Kotlin SDK to 1.7.0.
+
+
+## 1.7.0
 
 * Update Kotlin SDK to 1.7.0.
-* Added Alpha `PowerSyncGRDB` product which supports sharing GRDB `DatabasePool`s with PowerSync and application logic.
+* Add `close(deleteDatabase:)` method to `PowerSyncDatabaseProtocol` for deleting SQLite database files when closing the database. This includes the main database file and all WAL mode files (.wal, .shm, .journal). Files that don't exist are ignored, but an error is thrown if a file exists but cannot be deleted.
+
+```swift
+// Close the database and delete all SQLite files
+try await database.close(deleteDatabase: true)
+
+// Close the database without deleting files (default behavior)
+try await database.close(deleteDatabase: false)
+// or simply
+try await database.close()
+```
+* Add `PowerSyncDataTypeConvertible` protocol for casting query parameters to SQLite supported types.
+* [Internal] Removed unnecessary `Task` creation in Attachment helper `FileManagerStorageAdapter`.
 
 ## 1.6.0
 
