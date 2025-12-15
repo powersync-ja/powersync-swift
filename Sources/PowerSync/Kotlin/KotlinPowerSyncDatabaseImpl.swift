@@ -19,8 +19,9 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     ) {
         self.logger = logger
         self.kotlinDatabase = kotlinDatabase
-        // We currently use the dbFilename to delete the database files when the database is closed
-        // The kotlin PowerSyncdatabase.identifier currently prepends `null` to the dbFilename (for the directory).
+        /// We currently use the dbFilename to delete the database files when the database is closed
+        /// The kotlin PowerSyncDatabase.identifier currently prepends `null` to the dbFilename (for the directory).
+        /// FIXME. Update this once we support database directory configuration.
         self.dbFilename = dbFilename
         currentStatus = KotlinSyncStatus(
             baseStatus: kotlinDatabase.currentStatus

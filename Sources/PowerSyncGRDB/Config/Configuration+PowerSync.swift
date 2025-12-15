@@ -28,7 +28,7 @@ public extension Configuration {
     ) throws {
         // Handles the case on WatchOS where the extension is statically loaded.
         // We need to register the extension before SQLite connections are established.
-        // This should only throw on non-WatchOS platforms if the extension path cannot be resolved. So we catch and ignore the error.
+        // This should only throw on non-WatchOS platforms if the extension path cannot be resolved.
         let extensionPath = try resolvePowerSyncLoadableExtensionPath()
 
         // Register the PowerSync core extension
