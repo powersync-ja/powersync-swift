@@ -104,13 +104,11 @@ final class GRDBTests: XCTestCase {
         // Create users with the PowerSync SDK
         let initialUserName = "Bob"
 
-        print("creating user \(initialUserName)")
         try await database.execute(
             sql: "INSERT INTO users(id, name) VALUES(uuid(), ?)",
             parameters: [initialUserName]
         )
 
-        print("fetching users")
         // Fetch those users
         let initialUserNames = try await database.getAll(
             "SELECT * FROM users"
@@ -120,7 +118,6 @@ final class GRDBTests: XCTestCase {
 
         XCTAssertTrue(initialUserNames.first == initialUserName)
 
-        print("fetching users with GRDB")
         // Now define a GRDB struct for query purposes
         // Query the Users with GRDB, this should have the same result as with PowerSync
         let grdbUserNames = try await pool.read { database in
@@ -129,7 +126,6 @@ final class GRDBTests: XCTestCase {
 
         XCTAssertTrue(grdbUserNames.first?.name == initialUserName)
 
-        print("inserting user with GRDB")
         // Insert a user with GRDB
         try await pool.write { database in
             try User(
@@ -138,7 +134,6 @@ final class GRDBTests: XCTestCase {
             ).insert(database)
         }
 
-        print("fetching users with GRDB after insert")
         let grdbUserNames2 = try await pool.read { database in
             try User.order(User.Columns.name.asc).fetchAll(database)
         }
