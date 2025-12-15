@@ -47,6 +47,10 @@ final class GRDBTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
+
+        // Use a unique identifier per test instance to avoid conflicts during parallel test execution
+        let dbIdentifier = "test-\(UUID().uuidString).sqlite"
+
         schema = Schema(tables: [
             Table(name: "users", columns: [
                 .text("name")
@@ -73,7 +77,7 @@ final class GRDBTests: XCTestCase {
         // Ensure the documents directory exists
         try FileManager.default.createDirectory(at: documentsDir, withIntermediateDirectories: true, attributes: nil)
 
-        let dbURL = documentsDir.appendingPathComponent("test.sqlite")
+        let dbURL = documentsDir.appendingPathComponent(dbIdentifier)
         pool = try DatabasePool(
             path: dbURL.path,
             configuration: config
@@ -82,7 +86,7 @@ final class GRDBTests: XCTestCase {
         database = openPowerSyncWithGRDB(
             pool: pool,
             schema: schema,
-            identifier: "test.sqlite"
+            identifier: dbIdentifier
         )
 
         try await database.disconnectAndClear()
