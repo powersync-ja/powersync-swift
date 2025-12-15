@@ -2,10 +2,11 @@
 
 ## 1.8.0 (unreleased)
 
-* Update Kotlin SDK to 1.7.0.
-* Update PowerSync SQLite core to 0.4.10
-* Add the `soft` flag to `disconnectAndClear()` which keeps an internal copy of synced data in the database, allowing faster re-sync if a compatible token is used in the next connect() call
 * Enable the `newClientImplementation` by default. This should improve performance and memory usage.
+* **Potential Breaking Change** The `newClientImplementation` now uses WebSockets to connect to the PowerSync service. These WebSockets connections do not log events to `SyncClientConfiguration->requestLogger`.
+* Add the `soft` flag to `disconnectAndClear()` which keeps an internal copy of synced data in the database, allowing faster re-sync if a compatible token is used in the next connect() call
+* Update PowerSync SQLite core to 0.4.10
+* Update Kotlin SDK to 1.7.0.
 
 
 ## 1.7.0
