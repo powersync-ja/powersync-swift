@@ -5,6 +5,7 @@
 * Enable the `newClientImplementation` by default. This should improve performance and memory usage.
 * **Potential Breaking Change** The `newClientImplementation` now uses WebSockets to connect to the PowerSync service. These WebSockets connections do not log events to `SyncClientConfiguration->requestLogger`.
 * Add the `soft` flag to `disconnectAndClear()` which keeps an internal copy of synced data in the database, allowing faster re-sync if a compatible token is used in the next connect() call
+* Added Alpha `PowerSyncGRDB` product which supports sharing GRDB `DatabasePool`s with PowerSync and application logic.
 * Update PowerSync SQLite core to 0.4.10
 * Update Kotlin SDK to 1.9.0.
 * Bumped the minimum Swift tools version requirement to 6.1
