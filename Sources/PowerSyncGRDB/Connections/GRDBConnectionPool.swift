@@ -88,6 +88,7 @@ actor GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         try await pool.writeWithoutTransaction { database in
             let lease = try GRDBConnectionLease(database: database)
             try onConnection(lease, [])
+            database.clearSchemaCache()
         }
         pool.invalidateReadOnlyConnections()
     }
