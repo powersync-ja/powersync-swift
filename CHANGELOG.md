@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.1
+
+* Pin dependency on `CSQLite` to avoid "unstable version package" errors.
+
 ## 1.8.0
 
 * Enable the `newClientImplementation` by default. This should improve performance and memory usage.
