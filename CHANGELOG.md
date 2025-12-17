@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.2
+
+* Fix `PowerSyncKotlin` frameworks not containing a `CFBundleVersion`.
+
 ## 1.8.1
 
 * Pin dependency on `CSQLite` to avoid "unstable version package" errors.
