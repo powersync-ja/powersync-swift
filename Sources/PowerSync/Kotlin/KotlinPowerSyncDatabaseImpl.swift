@@ -70,7 +70,8 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
                 newClient: resolvedOptions.newClientImplementation,
                 userAgent: "PowerSync Swift SDK",
                 loggingConfig: resolvedOptions.clientConfiguration?.requestLogger?.toKotlinConfig()
-            )
+            ),
+            appMetadata: [:]
         )
     }
 
