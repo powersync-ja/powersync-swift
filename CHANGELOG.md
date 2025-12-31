@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.0 (unreleased)
+
+* Added Alpha `PowerSyncGRDB` product which supports sharing GRDB `DatabasePool`s with PowerSync and application logic.
+
 ## 1.8.2
 
 * Fix `PowerSyncKotlin` frameworks not containing a `CFBundleVersion`.
