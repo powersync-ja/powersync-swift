@@ -115,6 +115,7 @@ Feel free to use the `DatabasePool` for view logic and the `PowerSyncDatabase` f
 
 - Updating the PowerSync schema, with `updateSchema`, is not currently fully supported with GRDB connections.
 - This integration currently requires statically linking PowerSync and GRDB.
+- This implementation requires defining the PowerSync Schema and GRDB data types. This results in some duplication.
 - This implementation uses the SQLite session API to track updates made by the PowerSync SDK. This could use more memory compared to the Standard PowerSync SQLite implementation.
 - This implementation can cause warnings such as "Thread Performance Checker: Thread running at User-interactive quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions". This will be addressed in a future release.
 
