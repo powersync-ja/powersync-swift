@@ -139,6 +139,57 @@ final class ConnectTests: XCTestCase {
         try await database.disconnectAndClear()
     }
 
+    func testAppMetadata() async throws {
+        let expectation = XCTestExpectation(
+            description: "Should log a request to the PowerSync endpoint with metadata"
+        )
+
+        let fakeUrl = "https://fakepowersyncinstance.fakepowersync.local"
+        let testAppName = "testAppName"
+        final class TestConnector: PowerSyncBackendConnectorProtocol {
+            let url: String
+
+            init(url: String) {
+                self.url = url
+            }
+
+            func fetchCredentials() async throws -> PowerSyncCredentials? {
+                PowerSyncCredentials(
+                    endpoint: url,
+                    token: "123"
+                )
+            }
+
+            func uploadData(database _: PowerSyncDatabaseProtocol) async throws {}
+        }
+
+        try await database.connect(
+            connector: TestConnector(url: fakeUrl),
+            options: ConnectOptions(
+                /// Note that currently, HTTP logs are only supported with the old client implementation
+                /// which uses HTTP streams.
+                /// The new client implementation uses a WebSocket connection instead.
+                /// Which we don't get logs for currently.
+                newClientImplementation: false,
+                clientConfiguration: SyncClientConfiguration(
+                    requestLogger: SyncRequestLoggerConfiguration(
+                        requestLevel: .all
+                    ) { message in
+                        // We want to see a request to the specified instance with the app_metadata present
+                        if message.contains("\"app_metadata\":{\"appName\":\"\(testAppName)\"}") {
+                            expectation.fulfill()
+                        }
+                    }
+                ),
+                appMetadata: ["appName": testAppName]
+            )
+        )
+
+        await fulfillment(of: [expectation], timeout: 5)
+
+        try await database.disconnectAndClear()
+    }
+
     func testSendableConnect() async throws {
         /// This is just a basic sanity check to confirm that these protocols are
         /// correctly defined as Sendable.

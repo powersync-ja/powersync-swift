@@ -55,6 +55,17 @@ public struct ConnectOptions: Sendable {
     /// ```
     public var params: JsonParam
 
+    /// Application metadata that will be displayed in PowerSync service logs.
+    ///
+    /// Provide small, non-sensitive key/value pairs (for example: `appName`, `version`, `environment`) to
+    /// help identify the client in logs and diagnostics. Do not include secrets or tokens.
+    ///
+    /// Example:
+    /// ```swift
+    /// ["appName": "MyApp", "version": "1.2.3"]
+    /// ```
+    public var appMetadata: [String: String]
+
     /// Uses a new sync client implemented in Rust instead of the one implemented in Kotlin.
     ///
     /// The new client is more efficient and will become the default in the future, but is still marked as experimental for now.
@@ -85,13 +96,15 @@ public struct ConnectOptions: Sendable {
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
-        clientConfiguration: SyncClientConfiguration? = nil
+        clientConfiguration: SyncClientConfiguration? = nil,
+        appMetadata: [String: String] = [:]
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
         newClientImplementation = true
         self.clientConfiguration = clientConfiguration
+        self.appMetadata = appMetadata
     }
 
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
@@ -105,13 +118,15 @@ public struct ConnectOptions: Sendable {
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
         newClientImplementation: Bool = true,
-        clientConfiguration: SyncClientConfiguration? = nil
+        clientConfiguration: SyncClientConfiguration? = nil,
+        appMetadata: [String: String] = [:]
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
         self.params = params
         self.newClientImplementation = newClientImplementation
         self.clientConfiguration = clientConfiguration
+        self.appMetadata = appMetadata
     }
 }
 
