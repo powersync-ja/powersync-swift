@@ -34,8 +34,8 @@ if let kotlinSdkPath = localKotlinSdkOverride {
         .binaryTarget(
             name: "PowerSyncKotlin",
             url:
-            "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.9.0/PowersyncKotlinRelease.zip",
-            checksum: "6d9847391ab2bbbca1f6a7abe163f0682ddca4a559ef5a1d2567b3e62e7d9979"
+            "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.10.1/PowersyncKotlinRelease.zip",
+            checksum: "fe365cc9b14e71b75428940b4246a0d7e3326d9d9e2047f047f7e1bfafbb87e6"
         ))
 }
 
@@ -82,7 +82,7 @@ let package = Package(
     ],
     dependencies: conditionalDependencies + [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.9.0"),
-        .package(url: "https://github.com/powersync-ja/CSQLite.git", revision: "3.51.1")
+        .package(url: "https://github.com/powersync-ja/CSQLite.git", exact: "3.51.1")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
