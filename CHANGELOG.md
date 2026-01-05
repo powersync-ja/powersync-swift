@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.9.0 (unreleased)
+
+* Add `appMetadata` parameter to `PowerSyncDatabase.connect()` (via `ConnectOptions`) to include application metadata in sync requests. This metadata is merged into sync requests and displayed in PowerSync service logs.
+
+  Note: This requires a PowerSync service version `>=1.17.0` in order for logs to display metadata.
+
+  ```swift
+  try await database.connect(
+      connector: connector,
+      options: ConnectOptions(
+          appMetadata: ["appVersion": "1.0.0", "deviceId": "device456"]
+      )
+  )
+  ```
+
+## 1.8.2
+
+* Fix `PowerSyncKotlin` frameworks not containing a `CFBundleVersion`.
+
+## 1.8.1
+
+* Pin dependency on `CSQLite` to avoid "unstable version package" errors.
+
+## 1.8.0
+
+* Enable the `newClientImplementation` by default. This should improve performance and memory usage.
+* **Potential Breaking Change** The `newClientImplementation` now uses WebSockets to connect to the PowerSync service. These WebSockets connections do not log events to `SyncClientConfiguration->requestLogger`.
+* Add the `soft` flag to `disconnectAndClear()` which keeps an internal copy of synced data in the database, allowing faster re-sync if a compatible token is used in the next connect() call
+* Update PowerSync SQLite core to 0.4.10
+* Update Kotlin SDK to 1.9.0.
+* Bumped the minimum Swift tools version requirement to 6.1
+
+
 ## 1.7.0
 
 * Update Kotlin SDK to 1.7.0.

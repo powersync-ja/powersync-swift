@@ -49,7 +49,8 @@ enum KotlinAdapter {
             return PowerSyncKotlin.RawTable(
                 name: table.name,
                 put: translateStatement(table.put),
-                delete: translateStatement(table.delete)
+                delete: translateStatement(table.delete),
+                clear: table.clear
             );
         }
         
