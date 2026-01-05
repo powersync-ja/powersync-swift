@@ -7,8 +7,6 @@ import AppKit
 #endif
 
 func userAgent() -> String {
-    let libraryVersion = "1.0.0" // TODO: Replace with actual library version
-    
     #if os(iOS)
     let osName = "iOS"
     let osVersion = UIDevice.current.systemVersion
