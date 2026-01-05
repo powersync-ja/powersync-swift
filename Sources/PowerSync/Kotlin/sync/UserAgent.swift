@@ -16,6 +16,10 @@ func userAgent() -> String {
     let osName = "macOS"
     let version = ProcessInfo.processInfo.operatingSystemVersion
     let osVersion = "\(version.majorVersion).\(version.minorVersion)"
+    #elseif os(watchOS)
+    let osName = "watchOS"
+    let version = ProcessInfo.processInfo.operatingSystemVersion
+    let osVersion = "\(version.majorVersion).\(version.minorVersion)"
     #else
     let osName = "unknown"
     let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
