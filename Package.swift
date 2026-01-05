@@ -75,8 +75,13 @@ let package = Package(
             type: .dynamic,
             targets: ["PowerSync"]
         ),
+        .library(
+            name: "PowerSyncGRDB",
+            targets: ["PowerSyncGRDB"]
+        )
     ],
     dependencies: conditionalDependencies + [
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.9.0"),
         .package(url: "https://github.com/powersync-ja/CSQLite.git", exact: "3.51.1")
     ],
     targets: [
@@ -90,9 +95,20 @@ let package = Package(
                 .product(name: "CSQLite", package: "CSQLite"),
             ]
         ),
+        .target(
+            name: "PowerSyncGRDB",
+            dependencies: [
+                .target(name: "PowerSync"),
+                .product(name: "GRDB", package: "GRDB.swift")
+            ]
+        ),
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]
         ),
+        .testTarget(
+            name: "PowerSyncGRDBTests",
+            dependencies: ["PowerSync", "PowerSyncGRDB"]
+        )
     ] + conditionalTargets
 )

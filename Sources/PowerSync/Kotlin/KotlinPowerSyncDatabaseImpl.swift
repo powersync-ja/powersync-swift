@@ -13,23 +13,15 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     private let dbFilename: String
 
     init(
-        schema: Schema,
+        kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase,
         dbFilename: String,
         logger: DatabaseLogger
     ) {
-        let rc = sqlite3_initialize()
-        if rc != 0 {
-            fatalError("Call to sqlite3_initialize() failed with \(rc)")
-        }
-
-        let factory = sqlite3DatabaseFactory(initialStatements: [])
-        kotlinDatabase = PowerSyncDatabase(
-            factory: factory,
-            schema: KotlinAdapter.Schema.toKotlin(schema),
-            dbFilename: dbFilename,
-            logger: logger.kLogger
-        )
         self.logger = logger
+        self.kotlinDatabase = kotlinDatabase
+        /// We currently use the dbFilename to delete the database files when the database is closed
+        /// The kotlin PowerSyncDatabase.identifier currently prepends `null` to the dbFilename (for the directory).
+        /// FIXME. Update this once we support database directory configuration.
         self.dbFilename = dbFilename
         currentStatus = KotlinSyncStatus(
             baseStatus: kotlinDatabase.currentStatus
@@ -418,6 +410,47 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
             )
         }
     }
+}
+
+func openKotlinDBDefault(
+    schema: Schema,
+    dbFilename: String,
+    logger: DatabaseLogger,
+) -> PowerSyncDatabaseProtocol {
+    let rc = sqlite3_initialize()
+    if rc != 0 {
+        fatalError("Call to sqlite3_initialize() failed with \(rc)")
+    }
+
+    let factory = sqlite3DatabaseFactory(initialStatements: [])
+    return KotlinPowerSyncDatabaseImpl(
+        kotlinDatabase: PowerSyncDatabase(
+            factory: factory,
+            schema: KotlinAdapter.Schema.toKotlin(schema),
+            dbFilename: dbFilename,
+            logger: logger.kLogger
+        ),
+        dbFilename: dbFilename,
+        logger: logger
+    )
+}
+
+func openKotlinDBWithPool(
+    schema: Schema,
+    pool: SQLiteConnectionPoolProtocol,
+    identifier: String,
+    logger: DatabaseLogger
+) -> PowerSyncDatabaseProtocol {
+    return KotlinPowerSyncDatabaseImpl(
+        kotlinDatabase: openPowerSyncWithPool(
+            pool: pool.toKotlin(),
+            identifier: identifier,
+            schema: KotlinAdapter.Schema.toKotlin(schema),
+            logger: logger.kLogger
+        ),
+        dbFilename: identifier,
+        logger: logger
+    )
 }
 
 private struct ExplainQueryResult {

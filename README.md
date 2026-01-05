@@ -8,17 +8,21 @@ _[PowerSync](https://www.powersync.com) is a sync engine for building local-firs
 
 This is the PowerSync SDK for Swift clients. The SDK reference is available [here](https://docs.powersync.com/client-sdk-references/swift), API references are [documented here](https://powersync-ja.github.io/powersync-swift/documentation/powersync/).
 
-## Structure: Packages
+## Available Products
 
-- [Sources](./Sources/)
+The SDK provides two main products:
 
-  - This is the Swift SDK implementation.
+- **PowerSync**: Core SDK with SQLite support for data synchronization.
+- **PowerSyncDynamic**: Forced dynamically linked version of `PowerSync` - useful for XCode previews.
+- **PowerSyncGRDB [ALPHA]**: GRDB integration allowing PowerSync to work with GRDB databases. This product is currently in an alpha release.
 
 ## Demo Apps / Example Projects
 
 The easiest way to test the PowerSync Swift SDK is to run our demo application.
 
 - [Demo/PowerSyncExample](./Demo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector.
+
+- [Demo/GRDB Demo](./Demo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector and GRDB connections.
 
 ## Installation
 
@@ -38,6 +42,11 @@ Add
                     name: "PowerSync",
                     package: "powersync-swift"
                 ),
+                // Optional: Add if using GRDB
+                .product(
+                    name: "PowerSyncGRDB",
+                    package: "powersync-swift"
+                )
             ]
         )
     ]
@@ -47,32 +56,72 @@ to your `Package.swift` file.
 
 ## Usage
 
-Create a PowerSync client
+### Basic PowerSync Setup
 
 ```swift
 import PowerSync
 
-let powersync = PowerSyncDatabase(
-    schema: Schema(
-        tables: [
-            Table(
-                name: "users",
-                columns: [
-                    .text("count"),
-                    .integer("is_active"),
-                    .real("weight"),
-                    .text("description")
-                ]
-            )
-        ]
-    ),
+let mySchema = Schema(
+    tables: [
+        Table(
+            name: "users",
+            columns: [
+                .text("count"),
+                .integer("is_active"),
+                .real("weight"),
+                .text("description")
+            ]
+        )
+    ]
+)
+
+let powerSync = PowerSyncDatabase(
+    schema: mySchema,
     logger: DefaultLogger(minSeverity: .debug)
 )
 ```
 
+### GRDB Integration
+
+If you're using [GRDB.swift](https://github.com/groue/GRDB.swift) by [Gwendal Roué](https://github.com/groue), you can integrate PowerSync with your existing database. Special thanks to Gwendal for their help in developing this integration.
+
+**⚠️ Note:** The GRDB integration is currently in **alpha** release and the API may change significantly. While functional, it should be used with caution in production environments.
+
+```swift
+import PowerSync
+import PowerSyncGRDB
+import GRDB
+
+// Configure GRDB with PowerSync support
+var config = Configuration()
+try config.configurePowerSync(schema: mySchema)
+
+// Create database with PowerSync enabled
+let dbPool = try DatabasePool(
+    path: dbPath,
+    configuration: config
+)
+
+let powerSync = try openPowerSyncWithGRDB(
+    pool: dbPool,
+    schema: mySchema,
+    identifier: "app-db.sqlite"
+)
+```
+
+Feel free to use the `DatabasePool` for view logic and the `PowerSyncDatabase` for PowerSync operations.
+
+#### Limitations
+
+- Updating the PowerSync schema, with `updateSchema`, is not currently fully supported with GRDB connections.
+- This integration currently requires statically linking PowerSync and GRDB.
+- This implementation requires defining the PowerSync Schema and GRDB data types. This results in some duplication.
+- This implementation uses the SQLite session API to track updates made by the PowerSync SDK. This could use more memory compared to the Standard PowerSync SQLite implementation.
+- This implementation can cause warnings such as "Thread Performance Checker: Thread running at User-interactive quality-of-service class waiting on a lower QoS thread running at Default quality-of-service class. Investigate ways to avoid priority inversions". This will be addressed in a future release.
+
 ## Underlying Kotlin Dependency
 
-The PowerSync Swift SDK makes use of the [PowerSync Kotlin Multiplatform SDK](https://github.com/powersync-ja/powersync-kotlin) and the API tool [SKIE](https://skie.touchlab.co/) under the hood to implement the Swift package.
+The PowerSync Swift SDK makes use of the [PowerSync Kotlin SDK](https://github.com/powersync-ja/powersync-kotlin) and the API tool [SKIE](https://skie.touchlab.co/) under the hood to implement the Swift package.
 However, this dependency is resolved internally and all public APIs are written entirely in Swift.
 
 For more details, see the [Swift SDK reference](https://docs.powersync.com/client-sdk-references/swift) and generated [API references](https://powersync-ja.github.io/powersync-swift/documentation/powersync/).
