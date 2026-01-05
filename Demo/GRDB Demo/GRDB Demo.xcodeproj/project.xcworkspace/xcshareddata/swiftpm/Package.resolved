@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/CSQLite.git",
       "state" : {
-        "branch" : "3.51.1",
-        "revision" : "25f4a02fce2dcd588bad37ea6fc047c2bbe8ef5e"
+        "revision" : "25f4a02fce2dcd588bad37ea6fc047c2bbe8ef5e",
+        "version" : "3.51.1"
       }
     },
     {
