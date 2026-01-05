@@ -1,9 +1,7 @@
 import Foundation
 
-#if os(iOS) || os(watchOS) || os(tvOS)
+#if os(iOS) || os(tvOS)
 import UIKit
-#elseif os(macOS)
-import AppKit
 #endif
 
 func userAgent() -> String {
@@ -11,11 +9,12 @@ func userAgent() -> String {
     let osName = "macOS"
     let version = ProcessInfo.processInfo.operatingSystemVersion
     let osVersion = "\(version.majorVersion).\(version.minorVersion)"
-    #elseif os(iOS)
-    let osName = "iOS"
-    let osVersion = UIDevice.current.systemVersion
     #elseif os(watchOS)
     let osName = "watchOS"
+    let version = ProcessInfo.processInfo.operatingSystemVersion
+    let osVersion = "\(version.majorVersion).\(version.minorVersion)"
+    #elseif os(iOS)
+    let osName = "iOS"
     let osVersion = UIDevice.current.systemVersion
     #elseif os(tvOS)
     let osName = "tvOS"
