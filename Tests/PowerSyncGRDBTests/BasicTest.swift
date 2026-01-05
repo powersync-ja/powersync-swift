@@ -94,6 +94,7 @@ final class GRDBTests: XCTestCase {
 
     override func tearDown() async throws {
         try? await database?.disconnectAndClear()
+        try? await database.close(deleteDatabase: true)
         database = nil
         try? pool?.close()
         pool = nil
