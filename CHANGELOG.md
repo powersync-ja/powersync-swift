@@ -2,6 +2,7 @@
 
 ## 1.9.0 (unreleased)
 
+* Added Alpha `PowerSyncGRDB` product which supports sharing GRDB `DatabasePool`s with PowerSync and application logic.
 * Add `appMetadata` parameter to `PowerSyncDatabase.connect()` (via `ConnectOptions`) to include application metadata in sync requests. This metadata is merged into sync requests and displayed in PowerSync service logs.
 
   Note: This requires a PowerSync service version `>=1.17.0` in order for logs to display metadata.

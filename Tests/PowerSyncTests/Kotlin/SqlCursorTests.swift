@@ -14,7 +14,7 @@ struct UserOptional {
     let isActive: Bool?
     let weight: Double?
     let description: String?
-    
+
     init(
         id: String,
         count: Int? = nil,
@@ -51,9 +51,9 @@ func createTestUser(
 }
 
 final class SqlCursorTests: XCTestCase {
-    private var database: KotlinPowerSyncDatabaseImpl!
+    private var database: PowerSyncDatabaseProtocol!
     private var schema: Schema!
-    
+
     override func setUp() async throws {
         try await super.setUp()
         schema = Schema(tables: [
@@ -64,26 +64,26 @@ final class SqlCursorTests: XCTestCase {
                 .text("description")
             ])
         ])
-        
-        database = KotlinPowerSyncDatabaseImpl(
+
+        database = openKotlinDBDefault(
             schema: schema,
             dbFilename: ":memory:",
             logger: DatabaseLogger(DefaultLogger())
         )
         try await database.disconnectAndClear()
     }
-    
+
     override func tearDown() async throws {
         try await database.disconnectAndClear()
         database = nil
         try await super.tearDown()
     }
-    
+
     func testValidValues() async throws {
         try await createTestUser(
             db: database
         )
-        
+
         let user: User = try await database.get(
             sql: "SELECT id, count, is_active, weight FROM users WHERE id = ?",
             parameters: ["1"]
@@ -95,19 +95,19 @@ final class SqlCursorTests: XCTestCase {
                 weight: cursor.getDouble(name: "weight")
             )
         }
-        
+
         XCTAssertEqual(user.id, "1")
         XCTAssertEqual(user.count, 110)
         XCTAssertEqual(user.isActive, false)
         XCTAssertEqual(user.weight, 1.1111)
     }
-    
+
     /// Uses the indexed based cursor methods to obtain a required column value
     func testValidValuesWithIndex() async throws {
         try await createTestUser(
             db: database
         )
-        
+
         let user = try await database.get(
             sql: "SELECT id, count, is_active, weight FROM users WHERE id = ?",
             parameters: ["1"]
@@ -119,37 +119,37 @@ final class SqlCursorTests: XCTestCase {
                 weight: cursor.getDoubleOptional(index: 3)
             )
         }
-        
+
         XCTAssertEqual(user.id, "1")
         XCTAssertEqual(user.count, 110)
         XCTAssertEqual(user.isActive, false)
         XCTAssertEqual(user.weight, 1.1111)
     }
-    
+
     /// Uses index based cursor methods which are optional and don't throw
     func testIndexNoThrow() async throws {
         try await createTestUser(
             db: database
         )
-        
+
         let user = try await database.get(
             sql: "SELECT id, count, is_active, weight FROM users WHERE id = ?",
             parameters: ["1"]
         ) { cursor in
-             UserOptional(
+            UserOptional(
                 id: cursor.getStringOptional(index: 0) ?? "1",
                 count: cursor.getIntOptional(index: 1),
                 isActive: cursor.getBooleanOptional(index: 2),
                 weight: cursor.getDoubleOptional(index: 3)
             )
         }
-        
+
         XCTAssertEqual(user.id, "1")
         XCTAssertEqual(user.count, 110)
         XCTAssertEqual(user.isActive, false)
         XCTAssertEqual(user.weight, 1.1111)
     }
-    
+
     func testOptionalValues() async throws {
         try await createTestUser(
             db: database,
@@ -161,7 +161,7 @@ final class SqlCursorTests: XCTestCase {
                 description: nil
             )
         )
-        
+
         let user: UserOptional = try await database.get(
             sql: "SELECT id, count, is_active, weight, description FROM users WHERE id = ?",
             parameters: ["1"]
@@ -174,20 +174,20 @@ final class SqlCursorTests: XCTestCase {
                 description: cursor.getStringOptional(name: "description")
             )
         }
-        
+
         XCTAssertEqual(user.id, "1")
         XCTAssertNil(user.count)
         XCTAssertNil(user.isActive)
         XCTAssertNil(user.weight)
         XCTAssertNil(user.description)
     }
-    
+
     /// Tests that a `mapper` which does not throw is accepted by the protocol
     func testNoThrow() async throws {
         try await createTestUser(
             db: database
         )
-        
+
         let user = try await database.get(
             sql: "SELECT id, count, is_active, weight FROM users WHERE id = ?",
             parameters: ["1"]
@@ -200,18 +200,18 @@ final class SqlCursorTests: XCTestCase {
                 description: nil
             )
         }
-        
+
         XCTAssertEqual(user.id, "1")
         XCTAssertEqual(user.count, 110)
         XCTAssertEqual(user.isActive, false)
         XCTAssertEqual(user.weight, 1.1111)
     }
-    
+
     func testThrowsForMissingColumn() async throws {
         try await createTestUser(
             db: database
         )
-        
+
         do {
             _ = try await database.get(
                 sql: "SELECT id FROM users",
@@ -227,7 +227,7 @@ final class SqlCursorTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
     }
-    
+
     func testThrowsForNullValuedRequiredColumn() async throws {
         /// Create a test user with nil stored in columns
         try await createTestUser(
@@ -240,7 +240,7 @@ final class SqlCursorTests: XCTestCase {
                 description: nil
             )
         )
-        
+
         do {
             _ = try await database.get(
                 sql: "SELECT description FROM users",
@@ -257,7 +257,7 @@ final class SqlCursorTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
     }
-    
+
     /// Index based cursor methods should throw if null is returned for required values
     func testThrowsForNullValuedRequiredColumnIndex() async throws {
         /// Create a test user with nil stored in columns
@@ -271,7 +271,7 @@ final class SqlCursorTests: XCTestCase {
                 description: nil
             )
         )
-        
+
         do {
             _ = try await database.get(
                 sql: "SELECT description FROM users",
