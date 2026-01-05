@@ -16,7 +16,7 @@ public extension Configuration {
     /// ```swift
     /// var config = Configuration()
     /// try config.configurePowerSync(schema: mySchema)
-    /// let dbQueue = try DatabaseQueue(path: dbPath, configuration: config)
+    /// let dbQueue = try DatabasePool(path: dbPath, configuration: config)
     /// ```
     ///
     /// - Parameter schema: The PowerSync `Schema` describing your sync views.
