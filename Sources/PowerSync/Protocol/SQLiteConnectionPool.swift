@@ -3,6 +3,7 @@ import Foundation
 /// A lease representing a temporarily borrowed SQLite connection from the pool.
 public protocol SQLiteConnectionLease {
     /// Pointer to the underlying SQLite connection.
+    /// This pointer should not be used outside of the closure which provided the lease.
     var pointer: OpaquePointer { get }
 }
 

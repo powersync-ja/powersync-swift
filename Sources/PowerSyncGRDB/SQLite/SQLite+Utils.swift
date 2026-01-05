@@ -1,5 +1,5 @@
 // The system SQLite does not expose this,
-// linking PowerSync provides them
+// linking CSQLite (or another implementation of SQLite) provides them
 // Declare the missing function manually
 @_silgen_name("sqlite3_enable_load_extension")
 func sqlite3_enable_load_extension(
