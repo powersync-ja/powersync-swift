@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.9.0 (unreleased)
+## 1.9.0
 
 * Fixed user agent strings not following expected format.
 * Added Alpha `PowerSyncGRDB` product which supports sharing GRDB `DatabasePool`s with PowerSync and application logic.
