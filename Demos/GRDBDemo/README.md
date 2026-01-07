@@ -1,6 +1,6 @@
-# PowerSync Swift Demo App
+# PowerSync Swift GRDB Demo App
 
-A Todo List app demonstrating the use of the PowerSync Swift SDK together with Supabase.
+A Todo List app demonstrating the use of the PowerSync Swift SDK with GRDB and Supabase.
 
 ## Set up your Supabase and PowerSync projects
 
@@ -14,15 +14,21 @@ Follow this guide to:
 
 ## Configure The App
 
-1. Open this directory in XCode.
+1. Open `GRDBDemo.xcodeproj` in XCode.
 
 2. Copy the `Secrets.template.swift` file to a new `Secrets.swift` file and insert the credentials of your Supabase and PowerSync projects (more info can be found [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#test-everything-using-our-demo-app)).
 
+From this directory
 ```bash
-cp Secrets.template.swift Secrets.swift
+cp GRDBDemo/Secrets.template.swift GRDBDemo/Secrets.swift
 ```
 
-3. You will need to enable `CasePathMacros` for SwiftUI Navigation. You can do this in settings, or just build the app and a dialog will be shown to enable `CasePathMacros`.
+### GRDB Implementation Details
+
+This demo uses GRDB.swift for local data storage and querying. The key differences from the standard PowerSync demo are:
+
+1. Queries and mutations are handled using GRDB's data access patterns
+2. Observable database queries are implemented using GRDB's ValueObservation
 
 ### Troubleshooting
 
@@ -42,4 +48,4 @@ rm -rf ~/Library/org.swift.swiftpm
 
 ## Run project
 
-Build the project, launch the app and sign in or register a new user.
+Build the project, launch the app and sign in or register a new user. The app demonstrates real-time synchronization of todo lists between multiple devices and the cloud, powered by PowerSync's offline-first architecture and GRDB's robust local database capabilities.

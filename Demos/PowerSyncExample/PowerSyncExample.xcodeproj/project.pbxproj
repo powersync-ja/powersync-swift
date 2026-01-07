@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -44,8 +44,8 @@
 		B69F7D862C8EE27400565448 /* AnyCodable in Frameworks */ = {isa = PBXBuildFile; productRef = B69F7D852C8EE27400565448 /* AnyCodable */; };
 		B6B3698A2C64F4B30033C307 /* Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B369892C64F4B30033C307 /* Navigation.swift */; };
 		BE2F26EC2DA54B2F0080F1AE /* SupabaseRemoteStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2F26EB2DA54B2A0080F1AE /* SupabaseRemoteStorage.swift */; };
-		BEDBE19C2E5F0299004E1AB5 /* PowerSyncDynamic in Frameworks */ = {isa = PBXBuildFile; productRef = BEDBE19B2E5F0299004E1AB5 /* PowerSyncDynamic */; };
-		BEDBE19D2E5F0299004E1AB5 /* PowerSyncDynamic in Embed Frameworks */ = {isa = PBXBuildFile; productRef = BEDBE19B2E5F0299004E1AB5 /* PowerSyncDynamic */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		BE4079B02F0E776400103811 /* PowerSyncDynamic in Frameworks */ = {isa = PBXBuildFile; productRef = BE4079AF2F0E776400103811 /* PowerSyncDynamic */; };
+		BE4079B12F0E776800103811 /* PowerSyncDynamic in Embed Frameworks */ = {isa = PBXBuildFile; productRef = BE4079AF2F0E776400103811 /* PowerSyncDynamic */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		BEE4708B2E3BBB2500140D11 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE4708A2E3BBB2500140D11 /* Secrets.swift */; };
 /* End PBXBuildFile section */
 
@@ -56,7 +56,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				BEDBE19D2E5F0299004E1AB5 /* PowerSyncDynamic in Embed Frameworks */,
+				BE4079B12F0E776800103811 /* PowerSyncDynamic in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -134,7 +134,7 @@
 				6A9669002B9EE4FE00B05DCF /* PostgREST in Frameworks */,
 				6A9668FE2B9EE4FE00B05DCF /* Auth in Frameworks */,
 				B666587A2C63B88700159A81 /* SwiftUINavigation in Frameworks */,
-				BEDBE19C2E5F0299004E1AB5 /* PowerSyncDynamic in Frameworks */,
+				BE4079B02F0E776400103811 /* PowerSyncDynamic in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -501,7 +501,7 @@
 				B66658792C63B88700159A81 /* SwiftUINavigation */,
 				B666587B2C63B88700159A81 /* SwiftUINavigationCore */,
 				B69F7D852C8EE27400565448 /* AnyCodable */,
-				BEDBE19B2E5F0299004E1AB5 /* PowerSyncDynamic */,
+				BE4079AF2F0E776400103811 /* PowerSyncDynamic */,
 			);
 			productName = PowerSyncExample;
 			productReference = 6A7315842B9854220004CB17 /* PowerSyncExample.app */;
@@ -537,7 +537,7 @@
 				B66658752C63B7BB00159A81 /* XCRemoteSwiftPackageReference "swift-identified-collections" */,
 				B66658782C63B88700159A81 /* XCRemoteSwiftPackageReference "swiftui-navigation" */,
 				B69F7D842C8EE27300565448 /* XCRemoteSwiftPackageReference "AnyCodable" */,
-				18F30B282CCA4B3B00A58917 /* XCLocalSwiftPackageReference "../../powersync-swift" */,
+				BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../../../powersync-swift" */,
 			);
 			productRefGroup = 6A7315852B9854220004CB17 /* Products */;
 			projectDirPath = "";
@@ -828,9 +828,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		18F30B282CCA4B3B00A58917 /* XCLocalSwiftPackageReference "../../powersync-swift" */ = {
+		BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../../../powersync-swift" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../powersync-swift";
+			relativePath = "../../../powersync-swift";
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -905,9 +905,9 @@
 			package = B69F7D842C8EE27300565448 /* XCRemoteSwiftPackageReference "AnyCodable" */;
 			productName = AnyCodable;
 		};
-		BEDBE19B2E5F0299004E1AB5 /* PowerSyncDynamic */ = {
+		BE4079AF2F0E776400103811 /* PowerSyncDynamic */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 18F30B282CCA4B3B00A58917 /* XCLocalSwiftPackageReference "../../powersync-swift" */;
+			package = BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../../../powersync-swift" */;
 			productName = PowerSyncDynamic;
 		};
 /* End XCSwiftPackageProductDependency section */
