@@ -14,10 +14,11 @@ Follow this guide to:
 
 ## Configure The App
 
-1. Open this directory in XCode.
+1. Open `GRDBDemo.xcodeproj` in XCode.
 
 2. Copy the `Secrets.template.swift` file to a new `Secrets.swift` file and insert the credentials of your Supabase and PowerSync projects (more info can be found [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#test-everything-using-our-demo-app)).
 
+From this directory
 ```bash
 cp GRDBDemo/Secrets.template.swift GRDBDemo/Secrets.swift
 ```
