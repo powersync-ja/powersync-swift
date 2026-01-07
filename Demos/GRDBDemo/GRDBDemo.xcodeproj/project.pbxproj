@@ -40,20 +40,23 @@
 		BE1EABA52E7B075D00D0A0A7 /* GRDB Demo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "GRDB Demo.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		BE4079772F0E743D00103811 /* Exceptions for "GRDBDemo" folder in "GRDB Demo" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Secrets.template.swift,
+			);
+			target = BE1EABA42E7B075D00D0A0A7 /* GRDB Demo */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		BE1EABA72E7B075D00D0A0A7 /* GRDB Demo */ = {
+		BE1EABA72E7B075D00D0A0A7 /* GRDBDemo */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "GRDB Demo";
-			sourceTree = "<group>";
-		};
-		BE1EABB52E7B075E00D0A0A7 /* GRDB DemoTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "GRDB DemoTests";
-			sourceTree = "<group>";
-		};
-		BE1EABBF2E7B075E00D0A0A7 /* GRDB DemoUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "GRDB DemoUITests";
+			exceptions = (
+				BE4079772F0E743D00103811 /* Exceptions for "GRDBDemo" folder in "GRDB Demo" target */,
+			);
+			path = GRDBDemo;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -76,9 +79,7 @@
 		BE1EAB9C2E7B075D00D0A0A7 = {
 			isa = PBXGroup;
 			children = (
-				BE1EABA72E7B075D00D0A0A7 /* GRDB Demo */,
-				BE1EABB52E7B075E00D0A0A7 /* GRDB DemoTests */,
-				BE1EABBF2E7B075E00D0A0A7 /* GRDB DemoUITests */,
+				BE1EABA72E7B075D00D0A0A7 /* GRDBDemo */,
 				BE1EAC4D2E7C461800D0A0A7 /* Frameworks */,
 				BE1EABA62E7B075D00D0A0A7 /* Products */,
 			);
@@ -117,7 +118,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				BE1EABA72E7B075D00D0A0A7 /* GRDB Demo */,
+				BE1EABA72E7B075D00D0A0A7 /* GRDBDemo */,
 			);
 			name = "GRDB Demo";
 			packageProductDependencies = (
@@ -145,7 +146,7 @@
 					};
 				};
 			};
-			buildConfigurationList = BE1EABA02E7B075D00D0A0A7 /* Build configuration list for PBXProject "GRDB Demo" */;
+			buildConfigurationList = BE1EABA02E7B075D00D0A0A7 /* Build configuration list for PBXProject "GRDBDemo" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -417,7 +418,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		BE1EABA02E7B075D00D0A0A7 /* Build configuration list for PBXProject "GRDB Demo" */ = {
+		BE1EABA02E7B075D00D0A0A7 /* Build configuration list for PBXProject "GRDBDemo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				BE1EABC42E7B075E00D0A0A7 /* Debug */,

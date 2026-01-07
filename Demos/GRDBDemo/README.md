@@ -16,10 +16,10 @@ Follow this guide to:
 
 1. Open this directory in XCode.
 
-2. Copy the `_Secrets.swift` file to a new `Secrets.swift` file and insert the credentials of your Supabase and PowerSync projects (more info can be found [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#test-everything-using-our-demo-app)).
+2. Copy the `Secrets.template.swift` file to a new `Secrets.swift` file and insert the credentials of your Supabase and PowerSync projects (more info can be found [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#test-everything-using-our-demo-app)).
 
 ```bash
-cp _Secrets.swift Secrets.swift
+cp GRDBDemo/Secrets.template.swift GRDBDemo/Secrets.swift
 ```
 
 ### GRDB Implementation Details
