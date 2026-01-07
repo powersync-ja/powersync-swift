@@ -907,6 +907,7 @@
 		};
 		BE4079AF2F0E776400103811 /* PowerSyncDynamic */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../../../powersync-swift" */;
 			productName = PowerSyncDynamic;
 		};
 /* End XCSwiftPackageProductDependency section */
