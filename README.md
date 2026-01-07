@@ -20,9 +20,9 @@ The SDK provides two main products:
 
 The easiest way to test the PowerSync Swift SDK is to run our demo application.
 
-- [Demo/PowerSyncExample](./Demo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector.
+- [Demos/PowerSyncExample](./Demo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector.
 
-- [Demo/GRDB Demo](./Demo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector and GRDB connections.
+- [Demos/GRDB Demo](./Demo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector and GRDB connections.
 
 ## Installation
 
