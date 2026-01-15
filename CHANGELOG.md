@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.0 (unreleased)
+
+* Fix "Linking a static library that was built with `-gmodules`, but the module cache was not found.` build warnings. 
+* Update to SQLite 3.51.2.
+
 ## 1.9.0
 
 * Fixed user agent strings not following expected format.
