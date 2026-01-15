@@ -1,15 +1,6 @@
 {
-  "originHash" : "34083d92f16a1a214d300bbd76626df53fe28bedc7a0a67ca21b753e731709a6",
+  "originHash" : "6c29834419fdcb92f539ecf8608ba7e848a255b9f77dbf9163a1f81e371f3c1d",
   "pins" : [
-    {
-      "identity" : "csqlite",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/powersync-ja/CSQLite.git",
-      "state" : {
-        "revision" : "9f10da4272e292c453db400342d9e16c15e59db5",
-        "version" : "3.51.2"
-      }
-    },
     {
       "identity" : "grdb.swift",
       "kind" : "remoteSourceControl",

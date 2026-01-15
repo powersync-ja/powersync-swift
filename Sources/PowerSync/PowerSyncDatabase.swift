@@ -8,16 +8,19 @@ public let DEFAULT_DB_FILENAME = "powersync.db"
 ///   - schema: The database schema
 ///   - dbFilename: The database filename. Defaults to "powersync.db"
 ///   - logger: Optional logging interface
+///   - initialStatements: An optional list of statements to run as the database is opened.
 /// - Returns: A configured PowerSyncDatabase instance
 public func PowerSyncDatabase(
     schema: Schema,
     dbFilename: String = DEFAULT_DB_FILENAME,
-    logger: (any LoggerProtocol) = DefaultLogger()
+    logger: (any LoggerProtocol) = DefaultLogger(),
+    initialStatements: [String] = []
 ) -> PowerSyncDatabaseProtocol {
     return openKotlinDBDefault(
         schema: schema,
         dbFilename: dbFilename,
-        logger: DatabaseLogger(logger)
+        logger: DatabaseLogger(logger),
+        initialStatements: initialStatements
     )
 }
 

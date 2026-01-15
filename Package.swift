@@ -7,7 +7,7 @@ let packageName = "PowerSync"
 
 // Set this to the absolute path of your Kotlin SDK checkout if you want to use a local Kotlin
 // build. Also see docs/LocalBuild.md for details
-let localKotlinSdkOverride: String? = nil
+let localKotlinSdkOverride: String? = "/Users/simon/src/powersync-kotlin"
 
 // Set this to the absolute path of your powersync-sqlite-core checkout if you want to use a
 // local build of the core extension.
@@ -48,7 +48,7 @@ if let corePath = localCoreExtension {
     conditionalDependencies.append(
         .package(
             url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
-            exact: "0.4.10"
+            exact: "0.4.10",
         ))
 }
 
