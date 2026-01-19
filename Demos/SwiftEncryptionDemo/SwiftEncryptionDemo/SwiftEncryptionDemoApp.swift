@@ -1,10 +1,3 @@
-//
-//  SwiftEncryptionDemoApp.swift
-//  SwiftEncryptionDemo
-//
-//  Created by Simon Binder on 09.01.26.
-//
-
 import SwiftUI
 
 @main

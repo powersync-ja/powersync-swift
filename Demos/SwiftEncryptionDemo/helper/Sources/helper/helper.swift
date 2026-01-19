@@ -1,1 +1,1 @@
-// Intentionally left empty, we only new a SwiftPM project for package traits
+// Intentionally left empty, we only need a SwiftPM project for package traits

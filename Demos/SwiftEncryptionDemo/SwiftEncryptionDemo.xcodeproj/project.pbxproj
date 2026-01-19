@@ -45,11 +45,6 @@
 			path = SwiftEncryptionDemoTests;
 			sourceTree = "<group>";
 		};
-		F410AD0D2F11330E003F542F /* SwiftEncryptionDemoUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = SwiftEncryptionDemoUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -84,7 +79,6 @@
 			children = (
 				F410ACF52F11330D003F542F /* SwiftEncryptionDemo */,
 				F410AD032F11330E003F542F /* SwiftEncryptionDemoTests */,
-				F410AD0D2F11330E003F542F /* SwiftEncryptionDemoUITests */,
 				F410AD232F11353E003F542F /* Frameworks */,
 				F410ACF42F11330D003F542F /* Products */,
 			);
@@ -169,9 +163,6 @@
 			);
 			dependencies = (
 				F410AD0C2F11330E003F542F /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				F410AD0D2F11330E003F542F /* SwiftEncryptionDemoUITests */,
 			);
 			name = SwiftEncryptionDemoUITests;
 			packageProductDependencies = (
