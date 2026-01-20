@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.10.0 (unreleased)
+## 1.10.0
 
 * Fix "Linking a static library that was built with `-gmodules`, but the module cache was not found.` build warnings. 
 * Update to SQLite 3.51.2.
