@@ -1,13 +1,28 @@
 import SwiftUI
 import PowerSync
 
+enum DatabaseOpenState {
+    case loading
+    case opened(String)
+    case error(Error)
+}
+
 struct ContentView: View {
+    @State var state = DatabaseOpenState.loading
+    
     var body: some View {
         VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+            switch state {
+            case .loading:
+                ProgressView()
+            case .opened(let cipher):
+                Image(systemName: "lock.circle")
+                    .imageScale(.large)
+                    .foregroundStyle(.tint)
+                Text("Opened encrypted database using \(cipher)")
+            case .error(let error):
+                Text("Error opening database: \(error.localizedDescription)")
+            }
         }
         .padding()
         .task {
@@ -20,6 +35,8 @@ struct ContentView: View {
                         ]
                     ),
                 ]),
+                // Note: This is for demo purposes. In real apps, follow best practices instead of hardcoding keys in
+                // code (e.g. by storing it in Keychain).
                 initialStatements: ["pragma key = 'my encryption key'"]
             )
             do {
@@ -31,8 +48,9 @@ struct ContentView: View {
                     parameters: ["Secret user"]
                 )
                 try await ps.close()
+                state = .opened(cipher)
             } catch {
-                print("error")
+                state = .error(error)
             }
         }
     }

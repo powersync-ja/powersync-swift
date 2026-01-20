@@ -4,6 +4,8 @@
 
 * Fix "Linking a static library that was built with `-gmodules`, but the module cache was not found.` build warnings. 
 * Update to SQLite 3.51.2.
+* Add `initialStatements` parameter to `PowerSyncDatabase()`. These statements run before anything else when databases are opened,
+  which is useful to e.g. enable encryption.
 
 ## 1.9.0
 
