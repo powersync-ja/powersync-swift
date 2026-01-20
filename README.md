@@ -24,6 +24,8 @@ The easiest way to test the PowerSync Swift SDK is to run our demo application.
 
 - [Demos/GRDBDemo](./Demos/GRDBDemo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector and GRDB connections.
 
+- [Demos/SwiftEncryptionDemo](./Demos/SwiftEncryptionDemo/README.md): A simple app opening an encrypted local PowerSync database.
+
 ## Installation
 
 Add

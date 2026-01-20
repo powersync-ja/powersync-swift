@@ -1,5 +1,5 @@
 {
-  "originHash" : "a344850cf0b5bc7563e0968d5918aeae92098aa428fbec50ff43b4a82a922246",
+  "originHash" : "2d885a1b46f17f9239b7876e3889168a6de98024718f2d7af03aede290c8a86a",
   "pins" : [
     {
       "identity" : "anycodable",
@@ -8,15 +8,6 @@
       "state" : {
         "revision" : "862808b2070cd908cb04f9aafe7de83d35f81b05",
         "version" : "0.6.7"
-      }
-    },
-    {
-      "identity" : "csqlite",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/powersync-ja/CSQLite.git",
-      "state" : {
-        "revision" : "25f4a02fce2dcd588bad37ea6fc047c2bbe8ef5e",
-        "version" : "3.51.1"
       }
     },
     {
