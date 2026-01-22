@@ -44,6 +44,11 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         )
     }
 
+    func syncStream(name: String, params: JsonParam?) -> any SyncStream {
+        let rawStream = kotlinDatabase.syncStream(name: name, parameters: params?.mapValues { $0.toKotlinMap() })
+        return KotlinSyncStream(kotlinStream: rawStream)
+    }
+    
     func connect(
         connector: PowerSyncBackendConnectorProtocol,
         options: ConnectOptions?

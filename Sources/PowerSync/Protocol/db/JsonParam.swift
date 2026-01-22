@@ -50,6 +50,27 @@ public enum JsonValue: Codable, Sendable {
             return anyDict
         }
     }
+
+    /// Converts a raw Swift value into a ``JsonValue``.
+    ///
+    /// The value must be one of the types returned by ``JsonValue/toValue()``.
+    internal static func fromValue(raw: Any?) -> Self {
+        if let string = raw as? String {
+            return Self.string(string)
+        } else if let int = raw as? Int {
+            return Self.int(int)
+        } else if let double = raw as? Double {
+            return Self.double(double)
+        } else if let bool = raw as? Bool {
+            return Self.bool(bool)
+        } else if let array = raw as? [Any?] {
+            return Self.array(array.map(fromValue))
+        } else if let object = raw as? [String: Any?] {
+            return Self.object(object.mapValues(fromValue))
+        } else {
+            return Self.null
+        }
+    }
 }
 
 /// A typealias representing a top-level JSON object with string keys and `JSONValue` values.

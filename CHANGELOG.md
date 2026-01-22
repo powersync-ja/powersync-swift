@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.0 (unreleased)
+
+* Add support for [sync streams](https://docs.powersync.com/sync/streams/overview).
+
 ## 1.10.0
 
 * Fix "Linking a static library that was built with `-gmodules`, but the module cache was not found.` build warnings. 
