@@ -6,6 +6,7 @@ protocol SecretsProvider {
     static var supabaseURL: URL { get }
     static var supabaseAnonKey: String { get }
     static var supabaseStorageBucket: String? { get }
+    static var previewSyncStreams: Bool { get }
 }
 
 // Default conforming type
