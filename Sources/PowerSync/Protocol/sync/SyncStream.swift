@@ -78,7 +78,7 @@ public struct SyncSubscriptionDescription: SyncStreamDescription {
     /// Whether this stream has been synced at least once.
     public var hasSynced: Bool {
         get {
-            return self.expiresAt != nil
+            return self.lastSyncedAt != nil
         }
     }
 }
