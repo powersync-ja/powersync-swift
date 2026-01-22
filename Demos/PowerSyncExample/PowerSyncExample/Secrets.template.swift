@@ -18,4 +18,22 @@ extension Secrets {
     static var supabaseStorageBucket: String? {
         return nil
     }
+
+    static var previewSyncStreams: Bool {
+        /* 
+        Set to true to preview https://docs.powersync.com/sync/streams/overview.
+        When enabling this, also set your sync rules to the following:
+
+        config:
+          edition: 2
+
+        streams:
+          lists:
+            query: SELECT * FROM lists WHERE owner_id = auth.user_id()
+            auto_subscribe: true
+          todos:
+            query: SELECT * FROM todos WHERE list_id = subscription.parameter('list') AND list_id IN (SELECT id FROM lists WHERE owner_id = auth.user_id())
+        */
+        false
+    }
 }

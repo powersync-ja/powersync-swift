@@ -2,6 +2,7 @@ import AVFoundation
 import IdentifiedCollections
 import SwiftUI
 import SwiftUINavigation
+import PowerSync
 
 struct TodoListView: View {
     @Environment(SystemManager.self) private var system
@@ -11,6 +12,7 @@ struct TodoListView: View {
     @State private var error: Error?
     @State private var newTodo: NewTodo?
     @State private var editing: Bool = false
+    @State private var loadingListItems: Bool = false
 
 #if os(iOS)
     // Called when a photo has been captured. Individual widgets should register the listener
@@ -32,6 +34,10 @@ struct TodoListView: View {
                         self.newTodo = nil
                     }
                 }
+            }
+            
+            if (loadingListItems) {
+                ProgressView()
             }
 
             ForEach(todos) { todo in
@@ -140,6 +146,22 @@ struct TodoListView: View {
                 withAnimation {
                     self.todos = IdentifiedArrayOf(uniqueElements: tds)
                 }
+            }
+        }
+        .task {
+            if (Secrets.previewSyncStreams) {
+                // With sync streams, todo items are not loaded by default. We have to request them while we need them.
+                // Thanks to builtin caching, navingating to the same list multiple times does not have to fetch items again.
+                loadingListItems = true
+                do {
+                    // This will make the sync client request items from this list as long as we keep a reference to the stream subscription,
+                    // and a default TTL of one day afterwards.
+                    let streamSubscription = try await system.db.syncStream(name: "todos", params: ["list": JsonValue.string(listId)]).subscribe()
+                    try await streamSubscription.waitForFirstSync()
+                } catch {
+                    print("Error subscribing to list stream \(error)")
+                }
+                loadingListItems = false
             }
         }
     }

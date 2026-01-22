@@ -11,6 +11,15 @@
       }
     },
     {
+      "identity" : "csqlite",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/powersync-ja/CSQLite.git",
+      "state" : {
+        "revision" : "9f10da4272e292c453db400342d9e16c15e59db5",
+        "version" : "3.51.2"
+      }
+    },
+    {
       "identity" : "grdb.swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/groue/GRDB.swift.git",
