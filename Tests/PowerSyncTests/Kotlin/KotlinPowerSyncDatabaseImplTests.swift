@@ -717,6 +717,22 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         // Clean up: delete all SQLite files using the helper function
         try deleteSQLiteFiles(dbFilename: testDbFilename, in: databaseDirectory)
     }
+    
+    func testSubscriptionsUpdateStateWhileOffline() async throws {
+        var streams = database.currentStatus.asFlow().makeAsyncIterator()
+        let initialStatus = await streams.next(); // Ignore initial
+        XCTAssertEqual(initialStatus?.syncStreams?.count, 0)
+        
+        // Subscribing while offline should add the stream to the subscriptions reported in the status.
+        let subscription = try await database.syncStream(name: "foo", params: ["foo": JsonValue.string("bar")]).subscribe()
+        let updatedStatus = await streams.next();
+        
+        XCTAssertEqual(updatedStatus?.syncStreams?.count, 1)
+        let status = updatedStatus?.forStream(stream: subscription)
+        XCTAssertNotNil(status)
+        
+        XCTAssertNil(status?.progress)
+    }
 }
 
 extension UUID: PowerSyncDataTypeConvertible {

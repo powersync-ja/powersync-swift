@@ -47,6 +47,15 @@ public protocol SyncStatusData: Sendable {
     /// - Parameter priority: The priority for which the status is requested.
     /// - Returns: A `PriorityStatusEntry` representing the synchronization status for the given priority.
     func statusForPriority(_ priority: BucketPriority) -> PriorityStatusEntry
+
+    /// All sync streams currently being tracked in the database.
+    ///
+    /// This returns null when the database is currently being opened and we don't have reliable information about
+    /// included streams yet.
+    var syncStreams: [SyncStreamStatus]? { get }
+
+    /// Status information for the given stream, if it's a stream that is currently tracked by the sync client.
+    func forStream(stream: SyncStreamDescription) -> SyncStreamStatus?
 }
 
 /// A protocol extending `SyncStatusData` to include flow-based updates for synchronization status.
@@ -54,4 +63,12 @@ public protocol SyncStatus: SyncStatusData, Sendable {
     /// Provides a flow of synchronization status updates.
     /// - Returns: An `AsyncStream` that emits updates whenever the synchronization status changes.
     func asFlow() -> AsyncStream<SyncStatusData>
+}
+
+/// Current information about a ``SyncStreamSubscription``.
+public struct SyncStreamStatus {
+    /// If the sync status is currently downloading, information about download progress related to this stream.
+    let progress: ProgressWithOperations?
+    /// The ``SyncSubscriptionDescription`` providing information about the subscription.
+    let subscription: SyncSubscriptionDescription
 }

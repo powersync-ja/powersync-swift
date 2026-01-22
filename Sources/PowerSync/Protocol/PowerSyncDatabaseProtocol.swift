@@ -68,9 +68,8 @@ public struct ConnectOptions: Sendable {
 
     /// Uses a new sync client implemented in Rust instead of the one implemented in Kotlin.
     ///
-    /// The new client is more efficient and will become the default in the future, but is still marked as experimental for now.
-    /// We encourage interested users to try the new client.
-    @_spi(PowerSyncExperimental)
+    /// This option is enabled by default and recommended for all apps. The old Kotlin-based implementation
+    /// will be removed in a future version of the SDK.
     public var newClientImplementation: Bool
 
     /// Configuration for the sync client used for PowerSync requests.
@@ -249,6 +248,11 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// Using soft clears is recommended where it's not a security issue that old data could be reconstructed from
     /// the database.
     func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws
+
+    /// Create a ``SyncStream`` instance for the given name and parameters.
+    ///
+    /// Use ``SyncStream/subscribe`` on the returned instance to subscribe to the stream.
+    func syncStream(name: String, params: JsonParam?) -> any SyncStream
 
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.
