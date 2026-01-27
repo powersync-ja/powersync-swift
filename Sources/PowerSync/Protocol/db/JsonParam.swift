@@ -68,7 +68,9 @@ public enum JsonValue: Codable, Sendable {
         } else if let object = raw as? [String: Any?] {
             return Self.object(object.mapValues(fromValue))
         } else {
-            return Self.null
+            // fatalError is fine here because this function is internal, so this being reached
+            // is an SDK bug.
+            fatalError("fromValue must only be called on outputs of JsonValue.toValue()");
         }
     }
 }
