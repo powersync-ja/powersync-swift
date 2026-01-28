@@ -733,6 +733,28 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         
         XCTAssertNil(status?.progress)
     }
+    
+    func testSubscriptionParameters() async throws {
+        var streams = database.currentStatus.asFlow().makeAsyncIterator()
+        let initialStatus = await streams.next(); // Ignore initial
+        XCTAssertEqual(initialStatus?.syncStreams?.count, 0)
+        
+        let _ = try await database.syncStream(name: "foo", params: [
+            "text": JsonValue.string("text"),
+            "int": JsonValue.int(42),
+            "double": JsonValue.double(1.23),
+            "bool": JsonValue.bool(true),
+        ]).subscribe()
+        let updatedStatus = await streams.next();
+        
+        XCTAssertEqual(updatedStatus?.syncStreams?.count, 1)
+        let stream = updatedStatus!.syncStreams![0]
+        let params = stream.subscription.parameters!
+        XCTAssertEqual(params["text"], JsonValue.string("text"))
+        XCTAssertEqual(params["int"], JsonValue.int(42))
+        XCTAssertEqual(params["double"], JsonValue.double(1.23))
+        XCTAssertEqual(params["bool"], JsonValue.bool(true))
+    }
 }
 
 extension UUID: PowerSyncDataTypeConvertible {

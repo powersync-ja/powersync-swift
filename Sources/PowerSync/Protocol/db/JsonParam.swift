@@ -2,7 +2,7 @@
 ///
 /// Supports all standard JSON types: string, number (integer and double),
 /// boolean, null, arrays, and nested objects.
-public enum JsonValue: Codable, Sendable {
+public enum JsonValue: Codable, Sendable, Equatable {
     /// A JSON string value.
     case string(String)
 
@@ -57,12 +57,12 @@ public enum JsonValue: Codable, Sendable {
     internal static func fromValue(raw: Any?) -> Self {
         if let string = raw as? String {
             return Self.string(string)
+        } else if let bool = raw as? Bool {
+            return Self.bool(bool)
         } else if let int = raw as? Int {
             return Self.int(int)
         } else if let double = raw as? Double {
             return Self.double(double)
-        } else if let bool = raw as? Bool {
-            return Self.bool(bool)
         } else if let array = raw as? [Any?] {
             return Self.array(array.map(fromValue))
         } else if let object = raw as? [String: Any?] {
