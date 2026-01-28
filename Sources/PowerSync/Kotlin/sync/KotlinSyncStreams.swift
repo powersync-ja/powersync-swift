@@ -11,7 +11,7 @@ class KotlinStreamDescription<T: PowerSyncKotlin.SyncStreamDescription> {
         self.inner = inner
         self.name = inner.name
         self.kotlinParameters = inner.parameters
-        self.parameters = inner.parameters?.mapValues { JsonValue.fromValue(raw: $0) }
+        self.parameters = inner.parameters?.mapValues { JsonValue.kotlinValueToJsonParam(raw: $0) }
     }
 }
 
@@ -104,7 +104,7 @@ func mapSyncStreamStatus(_ status: PowerSyncKotlin.SyncStreamStatus) -> SyncStre
         progress: progress,
         subscription: SyncSubscriptionDescription(
             name: subscription.name,
-            parameters: subscription.parameters?.mapValues { JsonValue.fromValue(raw: $0) },
+            parameters: subscription.parameters?.mapValues { JsonValue.kotlinValueToJsonParam(raw: $0) },
             active: subscription.active,
             isDefault: subscription.isDefault,
             hasExplicitSubscription: subscription.hasExplicitSubscription,

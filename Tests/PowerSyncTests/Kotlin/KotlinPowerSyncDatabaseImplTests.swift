@@ -741,7 +741,8 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         
         let _ = try await database.syncStream(name: "foo", params: [
             "text": JsonValue.string("text"),
-            "int": JsonValue.int(42),
+            "int1": JsonValue.int(1),
+            "int0": JsonValue.int(0),
             "double": JsonValue.double(1.23),
             "bool": JsonValue.bool(true),
         ]).subscribe()
@@ -751,7 +752,8 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let stream = updatedStatus!.syncStreams![0]
         let params = stream.subscription.parameters!
         XCTAssertEqual(params["text"], JsonValue.string("text"))
-        XCTAssertEqual(params["int"], JsonValue.int(42))
+        XCTAssertEqual(params["int1"], JsonValue.int(1))
+        XCTAssertEqual(params["int0"], JsonValue.int(0))
         XCTAssertEqual(params["double"], JsonValue.double(1.23))
         XCTAssertEqual(params["bool"], JsonValue.bool(true))
     }

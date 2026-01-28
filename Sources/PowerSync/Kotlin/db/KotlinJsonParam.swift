@@ -26,4 +26,24 @@ extension JsonValue {
             return PowerSyncKotlin.JsonParam.Map(value: anyDict)
         }
     }
+    
+    static func kotlinValueToJsonParam(raw: Any?) -> JsonValue {
+        if let string = raw as? String {
+            return Self.string(string)
+        } else if let bool = raw as? KotlinBoolean {
+            return Self.bool(bool.boolValue)
+        } else if let int = raw as? KotlinInt {
+            return Self.int(int.intValue)
+        } else if let double = raw as? KotlinDouble {
+            return Self.double(double.doubleValue)
+        } else if let array = raw as? [Any?] {
+            return Self.array(array.map(kotlinValueToJsonParam))
+        } else if let object = raw as? [String: Any?] {
+            return Self.object(object.mapValues(kotlinValueToJsonParam))
+        } else {
+            // fatalError is fine here because this function is internal, so this being reached
+            // is an SDK bug.
+            fatalError("fromValue must only be called on outputs of JsonValue.toValue()");
+        }
+    }
 }
