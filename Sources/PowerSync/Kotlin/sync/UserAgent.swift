@@ -20,7 +20,7 @@ func userAgent() async -> String {
 
 // Returns the OS version string for the current platform
 @MainActor func getOSVersion() async -> String {
-#if os(iOS) || os(tvOS)
+#if os(iOS)
     // UIDevice must be accessed on the main actor
     return UIDevice.current.systemVersion
 #else
