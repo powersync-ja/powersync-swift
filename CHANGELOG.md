@@ -3,6 +3,7 @@
 ## 1.11.0 (unreleased)
 
 * Add support for [sync streams](https://docs.powersync.com/sync/streams/overview).
+* Fixed MainActor isolation warning for UserAgent function.
 
 ## 1.10.0
 
