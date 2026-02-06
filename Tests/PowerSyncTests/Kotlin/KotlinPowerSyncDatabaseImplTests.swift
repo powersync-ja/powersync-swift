@@ -717,7 +717,84 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         // Clean up: delete all SQLite files using the helper function
         try deleteSQLiteFiles(dbFilename: testDbFilename, in: databaseDirectory)
     }
-    
+
+    func testCustomDbDirectory() async throws {
+        let fileManager = FileManager.default
+        let testDbFilename = "test_custom_dir_\(UUID().uuidString).db"
+        let customDirectory = fileManager.temporaryDirectory
+            .appendingPathComponent("powersync_test_\(UUID().uuidString)")
+
+        // Create the custom directory
+        try fileManager.createDirectory(at: customDirectory, withIntermediateDirectories: true)
+
+        let testDatabase = PowerSyncDatabase(
+            schema: schema,
+            dbFilename: testDbFilename,
+            dbDirectory: customDirectory.path,
+            logger: DatabaseLogger(DefaultLogger())
+        )
+
+        // Perform an operation to ensure the database file is created
+        try await testDatabase.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "Test User", "test@example.com"]
+        )
+
+        // Verify the database file exists in the custom directory
+        let dbFile = customDirectory.appendingPathComponent(testDbFilename)
+        XCTAssertTrue(fileManager.fileExists(atPath: dbFile.path), "Database file should exist in custom directory")
+
+        // Verify the file does NOT exist in the default directory
+        let defaultDirectory = try appleDefaultDatabaseDirectory()
+        let defaultDbFile = defaultDirectory.appendingPathComponent(testDbFilename)
+        XCTAssertFalse(fileManager.fileExists(atPath: defaultDbFile.path), "Database file should not exist in default directory")
+
+        // Close and clean up
+        try await testDatabase.close(deleteDatabase: true)
+
+        // Verify the database file is deleted from the custom directory
+        XCTAssertFalse(fileManager.fileExists(atPath: dbFile.path), "Database file should be deleted from custom directory")
+
+        // Clean up the temporary directory
+        try? fileManager.removeItem(at: customDirectory)
+    }
+
+    func testCustomDbDirectoryCloseWithDeleteDatabase() async throws {
+        let fileManager = FileManager.default
+        let testDbFilename = "test_custom_delete_\(UUID().uuidString).db"
+        let customDirectory = fileManager.temporaryDirectory
+            .appendingPathComponent("powersync_test_\(UUID().uuidString)")
+
+        try fileManager.createDirectory(at: customDirectory, withIntermediateDirectories: true)
+
+        let testDatabase = PowerSyncDatabase(
+            schema: schema,
+            dbFilename: testDbFilename,
+            dbDirectory: customDirectory.path,
+            logger: DatabaseLogger(DefaultLogger())
+        )
+
+        try await testDatabase.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "Test User", "test@example.com"]
+        )
+
+        let dbFile = customDirectory.appendingPathComponent(testDbFilename)
+        let walFile = customDirectory.appendingPathComponent("\(testDbFilename)-wal")
+        let shmFile = customDirectory.appendingPathComponent("\(testDbFilename)-shm")
+
+        XCTAssertTrue(fileManager.fileExists(atPath: dbFile.path), "Database file should exist")
+
+        try await testDatabase.close(deleteDatabase: true)
+
+        // Verify all SQLite files are deleted from the custom directory
+        XCTAssertFalse(fileManager.fileExists(atPath: dbFile.path), "Database file should be deleted")
+        XCTAssertFalse(fileManager.fileExists(atPath: walFile.path), "WAL file should be deleted")
+        XCTAssertFalse(fileManager.fileExists(atPath: shmFile.path), "SHM file should be deleted")
+
+        try? fileManager.removeItem(at: customDirectory)
+    }
+
     func testSubscriptionsUpdateStateWhileOffline() async throws {
         var streams = database.currentStatus.asFlow().makeAsyncIterator()
         let initialStatus = await streams.next(); // Ignore initial
