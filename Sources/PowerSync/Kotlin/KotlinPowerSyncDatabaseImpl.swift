@@ -11,18 +11,18 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     private let encoder = JSONEncoder()
     let currentStatus: SyncStatus
     private let dbFilename: String
+    private let dbDirectory: String?
 
     init(
         kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase,
         dbFilename: String,
+        dbDirectory: String? = nil,
         logger: DatabaseLogger
     ) {
         self.logger = logger
         self.kotlinDatabase = kotlinDatabase
-        /// We currently use the dbFilename to delete the database files when the database is closed
-        /// The kotlin PowerSyncDatabase.identifier currently prepends `null` to the dbFilename (for the directory).
-        /// FIXME. Update this once we support database directory configuration.
         self.dbFilename = dbFilename
+        self.dbDirectory = dbDirectory
         currentStatus = KotlinSyncStatus(
             baseStatus: kotlinDatabase.currentStatus
         )
@@ -340,8 +340,12 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     }
 
     private func deleteDatabase() async throws {
-        // We can use the supplied dbLocation when we support that in future
-        let directory = try appleDefaultDatabaseDirectory()
+        let directory: URL
+        if let dbDirectory {
+            directory = URL(fileURLWithPath: dbDirectory, isDirectory: true)
+        } else {
+            directory = try appleDefaultDatabaseDirectory()
+        }
         try deleteSQLiteFiles(dbFilename: dbFilename, in: directory)
     }
 
@@ -420,6 +424,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
 func openKotlinDBDefault(
     schema: Schema,
     dbFilename: String,
+    dbDirectory: String? = nil,
     logger: DatabaseLogger,
     initialStatements: [String] = []
 ) -> PowerSyncDatabaseProtocol {
@@ -434,9 +439,11 @@ func openKotlinDBDefault(
             factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),
             dbFilename: dbFilename,
-            logger: logger.kLogger
+            logger: logger.kLogger,
+            dbDirectory: dbDirectory
         ),
         dbFilename: dbFilename,
+        dbDirectory: dbDirectory,
         logger: logger
     )
 }

@@ -3,6 +3,7 @@
 ## 1.11.0 (unreleased)
 
 * Add support for [sync streams](https://docs.powersync.com/sync/streams/overview).
+* Add `dbDirectory` parameter to `PowerSyncDatabase()` to support custom database storage locations. This enables storing the database in a shared App Group container for access from Share Extensions and other app extensions.
 
 ## 1.10.0
 

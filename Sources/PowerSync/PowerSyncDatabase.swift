@@ -7,18 +7,29 @@ public let DEFAULT_DB_FILENAME = "powersync.db"
 /// - Parameters:
 ///   - schema: The database schema
 ///   - dbFilename: The database filename. Defaults to "powersync.db"
+///   - dbDirectory: Optional custom directory path for the database file.
+///     When `nil`, the database is stored in the default application support directory.
+///     Use this to store the database in a shared App Group container, e.g.:
+///     ```swift
+///     let containerURL = FileManager.default.containerURL(
+///         forSecurityApplicationGroupIdentifier: "group.com.example.app"
+///     )
+///     let dbDirectory = containerURL?.path
+///     ```
 ///   - logger: Optional logging interface
 ///   - initialStatements: An optional list of statements to run as the database is opened.
 /// - Returns: A configured PowerSyncDatabase instance
 public func PowerSyncDatabase(
     schema: Schema,
     dbFilename: String = DEFAULT_DB_FILENAME,
+    dbDirectory: String? = nil,
     logger: (any LoggerProtocol) = DefaultLogger(),
     initialStatements: [String] = []
 ) -> PowerSyncDatabaseProtocol {
     return openKotlinDBDefault(
         schema: schema,
         dbFilename: dbFilename,
+        dbDirectory: dbDirectory,
         logger: DatabaseLogger(logger),
         initialStatements: initialStatements
     )
