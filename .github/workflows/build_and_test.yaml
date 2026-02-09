@@ -20,8 +20,12 @@ jobs:
           swift build -Xswiftc -strict-concurrency=complete
           swift test -Xswiftc -strict-concurrency=complete
 
+      - name: List available simulator targets
+        run: xcrun xctrace list devices
+
       - name: Build and Test
         run: |
           xcodebuild test -scheme PowerSync-Package -destination "platform=iOS Simulator,name=iPhone 16"
           xcodebuild test -scheme PowerSync-Package -destination "platform=macOS,arch=arm64,name=My Mac"
           xcodebuild test -scheme PowerSync-Package -destination "platform=watchOS Simulator,arch=arm64,name=Apple Watch Ultra 2 (49mm)"
+          xcodebuild test -scheme PowerSync-Package -destination "platform=tvOS Simulator,arch=arm64,name=Apple TV Simulator"
