@@ -30,4 +30,4 @@ jobs:
       - name: Test on watchOS simulator
         run: xcodebuild test -scheme PowerSync-Package -destination "platform=watchOS Simulator,arch=arm64,name=Apple Watch Ultra 2 (49mm)"
       - name: Test on tvOS simulator
-        run: xcodebuild test -scheme PowerSync-Package -destination "platform=tvOS Simulator,arch=arm64,name=Apple TV Simulator"
+        run: xcodebuild test -scheme PowerSync-Package -destination "platform=tvOS Simulator,arch=arm64,name=Apple TV"
