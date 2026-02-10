@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.1 (unreleased)
+
+* Fix `SyncStreamStatus` fields not being visible.
+
 ## 1.11.0
 
 * Add support for [sync streams](https://docs.powersync.com/sync/streams/overview).
