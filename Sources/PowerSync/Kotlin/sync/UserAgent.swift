@@ -11,6 +11,8 @@ func userAgent() async -> String {
     let osName = "watchOS"
 #elseif os(iOS)
     let osName = "iOS"
+#elseif os(tvOS)
+    let osName = "tvOS"
 #else
     let osName = "unknown"
 #endif
@@ -20,7 +22,7 @@ func userAgent() async -> String {
 
 // Returns the OS version string for the current platform
 @MainActor func getOSVersion() async -> String {
-#if os(iOS)
+#if os(iOS) || os(tvOS)
     // UIDevice must be accessed on the main actor
     return UIDevice.current.systemVersion
 #else
