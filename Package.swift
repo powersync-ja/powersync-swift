@@ -34,8 +34,8 @@ if let kotlinSdkPath = localKotlinSdkOverride {
         .binaryTarget(
             name: "PowerSyncKotlin",
             url:
-            "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.10.2/PowersyncKotlinRelease.zip",
-            checksum: "78780e04436a872b80e2d8c90f4cc1901ec38de2d1b908c2f7c24f7d8ce0f82b"
+            "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.10.4/PowersyncKotlinRelease.zip",
+            checksum: "8e1dd97a4efa223585796e1d343927b56ed64cb73778ec4b384ab679210ad1b6"
         ))
 }
 
@@ -58,6 +58,7 @@ let package = Package(
         .iOS(.v15),
         .macOS(.v12),
         .watchOS(.v9),
+        .tvOS(.v15),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
