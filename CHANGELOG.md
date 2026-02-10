@@ -1,9 +1,10 @@
 # Changelog
 
-## 1.11.0 (unreleased)
+## 1.11.0
 
 * Add support for [sync streams](https://docs.powersync.com/sync/streams/overview).
 * Fixed MainActor isolation warning for UserAgent function.
+* Support tvOS.
 
 ## 1.10.0
 
