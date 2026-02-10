@@ -68,7 +68,7 @@ public protocol SyncStatus: SyncStatusData, Sendable {
 /// Current information about a ``SyncStreamSubscription``.
 public struct SyncStreamStatus {
     /// If the sync status is currently downloading, information about download progress related to this stream.
-    let progress: ProgressWithOperations?
+    public let progress: ProgressWithOperations?
     /// The ``SyncSubscriptionDescription`` providing information about the subscription.
-    let subscription: SyncSubscriptionDescription
+    public let subscription: SyncSubscriptionDescription
 }
