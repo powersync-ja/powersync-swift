@@ -48,7 +48,7 @@ if let corePath = localCoreExtension {
     conditionalDependencies.append(
         .package(
             url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
-            exact: "0.4.10",
+            exact: "0.4.11",
         ))
 }
 
