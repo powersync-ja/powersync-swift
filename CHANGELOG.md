@@ -3,6 +3,7 @@
 ## 1.11.1 (unreleased)
 
 * Fix `SyncStreamStatus` fields not being visible.
+* Update PowerSync core extension to version 0.4.11.
 
 ## 1.11.0
 
