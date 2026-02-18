@@ -1,7 +1,12 @@
 # Changelog
 
-## 1.11.1 (unreleased)
+## 1.12.0 (unreleased)
 
+* Make raw tables easier to use:
+  * Introduce the `RawTableSchema` struct storing the name of a raw table in the database. When set,
+    `put` and `delete` statements can be inferred automatically.
+  * Add `RawTable//jsonDescription`, which can be passed to the `powersync_create_raw_table_crud_trigger`
+    SQL function to auto-create triggers forwarding writes to `ps_crud`.
 * Fix `SyncStreamStatus` fields not being visible.
 * Update PowerSync core extension to version 0.4.11.
 
