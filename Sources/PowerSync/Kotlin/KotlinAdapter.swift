@@ -23,7 +23,47 @@ enum KotlinAdapter {
 
     struct Table {
         static func toKotlin(_ table: TableProtocol) -> PowerSyncKotlin.Table {
-            let trackPreviousKotlin: PowerSyncKotlin.TrackPreviousValuesOptions? = if let track = table.trackPreviousValues {
+            return PowerSyncKotlin.Table(
+                name: table.name,
+                columns: table.columns.map { Column.toKotlin($0) },
+                indexes: table.indexes.map { Index.toKotlin($0) },
+                options: translateTableOptions(table),
+                viewNameOverride: table.viewNameOverride,
+            )
+        }
+        
+        static func toKotlin(_ table: RawTable) -> PowerSyncKotlin.RawTable {
+            if let schema = table.schema {
+                var put: PowerSyncKotlin.PendingStatement? = nil
+                var delete: PowerSyncKotlin.PendingStatement? = nil
+                if let definedStmt = table.put {
+                    put = translateStatement(definedStmt)
+                }
+                if let definedStmt = table.delete {
+                    delete = translateStatement(definedStmt)
+                }
+                
+                return PowerSyncKotlin.RawTable(
+                    name: table.name,
+                    schema: translateRawTableSchema(schema),
+                    put: put,
+                    delete: delete,
+                    clear: table.clear,
+                )
+            }
+            
+            // If no schema is given, put and delete statements must be present (an invariant
+            // matched by constructor overloads on the RawTable struct).
+            return PowerSyncKotlin.RawTable(
+                name: table.name,
+                put: translateStatement(table.put!),
+                delete: translateStatement(table.delete!),
+                clear: table.clear
+            );
+        }
+        
+        private static func translateTableOptions(_ options: TableOptionsProtocol) -> PowerSyncKotlin.TableOptions {
+            let trackPreviousKotlin: PowerSyncKotlin.TrackPreviousValuesOptions? = if let track = options.trackPreviousValues {
                 PowerSyncKotlin.TrackPreviousValuesOptions(
                     columnFilter: track.columnFilter,
                     onlyWhenChanged: track.onlyWhenChanged
@@ -32,26 +72,21 @@ enum KotlinAdapter {
                 nil
             }
             
-            return PowerSyncKotlin.Table(
-                name: table.name,
-                columns: table.columns.map { Column.toKotlin($0) },
-                indexes: table.indexes.map { Index.toKotlin($0) },
-                localOnly: table.localOnly,
-                insertOnly: table.insertOnly,
-                viewNameOverride: table.viewNameOverride,
-                trackMetadata: table.trackMetadata,
+            return PowerSyncKotlin.TableOptions(
+                localOnly: options.localOnly,
+                insertOnly: options.insertOnly,
+                trackMetadata: options.trackMetadata,
                 trackPreviousValues: trackPreviousKotlin,
-                ignoreEmptyUpdates: table.ignoreEmptyUpdates
+                ignoreEmptyUpdates: options.ignoreEmptyUpdates,
             )
         }
         
-        static func toKotlin(_ table: RawTable) -> PowerSyncKotlin.RawTable {
-            return PowerSyncKotlin.RawTable(
-                name: table.name,
-                put: translateStatement(table.put),
-                delete: translateStatement(table.delete),
-                clear: table.clear
-            );
+        private static func translateRawTableSchema(_ schema: RawTableSchema) -> PowerSyncKotlin.RawTableSchema {
+            return PowerSyncKotlin.RawTableSchema.init(
+                tableName: schema.tableName,
+                syncedColumns: schema.syncedColumns,
+                options: translateTableOptions(schema.options)
+            )
         }
         
         private static func translateStatement(_ stmt: PendingStatement) -> PowerSyncKotlin.PendingStatement {
@@ -67,6 +102,8 @@ enum KotlinAdapter {
                 return PowerSyncKotlin.PendingStatementParameterId.shared
             case .column(let name):
                 return PowerSyncKotlin.PendingStatementParameterColumn(name: name)
+            case .rest:
+                return PowerSyncKotlin.PendingStatementParameterRest.shared
             }
         }
     }

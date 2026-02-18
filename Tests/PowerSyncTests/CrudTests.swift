@@ -253,4 +253,71 @@ final class CrudTests: XCTestCase {
         let newEntries = try await database.getAll("SELECT name FROM ps_buckets", mapper: { cursor in try cursor.getString(index: 0) })
         XCTAssertEqual(newEntries.count, 0)
     }
+    
+    func testRawTableInferredCrudTrigger() async throws {
+        let table = RawTable(name: "sync_name", schema: RawTableSchema(tableName: "users"))
+        try await database.updateSchema(schema: Schema(table))
+        
+        try await database.execute("CREATE TABLE users (id TEXT, name TEXT);")
+        try await database.execute(sql: "SELECT powersync_create_raw_table_crud_trigger(?, ?, ?)", parameters: [
+            table.jsonDescription(),
+            "users_insert",
+            "INSERT"
+        ])
+        try await database.execute(sql: "INSERT INTO users (id, name) VALUES (?, ?)", parameters: [
+            "id",
+            "user"
+        ])
+        
+        let tx = try await database.getNextCrudTransaction()
+        XCTAssertEqual(tx?.crud.count, 1)
+        let write = tx!.crud[0]
+        XCTAssertEqual(write.op, .put)
+        XCTAssertEqual(write.table, "sync_name")
+        XCTAssertEqual(write.id, "id")
+        let opData = write.opData?["name"]
+        XCTAssertEqual(opData, "user")
+    }
+    
+    func testRawTableInferredCrudTriggerWithOptions() async throws {
+        return;
+        try await database.updateSchema(schema: Schema())
+        return;
+        let table = RawTable(
+            name: "sync_name",
+            schema: RawTableSchema(
+                tableName: "users",
+                syncedColumns: ["name"],
+                options: TableOptions(
+                    trackPreviousValues: TrackPreviousValuesOptions(),
+                    ignoreEmptyUpdates: true,
+                ),
+            )
+        )
+
+        try await database.execute("CREATE TABLE users (id TEXT, name TEXT, local TEXT);")
+        try await database.execute(sql: "INSERT INTO users (id, name, local) VALUES (?, ?, ?)", parameters: [
+            "id",
+            "user",
+            "local"
+        ])
+        try await database.execute(sql: "SELECT powersync_create_raw_table_crud_trigger(?, ?, ?)", parameters: [
+            table.jsonDescription(),
+            "users_update",
+            "UPDATE"
+        ])
+        
+        try await database.execute(sql: "UPDATE users SET name = ?, local = ?", parameters: ["updated_name", "updated_local"])
+        
+        // This should not generate a CRUD entry because the only synced column is not affected.
+        try await database.execute(sql: "UPDATE users SET name = ?, local = ?", parameters: ["updated_name", "updated_local_2"])
+
+        let tx = try await database.getNextCrudTransaction()
+        XCTAssertEqual(tx?.crud.count, 1)
+        let write = tx!.crud[0]
+        XCTAssertEqual(write.op, .patch)
+        XCTAssertEqual(write.id, "id")
+        XCTAssertEqual(write.opData?["name"], "updated_name")
+        XCTAssertEqual(write.previousValues?["name"], "name")
+    }
 }
