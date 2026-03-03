@@ -10,7 +10,7 @@ Follow this guide to:
 
 1. Create and configure a Supabase project.
 2. Create a new PowerSync instance, connecting to the database of the Supabase project. See instructions [here](https://docs.powersync.com/integration-guides/supabase-+-powersync#connect-powersync-to-your-supabase).
-3. Deploy sync rules.
+3. Deploy Sync Streams.
 
 ## Configure The App
 
