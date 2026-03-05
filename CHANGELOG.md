@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.12.0 (unreleased)
+## 1.12.0
 
 * Make raw tables easier to use:
   * Introduce the `RawTableSchema` struct storing the name of a raw table in the database. When set,
