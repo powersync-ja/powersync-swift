@@ -33,50 +33,46 @@ enum KotlinAdapter {
         }
         
         static func toKotlin(_ table: RawTable) -> PowerSyncKotlin.RawTable {
+            let translatedPut = table.put.map(translateStatement)
+            let translatedDelete = table.delete.map(translateStatement)
+            
             if let schema = table.schema {
-                var put: PowerSyncKotlin.PendingStatement? = nil
-                var delete: PowerSyncKotlin.PendingStatement? = nil
-                if let definedStmt = table.put {
-                    put = translateStatement(definedStmt)
-                }
-                if let definedStmt = table.delete {
-                    delete = translateStatement(definedStmt)
-                }
-                
                 return PowerSyncKotlin.RawTable(
                     name: table.name,
                     schema: translateRawTableSchema(schema),
-                    put: put,
-                    delete: delete,
+                    put: translatedPut,
+                    delete: translatedDelete,
                     clear: table.clear,
                 )
+            }
+            
+            // If we have no schema, put and delete are required. The constructor overloads on RawTable
+            // should ensure that, but it's better to be defensive here.
+            guard let put = translatedPut, let delete = translatedDelete else {
+                fatalError("RawTable '\(table.name)' has no schema and must provide both put and delete statements")
             }
             
             // If no schema is given, put and delete statements must be present (an invariant
             // matched by constructor overloads on the RawTable struct).
             return PowerSyncKotlin.RawTable(
                 name: table.name,
-                put: translateStatement(table.put!),
-                delete: translateStatement(table.delete!),
+                put: put,
+                delete: delete,
                 clear: table.clear
             );
         }
         
         private static func translateTableOptions(_ options: TableOptionsProtocol) -> PowerSyncKotlin.TableOptions {
-            let trackPreviousKotlin: PowerSyncKotlin.TrackPreviousValuesOptions? = if let track = options.trackPreviousValues {
-                PowerSyncKotlin.TrackPreviousValuesOptions(
-                    columnFilter: track.columnFilter,
-                    onlyWhenChanged: track.onlyWhenChanged
-                )
-            } else {
-                nil
-            }
-            
             return PowerSyncKotlin.TableOptions(
                 localOnly: options.localOnly,
                 insertOnly: options.insertOnly,
                 trackMetadata: options.trackMetadata,
-                trackPreviousValues: trackPreviousKotlin,
+                trackPreviousValues: options.trackPreviousValues.map {
+                    PowerSyncKotlin.TrackPreviousValuesOptions(
+                        columnFilter: $0.columnFilter,
+                        onlyWhenChanged: $0.onlyWhenChanged
+                    )
+                },
                 ignoreEmptyUpdates: options.ignoreEmptyUpdates,
             )
         }
