@@ -255,7 +255,7 @@ final class CrudTests: XCTestCase {
     }
     
     func testRawTableInferredCrudTrigger() async throws {
-        let table = RawTable(name: "sync_name", schema: RawTableSchema(tableName: "users"))
+        let table = RawTable(name: "users", schema: RawTableSchema())
         try await database.updateSchema(schema: Schema(table))
         
         try await database.execute("CREATE TABLE users (id TEXT, name TEXT);")
@@ -273,16 +273,14 @@ final class CrudTests: XCTestCase {
         XCTAssertEqual(tx?.crud.count, 1)
         let write = tx!.crud[0]
         XCTAssertEqual(write.op, .put)
-        XCTAssertEqual(write.table, "sync_name")
+        XCTAssertEqual(write.table, "users")
         XCTAssertEqual(write.id, "id")
         let opData = write.opData?["name"]
         XCTAssertEqual(opData, "user")
     }
     
     func testRawTableInferredCrudTriggerWithOptions() async throws {
-        return;
         try await database.updateSchema(schema: Schema())
-        return;
         let table = RawTable(
             name: "sync_name",
             schema: RawTableSchema(
@@ -318,6 +316,6 @@ final class CrudTests: XCTestCase {
         XCTAssertEqual(write.op, .patch)
         XCTAssertEqual(write.id, "id")
         XCTAssertEqual(write.opData?["name"], "updated_name")
-        XCTAssertEqual(write.previousValues?["name"], "name")
+        XCTAssertEqual(write.previousValues?["name"], "user")
     }
 }

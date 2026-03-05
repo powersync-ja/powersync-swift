@@ -429,13 +429,23 @@ func openKotlinDBDefault(
     }
 
     let factory = sqlite3DatabaseFactory(initialStatements: initialStatements)
-    return KotlinPowerSyncDatabaseImpl(
-        kotlinDatabase: PowerSyncDatabase(
+    let kotlinDatabase = if dbFilename == ":memory:" {
+        openPowerSyncInMemory(
+            factory: factory,
+            schema: KotlinAdapter.Schema.toKotlin(schema),
+            logger: logger.kLogger
+        )
+    } else {
+        PowerSyncDatabase(
             factory: factory,
             schema: KotlinAdapter.Schema.toKotlin(schema),
             dbFilename: dbFilename,
             logger: logger.kLogger
-        ),
+        )
+    }
+    
+    return KotlinPowerSyncDatabaseImpl(
+        kotlinDatabase: kotlinDatabase,
         dbFilename: dbFilename,
         logger: logger
     )
