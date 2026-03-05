@@ -73,7 +73,9 @@ public struct RawTableSchema: Sendable {
     /// the SQLite table name. This is used to infer ``RawTable/put`` and ``RawTable/delete`` statements
     /// for the sync client. It can also be used to auto-generate triggers forwarding writes on raw
     /// tables into the CRUD upload queue (using the `powersync_create_raw_table_crud_trigger` SQL function).
-    public let tableName: String
+    /// 
+    /// When set to `nil`, ``RawTable/name`` is used as a default.
+    public let tableName: String?
 
     /// An optional filter of columns that should be synced.
     /// 
@@ -85,7 +87,7 @@ public struct RawTableSchema: Sendable {
     /// triggers.
     public let options: TableOptions
 
-    public init(tableName: String, syncedColumns: [String]? = nil, options: TableOptions = TableOptions()) {
+    public init(tableName: String? = nil, syncedColumns: [String]? = nil, options: TableOptions = TableOptions()) {
         self.tableName = tableName
         self.syncedColumns = syncedColumns
         self.options = options
