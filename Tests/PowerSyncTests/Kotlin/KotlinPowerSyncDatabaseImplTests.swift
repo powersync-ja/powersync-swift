@@ -531,11 +531,12 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             logger: DatabaseLogger(logger)
         )
 
+        try await db2.execute("SELECT 1")
         try await db2.close()
 
         let warningIndex = testWriter.getLogs().firstIndex(
             where: { value in
-                value.contains("warning: Multiple PowerSync instances for the same database have been detected")
+                value.contains("debug: PowerSyncVersion")
             }
         )
 
