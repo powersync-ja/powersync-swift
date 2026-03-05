@@ -51,9 +51,7 @@ enum KotlinAdapter {
             guard let put = translatedPut, let delete = translatedDelete else {
                 fatalError("RawTable '\(table.name)' has no schema and must provide both put and delete statements")
             }
-            
-            // If no schema is given, put and delete statements must be present (an invariant
-            // matched by constructor overloads on the RawTable struct).
+
             return PowerSyncKotlin.RawTable(
                 name: table.name,
                 put: put,
