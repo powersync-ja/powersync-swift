@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.0 (unreleased)
+
+* Add optional `logger` parameter on `openPowerSyncWithGRDB` to enable custom loggers.
+
 ## 1.12.0
 
 * Make raw tables easier to use:

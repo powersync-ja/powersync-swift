@@ -44,6 +44,7 @@ final class GRDBTests: XCTestCase {
     private var database: PowerSyncDatabaseProtocol!
     private var schema: Schema!
     private var pool: DatabasePool!
+    private var logs: TestLogWriterAdapter!
 
     override func setUp() async throws {
         try await super.setUp()
@@ -83,10 +84,13 @@ final class GRDBTests: XCTestCase {
             configuration: config
         )
 
+        logs = TestLogWriterAdapter()
+        let logger = DefaultLogger(minSeverity: LogSeverity.debug, writers: [logs])
         database = openPowerSyncWithGRDB(
             pool: pool,
             schema: schema,
-            identifier: dbIdentifier
+            identifier: dbIdentifier,
+            logger: DatabaseLogger(logger)
         )
 
         try await database.disconnectAndClear()
@@ -416,5 +420,38 @@ final class GRDBTests: XCTestCase {
 
         await fulfillment(of: [expectation], timeout: 5)
         watchTask.cancel()
+    }
+    
+    func testCustomLogger() async throws {
+        try await database.get("SELECT 1", mapper: { row in })
+
+        let warningIndex = logs.getLogs().firstIndex(
+            where: { value in
+                value.contains("debug: PowerSyncVersion")
+            }
+        )
+
+        XCTAssert(warningIndex! >= 0)
+    }
+}
+
+final class TestLogWriterAdapter: LogWriterProtocol,
+    // The shared state is guarded by the DispatchQueue
+    @unchecked Sendable
+{
+    private let queue = DispatchQueue(label: "TestLogWriterAdapter")
+
+    private var logs = [String]()
+
+    func getLogs() -> [String] {
+        queue.sync {
+            logs
+        }
+    }
+
+    func log(severity: LogSeverity, message: String, tag: String?) {
+        queue.sync {
+            logs.append("\(severity): \(message) \(tag != nil ? "\(tag!)" : "")")
+        }
     }
 }
