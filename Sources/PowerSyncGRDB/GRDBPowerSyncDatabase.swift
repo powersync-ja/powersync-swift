@@ -38,17 +38,20 @@ import PowerSync
 ///   - pool: The GRDB DatabasePool instance to use for storage
 ///   - schema: The PowerSync schema describing your sync views
 ///   - identifier: A unique identifier for this database instance
+///   - logger: An optional logger used for the PowerSync database.
 /// - Returns: A PowerSync database that works with the provided GRDB pool
 public func openPowerSyncWithGRDB(
     pool: DatabasePool,
     schema: Schema,
-    identifier: String
+    identifier: String,
+    logger: (any LoggerProtocol) = DefaultLogger()
 ) -> PowerSyncDatabaseProtocol {
     return OpenedPowerSyncDatabase(
         schema: schema,
         pool: GRDBConnectionPool(
             pool: pool
         ),
-        identifier: identifier
+        identifier: identifier,
+        logger: logger
     )
 }
