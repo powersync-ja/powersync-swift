@@ -1,8 +1,14 @@
 # Changelog
 
-## 1.13.0 (unreleased)
+## 1.13.0
 
 * Add optional `logger` parameter on `openPowerSyncWithGRDB` to enable custom loggers.
+* Fixed potential connection issues
+  * Fix false `connected: true` status when using an invalid token. 
+  * Fix sync loop terminating permanently when the server rejects the connection.
+  * Fix sync loop stalling indefinitely after a transport-layer failure (dead socket, network
+dropout).
+
 
 ## 1.12.0
 
