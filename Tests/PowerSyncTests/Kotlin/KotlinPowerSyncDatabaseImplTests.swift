@@ -1,10 +1,13 @@
-import struct Foundation.UUID
-@testable import PowerSync
 import XCTest
+
+import struct Foundation.UUID
+
+@testable import PowerSync
 
 final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
     private var database: (any PowerSyncDatabaseProtocol)!
     private var schema: Schema!
+    private var logs: TestLogWriterAdapter!
 
     override func setUp() async throws {
         try await super.setUp()
@@ -14,15 +17,16 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 columns: [
                     .text("name"),
                     .text("email"),
-                    .text("photo_id")
+                    .text("photo_id"),
                 ]
             )
         ])
 
+        logs = TestLogWriterAdapter()
         database = PowerSyncDatabase(
             schema: schema,
             dbFilename: ":memory:",
-            logger: DatabaseLogger(DefaultLogger())
+            logger: DatabaseLogger(DefaultLogger(minSeverity: LogSeverity.debug, writers: [logs]))
         )
         try await database.disconnectAndClear()
     }
@@ -31,6 +35,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         try await database.disconnectAndClear()
         try await database.close()
         database = nil
+        logs = nil
         try await super.tearDown()
     }
 
@@ -42,9 +47,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             )
             XCTFail("Expected an error to be thrown")
         } catch {
-            XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
-            """)
+            XCTAssertEqual(
+                error.localizedDescription,
+                """
+                SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+                """)
         }
     }
 
@@ -84,9 +91,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
             XCTFail("Expected an error to be thrown")
         } catch {
-            XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
-            """)
+            XCTAssertEqual(
+                error.localizedDescription,
+                """
+                SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
+                """)
         }
     }
 
@@ -129,9 +138,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
             XCTFail("Expected an error to be thrown")
         } catch {
-            XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
-            """)
+            XCTAssertEqual(
+                error.localizedDescription,
+                """
+                SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
+                """)
         }
     }
 
@@ -213,9 +224,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
             XCTFail("Expected an error to be thrown")
         } catch {
-            XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
-            """)
+            XCTAssertEqual(
+                error.localizedDescription,
+                """
+                SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
+                """)
         }
     }
 
@@ -296,9 +309,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
             XCTFail("Expected an error to be thrown")
         } catch {
-            XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: EXPLAIN SELECT name FROM usersfail ORDER BY id
-            """)
+            XCTAssertEqual(
+                error.localizedDescription,
+                """
+                SqliteException(1): SQL logic error, no such table: usersfail for SQL: EXPLAIN SELECT name FROM usersfail ORDER BY id
+                """)
         }
     }
 
@@ -312,7 +327,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             let stream = try database.watch(
                 sql: "SELECT name FROM users ORDER BY id",
                 parameters: nil
-            ) { _ throws in throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "cursor error"]) }
+            ) { _ throws in
+                throw NSError(
+                    domain: "TestError", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "cursor error"])
+            }
 
             // Actually consume the stream to trigger the error
             for try await _ in stream {
@@ -323,6 +342,227 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         } catch {
             print(error.localizedDescription)
             XCTAssertEqual(error.localizedDescription, "cursor error")
+        }
+    }
+
+    func testWatchCancellationCompletesWithoutFurtherChanges() async throws {
+        try await database.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "User 1", "user1@example.com"]
+        )
+
+        let emissions = StreamEmissionStore<[String]>()
+        let initialEmission = XCTestExpectation(description: "Initial watch emission")
+        let completion = DeferredCompletion()
+
+        let watchTask = Task { [database = self.database] in
+            guard let database = database else {
+                XCTFail("Database should not be nil")
+                return
+            }
+            defer { Task { await completion.complete() } }
+            do {
+                let stream = try database.watch(
+                    options: WatchOptions(
+                        sql: "SELECT name FROM users ORDER BY id",
+                        mapper: { cursor in
+                            try cursor.getString(index: 0)
+                        }
+                    )
+                )
+
+                for try await names in stream {
+                    await emissions.append(names)
+                    if await emissions.count() == 1 {
+                        initialEmission.fulfill()
+                    }
+                }
+            } catch {
+                XCTFail("Unexpected watch error: \(error)")
+            }
+        }
+
+        await fulfillment(of: [initialEmission], timeout: 5)
+
+        let emissionsBeforeCancel = await emissions.snapshot()
+        XCTAssertEqual(emissionsBeforeCancel, [["User 1"]])
+
+        watchTask.cancel()
+        try await completion.wait(timeout: 1)
+        _ = await watchTask.result
+
+        let emissionsAfterCancel = await emissions.snapshot()
+        XCTAssertEqual(emissionsAfterCancel, emissionsBeforeCancel)
+    }
+
+    func testWatchCancellationBeforeConsumptionProducesNoEmissions() async throws {
+        try await database.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "User 1", "user1@example.com"]
+        )
+
+        let emissions = StreamEmissionStore<[String]>()
+        let inTaskCompletion = DeferredCompletion()
+        let taskHoldCompletion = DeferredCompletion()
+
+        let watchTask = Task { [database = self.database] in
+            guard let database else {
+                XCTFail("Database should not be nil")
+                return
+            }
+            do {
+                let stream = try database.watch(
+                    options: WatchOptions(
+                        sql: "SELECT name FROM users ORDER BY id",
+                        mapper: { cursor in
+                            try cursor.getString(index: 0)
+                        }
+                    )
+                )
+
+                for try await names in stream {
+                    // We have received at least the first event, after this, we should
+                    // only emit if there is a change
+                    print("Got an emisison from watch query")
+                    await inTaskCompletion.complete()
+                    await emissions.append(names)
+                }
+                print("The watch stream ended")
+                await taskHoldCompletion.complete()
+            } catch is CancellationError {
+                // We should not reach this flow. We don't rethrow CancellationErrors from the watch stream,
+                // instead we just end the stream and complete the task.
+                print("Watch task was cancelled, CancellationError caught")
+                await taskHoldCompletion.complete()
+                return
+            } catch {
+                XCTFail("Unexpected watch error: \(error)")
+            }
+        }
+
+        try await inTaskCompletion.wait(timeout: 10)
+        //wait for 2 seconds
+        try await Task.sleep(nanoseconds: 2 * 1_000_000_000)
+        watchTask.cancel()
+        try await taskHoldCompletion.wait(timeout: 10)
+        _ = await watchTask.result
+
+        let recordedEmissions = await emissions.snapshot()
+        XCTAssertTrue(recordedEmissions.count == 1)
+        try await waitFor(timeout: 1) { [logs] in
+            let terminationLogs = logs!.getLogs().filter { value in
+                value.contains("debug: Kotlin Onchange terminated KotlinPowerSyncDatabaseImpl")
+            }
+            guard terminationLogs.count == 1 else {
+                throw WaitForMatchError.predicateFail(message: "Expected watch termination log")
+            }
+        }
+    }
+
+    func testMultipleWatchCancellationBeforeConsumptionProducesNoEmissions() async throws {
+        try await database.execute(
+            sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            parameters: ["1", "User 1", "user1@example.com"]
+        )
+
+        let testCount = 50
+
+        struct WatchHarness {
+            let emissions: StreamEmissionStore<[String]>
+            let inTaskCompletion: DeferredCompletion
+            let taskHoldCompletion: DeferredCompletion
+            let watchTask: Task<Void, Never>
+        }
+
+        let harnesses: [WatchHarness] = (0..<testCount).map { _ in
+            let emissions = StreamEmissionStore<[String]>()
+            let inTaskCompletion = DeferredCompletion()
+            let taskHoldCompletion = DeferredCompletion()
+            let watchTask = Task { [database = self.database] in
+                guard let database else {
+                    XCTFail("Database should not be nil")
+                    return
+                }
+                do {
+                    let stream = try database.watch(
+                        options: WatchOptions(
+                            sql: "SELECT name FROM users ORDER BY id",
+                            mapper: { cursor in
+                                try cursor.getString(index: 0)
+                            }
+                        )
+                    )
+
+                    for try await names in stream {
+                        // We have received at least the first event, after this, we should
+                        // only emit if there is a change
+                        print("Got an emisison from watch query")
+                        await inTaskCompletion.complete()
+                        await emissions.append(names)
+                    }
+                    print("The watch stream ended")
+                    await taskHoldCompletion.complete()
+                } catch is CancellationError {
+                    // We should not reach this flow. We don't rethrow CancellationErrors from the watch stream,
+                    // instead we just end the stream and complete the task.
+                    print("Watch task was cancelled, CancellationError caught")
+                    await taskHoldCompletion.complete()
+                    return
+                } catch {
+                    XCTFail("Unexpected watch error: \(error)")
+                }
+            }
+
+            return WatchHarness(
+                emissions: emissions,
+                inTaskCompletion: inTaskCompletion,
+                taskHoldCompletion: taskHoldCompletion,
+                watchTask: watchTask
+            )
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for harness in harnesses {
+                group.addTask {
+                    try await harness.inTaskCompletion.wait(timeout: 10)
+                }
+            }
+
+            while let result = try await group.next() {
+                _ = result
+            }
+        }
+
+        for harness in harnesses {
+            harness.watchTask.cancel()
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for harness in harnesses {
+                group.addTask {
+                    try await harness.taskHoldCompletion.wait(timeout: 10)
+                }
+            }
+
+            while let result = try await group.next() {
+                _ = result
+            }
+        }
+
+        for harness in harnesses {
+            _ = await harness.watchTask.result
+            let recordedEmissions = await harness.emissions.snapshot()
+            XCTAssertTrue(recordedEmissions.count == 1)
+        }
+
+        try await waitFor(timeout: 1) { [logs] in
+            let terminationLogsAfterCancellation = logs!.getLogs().filter { value in
+                value.contains("debug: Kotlin Onchange terminated KotlinPowerSyncDatabaseImpl")
+            }.count
+            guard terminationLogsAfterCancellation ==  testCount else {
+                throw WaitForMatchError.predicateFail(
+                    message: "Expected watch termination log for each cancelled watch")
+            }
         }
     }
 
@@ -353,7 +593,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let loopCount = 100
 
         _ = try await database.writeTransaction { transaction in
-            for i in 1 ... loopCount {
+            for i in 1...loopCount {
                 _ = try transaction.execute(
                     sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
                     parameters: [String(i), "Test User \(i)", "test\(i)@example.com"]
@@ -385,9 +625,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 )
             }
         } catch {
-            XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
-            """)
+            XCTAssertEqual(
+                error.localizedDescription,
+                """
+                SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+                """)
         }
     }
 
@@ -405,9 +647,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 )
             }
         } catch {
-            XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
-            """)
+            XCTAssertEqual(
+                error.localizedDescription,
+                """
+                SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+                """)
         }
 
         let result = try await database.getOptional(
@@ -448,9 +692,11 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                 }
             }
         } catch {
-            XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT COUNT(*) FROM usersfail
-            """)
+            XCTAssertEqual(
+                error.localizedDescription,
+                """
+                SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT COUNT(*) FROM usersfail
+                """)
         }
     }
 
@@ -508,7 +754,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
                     .text("email"),
                 ],
                 viewNameOverride: "people"
-            ),
+            )
         ])
 
         try await database.updateSchema(schema: newSchema)
@@ -557,7 +803,9 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         let warningIndex = testWriter.getLogs().firstIndex(
             where: { value in
-                value.contains("warning: Multiple PowerSync instances for the same database have been detected")
+                value.contains(
+                    "warning: Multiple PowerSync instances for the same database have been detected"
+                )
             }
         )
 
@@ -572,23 +820,30 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             var comment: String
         }
 
-        try await database.updateSchema(schema:
-            Schema(tables: [
-                Table(name: "users", columns: [
-                    .text("name"),
-                    .text("email"),
-                    .text("photo_id")
-                ]),
-                Table(name: "tasks", columns: [
-                    .text("user_id"),
-                    .text("description"),
-                    .text("tags")
-                ]),
-                Table(name: "comments", columns: [
-                    .text("task_id"),
-                    .text("comment"),
+        try await database.updateSchema(
+            schema:
+                Schema(tables: [
+                    Table(
+                        name: "users",
+                        columns: [
+                            .text("name"),
+                            .text("email"),
+                            .text("photo_id"),
+                        ]),
+                    Table(
+                        name: "tasks",
+                        columns: [
+                            .text("user_id"),
+                            .text("description"),
+                            .text("tags"),
+                        ]),
+                    Table(
+                        name: "comments",
+                        columns: [
+                            .text("task_id"),
+                            .text("comment"),
+                        ]),
                 ])
-            ])
         )
 
         try await database.writeTransaction { transaction in
@@ -624,14 +879,14 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         let result = try await database.getAll(
             sql: """
-                    SELECT
-                        users.name as name,
-                        tasks.description as description,
-                        comments.comment as comment
-                    FROM users
-                    LEFT JOIN tasks ON users.id = tasks.user_id
-                    LEFT JOIN comments ON tasks.id = comments.task_id;
-            """,
+                        SELECT
+                            users.name as name,
+                            tasks.description as description,
+                            comments.comment as comment
+                        FROM users
+                        LEFT JOIN tasks ON users.id = tasks.user_id
+                        LEFT JOIN comments ON tasks.id = comments.task_id;
+                """,
             parameters: []
         ) { cursor in
             try JoinOutput(
@@ -642,8 +897,10 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         }
 
         XCTAssertEqual(result.count, 2)
-        XCTAssertEqual(result[0], JoinOutput(name: "Test User", description: "task 1", comment: "comment 1"))
-        XCTAssertEqual(result[1], JoinOutput(name: "Test User", description: "task 2", comment: "comment 2"))
+        XCTAssertEqual(
+            result[0], JoinOutput(name: "Test User", description: "task 1", comment: "comment 1"))
+        XCTAssertEqual(
+            result[1], JoinOutput(name: "Test User", description: "task 2", comment: "comment 2"))
     }
 
     func testCloseWithDeleteDatabase() async throws {
@@ -674,7 +931,8 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         try await testDatabase.close(deleteDatabase: true)
 
         // Verify the database file and related files are deleted
-        XCTAssertFalse(fileManager.fileExists(atPath: dbFile.path), "Database file should be deleted")
+        XCTAssertFalse(
+            fileManager.fileExists(atPath: dbFile.path), "Database file should be deleted")
 
         let walFile = databaseDirectory.appendingPathComponent("\(testDbFilename)-wal")
         let shmFile = databaseDirectory.appendingPathComponent("\(testDbFilename)-shm")
@@ -682,7 +940,8 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         XCTAssertFalse(fileManager.fileExists(atPath: walFile.path), "WAL file should be deleted")
         XCTAssertFalse(fileManager.fileExists(atPath: shmFile.path), "SHM file should be deleted")
-        XCTAssertFalse(fileManager.fileExists(atPath: journalFile.path), "Journal file should be deleted")
+        XCTAssertFalse(
+            fileManager.fileExists(atPath: journalFile.path), "Journal file should be deleted")
     }
 
     func testCloseWithoutDeleteDatabase() async throws {
@@ -713,42 +972,49 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         try await testDatabase.close()
 
         // Verify the database file still exists
-        XCTAssertTrue(fileManager.fileExists(atPath: dbFile.path), "Database file should still exist after close without delete")
+        XCTAssertTrue(
+            fileManager.fileExists(atPath: dbFile.path),
+            "Database file should still exist after close without delete")
 
         // Clean up: delete all SQLite files using the helper function
         try deleteSQLiteFiles(dbFilename: testDbFilename, in: databaseDirectory)
     }
-    
+
     func testSubscriptionsUpdateStateWhileOffline() async throws {
         var streams = database.currentStatus.asFlow().makeAsyncIterator()
-        let initialStatus = await streams.next(); // Ignore initial
+        let initialStatus = await streams.next()  // Ignore initial
         XCTAssertEqual(initialStatus?.syncStreams?.count, 0)
-        
+
         // Subscribing while offline should add the stream to the subscriptions reported in the status.
-        let subscription = try await database.syncStream(name: "foo", params: ["foo": JsonValue.string("bar")]).subscribe()
-        let updatedStatus = await streams.next();
-        
+        let subscription = try await database.syncStream(
+            name: "foo", params: ["foo": JsonValue.string("bar")]
+        ).subscribe()
+        let updatedStatus = await streams.next()
+
         XCTAssertEqual(updatedStatus?.syncStreams?.count, 1)
         let status = updatedStatus?.forStream(stream: subscription)
         XCTAssertNotNil(status)
-        
+
         XCTAssertNil(status?.progress)
     }
-    
+
     func testSubscriptionParameters() async throws {
         var streams = database.currentStatus.asFlow().makeAsyncIterator()
-        let initialStatus = await streams.next(); // Ignore initial
+        let initialStatus = await streams.next()  // Ignore initial
         XCTAssertEqual(initialStatus?.syncStreams?.count, 0)
-        
-        let _ = try await database.syncStream(name: "foo", params: [
-            "text": JsonValue.string("text"),
-            "int1": JsonValue.int(1),
-            "int0": JsonValue.int(0),
-            "double": JsonValue.double(1.23),
-            "bool": JsonValue.bool(true),
-        ]).subscribe()
-        let updatedStatus = await streams.next();
-        
+
+        let _ = try await database.syncStream(
+            name: "foo",
+            params: [
+                "text": JsonValue.string("text"),
+                "int1": JsonValue.int(1),
+                "int0": JsonValue.int(0),
+                "double": JsonValue.double(1.23),
+                "bool": JsonValue.bool(true),
+            ]
+        ).subscribe()
+        let updatedStatus = await streams.next()
+
         XCTAssertEqual(updatedStatus?.syncStreams?.count, 1)
         let stream = updatedStatus!.syncStreams![0]
         let params = stream.subscription.parameters!

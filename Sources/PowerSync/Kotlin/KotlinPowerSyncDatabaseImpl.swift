@@ -255,6 +255,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
                         )
                     }
 
+                    logger.debug("Kotlin Onchange terminated", tag: "KotlinPowerSyncDatabaseImpl")
                     continuation.finish()
                 } catch {
                     if error is CancellationError {

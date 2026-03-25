@@ -251,6 +251,137 @@ final class AttachmentTests: XCTestCase {
 
         XCTAssert(firstAttachment.localUri == URL(fileURLWithPath: attachmentsDirectory).appendingPathComponent(filename).path)
     }
+
+    func testWatchActiveAttachmentsCancellationCompletesWithoutFurtherChanges() async throws {
+        let attachmentId = UUID().uuidString
+
+        try await database.execute(
+            sql: """
+            INSERT INTO attachments (
+                id,
+                timestamp,
+                filename,
+                local_uri,
+                media_type,
+                size,
+                state,
+                has_synced,
+                meta_data
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            parameters: [
+                attachmentId,
+                Int(Date().timeIntervalSince1970),
+                "queued.jpg",
+                nil,
+                "image/jpeg",
+                1,
+                AttachmentState.queuedUpload.rawValue,
+                0,
+                nil
+            ]
+        )
+
+        let service = AttachmentServiceImpl(
+            db: database,
+            tableName: "attachments",
+            logger: DefaultLogger(),
+            maxArchivedCount: 100
+        )
+        let emissions = StreamEmissionStore<[String]>()
+        let initialEmission = XCTestExpectation(description: "Initial attachment watch emission")
+        let completion = DeferredCompletion()
+
+        let watchTask = Task {
+            defer { Task { await completion.complete() } }
+            do {
+                let stream = try await service.watchActiveAttachments()
+                for try await ids in stream {
+                    await emissions.append(ids)
+                    if await emissions.count() == 1 {
+                        initialEmission.fulfill()
+                    }
+                }
+            } catch {
+                XCTFail("Unexpected watch error: \(error)")
+            }
+        }
+
+        await fulfillment(of: [initialEmission], timeout: 5)
+
+        let emissionsBeforeCancel = await emissions.snapshot()
+        XCTAssertEqual(emissionsBeforeCancel, [[attachmentId]])
+
+        watchTask.cancel()
+        try await completion.wait(timeout: 1)
+        _ = await watchTask.result
+
+        let emissionsAfterCancel = await emissions.snapshot()
+        XCTAssertEqual(emissionsAfterCancel, emissionsBeforeCancel)
+    }
+
+    func testWatchActiveAttachmentsCancellationBeforeConsumptionProducesNoEmissions() async throws {
+        let attachmentId = UUID().uuidString
+
+        try await database.execute(
+            sql: """
+            INSERT INTO attachments (
+                id,
+                timestamp,
+                filename,
+                local_uri,
+                media_type,
+                size,
+                state,
+                has_synced,
+                meta_data
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            parameters: [
+                attachmentId,
+                Int(Date().timeIntervalSince1970),
+                "queued.jpg",
+                nil,
+                "image/jpeg",
+                1,
+                AttachmentState.queuedUpload.rawValue,
+                0,
+                nil
+            ]
+        )
+
+        let service = AttachmentServiceImpl(
+            db: database,
+            tableName: "attachments",
+            logger: DefaultLogger(),
+            maxArchivedCount: 100
+        )
+        let emissions = StreamEmissionStore<[String]>()
+        let completion = DeferredCompletion()
+
+        let watchTask = Task {
+            defer { Task { await completion.complete() } }
+            do {
+                try await Task.sleep(nanoseconds: 200_000_000)
+
+                let stream = try await service.watchActiveAttachments()
+                for try await ids in stream {
+                    await emissions.append(ids)
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                XCTFail("Unexpected watch error: \(error)")
+            }
+        }
+
+        watchTask.cancel()
+        try await completion.wait(timeout: 1)
+        _ = await watchTask.result
+
+        let recordedEmissions = await emissions.snapshot()
+        XCTAssertTrue(recordedEmissions.isEmpty)
+    }
 }
 
 public enum WaitForMatchError: Error {
@@ -313,4 +444,75 @@ func waitFor(
     throw WaitForMatchError.timeout(
         lastError: lastError
     )
+}
+
+actor StreamEmissionStore<T: Sendable> {
+    private var values: [T] = []
+
+    func append(_ value: T) {
+        values.append(value)
+    }
+
+    func count() -> Int {
+        values.count
+    }
+
+    func snapshot() -> [T] {
+        values
+    }
+}
+
+actor DeferredCompletion {
+    private var completed = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func complete() {
+        guard !completed else { return }
+        completed = true
+        let continuations = waiters
+        waiters.removeAll()
+        for continuation in continuations {
+            continuation.resume()
+        }
+    }
+
+    func wait(timeout: TimeInterval) async throws {
+        if completed {
+            return
+        }
+
+        let timeoutNanoseconds = UInt64(timeout * 1_000_000_000)
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                await self.waitUntilCompleted()
+            }
+
+            group.addTask {
+                try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                throw WaitForMatchError.timeout()
+            }
+
+            try await group.next()
+            group.cancelAll()
+        }
+    }
+
+    private func waitUntilCompleted() async {
+        if completed {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            enqueueOrResume(continuation)
+        }
+    }
+
+    private func enqueueOrResume(_ continuation: CheckedContinuation<Void, Never>) {
+        if completed {
+            continuation.resume()
+        } else {
+            waiters.append(continuation)
+        }
+    }
 }
