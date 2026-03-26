@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.1
+
+* Don't attempt to create WebSocket connections on watchOS.
+* Update default SQLite cache size to 50MB, this was previously erroneously set to 200MB.
+* Skip creating `ps_crud` entries when clearing raw tables.
+
 ## 1.13.0
 
 * Add optional `logger` parameter on `openPowerSyncWithGRDB` to enable custom loggers.
