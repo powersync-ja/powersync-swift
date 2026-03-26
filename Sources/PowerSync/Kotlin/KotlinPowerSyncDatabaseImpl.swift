@@ -353,6 +353,9 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         do {
             return try await handler()
         } catch {
+            if error is CancellationError {
+                throw error
+            }
             // Try and parse errors back from the Kotlin side
             if let mapperError = SqlCursorError.fromDescription(error.localizedDescription) {
                 throw mapperError
