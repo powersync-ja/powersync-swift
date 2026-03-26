@@ -8,7 +8,7 @@
   * Fix sync loop terminating permanently when the server rejects the connection.
   * Fix sync loop stalling indefinitely after a transport-layer failure (dead socket, network
 dropout).
-
+* Prevent swallowing `CancellationError`s for PowerSync wrapped operations. 
 
 ## 1.12.0
 
