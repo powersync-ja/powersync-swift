@@ -13,7 +13,7 @@ public struct CrudTransaction: Sendable {
 
     private let db: any PowerSyncDatabaseProtocol
 
-    internal init(transactionId: Int64, crud: [CrudEntry], db: any PowerSyncDatabaseProtocol) {
+    internal init(transactionId: Int64?, crud: [CrudEntry], db: any PowerSyncDatabaseProtocol) {
         self.transactionId = transactionId
         self.crud = crud
         self.db = db
