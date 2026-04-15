@@ -2,7 +2,7 @@
 
 ## 1.14.0 (unreleased)
 
-* 
+* Add `opDataTyped` and `previousValuesTyped` to `CrudEntry`, providing typed values instead of strings.
 
 ## 1.13.1
 

@@ -3,13 +3,13 @@ import Foundation
 /// A collection of client-side changes.
 public struct CrudBatch: Sendable {
     /// Indicates if there are additional Crud items in the queue which are not included in this batch
-    let hasMore: Bool
+    public let hasMore: Bool
 
     /// List of client-side changes.
-    let crud: [CrudEntry]
-    
+    public let crud: [CrudEntry]
+
     private let db: PowerSyncDatabaseProtocol
-    
+
     internal init(hasMore: Bool, crud: [CrudEntry], db: PowerSyncDatabaseProtocol) {
         self.hasMore = hasMore
         self.crud = crud
@@ -19,13 +19,13 @@ public struct CrudBatch: Sendable {
     /// Call to remove the changes from the local queue, once successfully uploaded.
     ///
     /// `writeCheckpoint` is optional.
-    func complete(writeCheckpoint: String?) async throws {
+    public func complete(writeCheckpoint: String?) async throws {
         let lastId = crud.last!.clientId
         try await completeCrudItems(self.db, lastId)
     }
-    
+
     /// Call to remove the changes from the local queue, once successfully uploaded.
-    func complete() async throws {
+    public func complete() async throws {
         try await self.complete(
             writeCheckpoint: nil
         )

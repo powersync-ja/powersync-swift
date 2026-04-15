@@ -6,13 +6,13 @@ public struct CrudTransaction: Sendable {
     /// Unique transaction id.
     ///
     /// If nil, this contains a list of changes recorded without an explicit transaction associated.
-    let transactionId: Int64
+    public let transactionId: Int64
 
     /// List of client-side changes.
-    let crud: [CrudEntry]
-    
+    public let crud: [CrudEntry]
+
     private let db: any PowerSyncDatabaseProtocol
-    
+
     internal init(transactionId: Int64, crud: [CrudEntry], db: any PowerSyncDatabaseProtocol) {
         self.transactionId = transactionId
         self.crud = crud
@@ -22,25 +22,26 @@ public struct CrudTransaction: Sendable {
     /// Call to remove the changes from the local queue, once successfully uploaded.
     ///
     /// `writeCheckpoint` is optional.
-    func complete(writeCheckpoint: String?) async throws {
+    public func complete(writeCheckpoint: String?) async throws {
         let id = self.crud.last!.clientId
         try await completeCrudItems(db, id, writeCheckpoint: writeCheckpoint)
     }
-    
+
     /// Call to remove the changes from the local queue, once successfully uploaded.
-    func complete() async throws {
+    public func complete() async throws {
         try await self.complete(
             writeCheckpoint: nil
         )
     }
 }
+
 /// A sequence of crud transactions in a PowerSync database.
 ///
 /// For details, see ``PowerSyncDatabaseProtocol/getCrudTransactions()``.
 public struct CrudTransactions: AsyncSequence {
     public typealias Element = CrudTransaction
     public typealias AsyncIterator = CrudTransactionsIterator
-    
+
     private let db: any PowerSyncDatabaseProtocol
 
     internal init(db: any PowerSyncDatabaseProtocol) {
@@ -78,15 +79,15 @@ WITH RECURSIVE crud_entries AS (
 )
 SELECT * FROM crud_entries;
 """
-        
+
         let items = try await db.getAll(sql: query, parameters: [lastItemId], mapper: CrudEntry.fromCursor)
         if items.isEmpty {
             return nil
         }
-        
+
         let txId = items.first!.transactionId
         let lastId = items.last!.clientId
-        
+
         lastItemId = lastId
         return CrudTransaction(
             transactionId: txId!,
