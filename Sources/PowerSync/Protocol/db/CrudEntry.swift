@@ -112,12 +112,7 @@ public struct CrudEntry: Sendable {
         }
 
         let decoder = JSONDecoder()
-        var entry: CrudJsonEntry
-        do {
-            entry = try decoder.decode(CrudJsonEntry.self, from: data.data(using: .utf8)!)
-        } catch {
-            throw error
-        }
+        let entry = try decoder.decode(CrudJsonEntry.self, from: data.data(using: .utf8)!)
 
         return CrudEntry(
             id: entry.id,

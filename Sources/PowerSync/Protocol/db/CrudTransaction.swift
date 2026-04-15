@@ -6,7 +6,7 @@ public struct CrudTransaction: Sendable {
     /// Unique transaction id.
     ///
     /// If nil, this contains a list of changes recorded without an explicit transaction associated.
-    public let transactionId: Int64
+    public let transactionId: Int64?
 
     /// List of client-side changes.
     public let crud: [CrudEntry]
@@ -90,7 +90,7 @@ SELECT * FROM crud_entries;
 
         lastItemId = lastId
         return CrudTransaction(
-            transactionId: txId!,
+            transactionId: txId,
             crud: items,
             db: db
         )
