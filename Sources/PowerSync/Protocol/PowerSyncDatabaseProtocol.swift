@@ -223,7 +223,7 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// ```Swift
     ///
     /// ```
-    func getCrudTransactions() -> any CrudTransactions
+    func getCrudTransactions() -> CrudTransactions
 
     /// Convenience method to get the current version of PowerSync.
     func getPowerSyncVersion() async throws -> String

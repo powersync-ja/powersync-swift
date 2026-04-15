@@ -73,16 +73,30 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     }
 
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
-        guard let base = try await kotlinDatabase.getCrudBatch(limit: limit) else {
+        var entries = try await getAll(
+            sql: "SELECT id, tx_id, data FROM ps_crud ORDER BY id ASC LIMIT ?",
+            parameters: [Int64(limit + 1)],
+            mapper: CrudEntry.fromCursor
+        )
+
+        if entries.isEmpty {
             return nil
         }
-        return try KotlinCrudBatch(
-            batch: base
+        
+        let hasMore = entries.count > limit
+        if hasMore {
+            entries.removeLast()
+        }
+        
+        return CrudBatch(
+            hasMore: hasMore,
+            crud: entries,
+            db: self
         )
     }
 
-    func getCrudTransactions() -> any CrudTransactions {
-        return KotlinCrudTransactions(db: kotlinDatabase)
+    func getCrudTransactions() -> CrudTransactions {
+        return CrudTransactions(db: self)
     }
 
     func getPowerSyncVersion() async throws -> String {
