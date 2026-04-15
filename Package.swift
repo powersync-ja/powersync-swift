@@ -55,9 +55,9 @@ if let corePath = localCoreExtension {
 let package = Package(
     name: packageName,
     platforms: [
-        .iOS(.v15),
-        .macOS(.v12),
-        .watchOS(.v9),
+        .iOS(.v18),
+        .macOS(.v15),
+        .watchOS(.v11),
         .tvOS(.v15),
     ],
     products: [
@@ -83,7 +83,8 @@ let package = Package(
     ],
     dependencies: conditionalDependencies + [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.9.0"),
-        .package(url: "https://github.com/powersync-ja/CSQLite.git", exact: "3.51.2")
+        .package(url: "https://github.com/powersync-ja/CSQLite.git", exact: "3.51.2"),
+        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -94,6 +95,7 @@ let package = Package(
                 kotlinTargetDependency,
                 .product(name: "PowerSyncSQLiteCore", package: corePackageName),
                 .product(name: "CSQLite", package: "CSQLite"),
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ]
         ),
         .target(
@@ -103,6 +105,7 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift")
             ]
         ),
+        .executableTarget(name: "SyncPlayground", dependencies: [.target(name: "PowerSync")]),
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]

@@ -81,4 +81,25 @@ public struct SyncSubscriptionDescription: SyncStreamDescription {
             return self.lastSyncedAt != nil
         }
     }
+    
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case parameters
+        case active
+        case isDefault = "is_default"
+        case hasExplicitSubscription = "has_explicit_subscription"
+        case expiresAt = "expires_at"
+        case lastSyncedAt = "last_synced_at"
+    }
+    
+    internal init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.parameters = try container.decodeIfPresent(JsonParam.self, forKey: .parameters)
+        self.active = try container.decode(Bool.self, forKey: .active)
+        self.isDefault = try container.decode(Bool.self, forKey: .isDefault)
+        self.hasExplicitSubscription = try container.decode(Bool.self, forKey: .hasExplicitSubscription)
+        self.expiresAt = try container.decodeIfPresent(Int64.self, forKey: .expiresAt).map { t in TimeInterval(t) }
+        self.lastSyncedAt = try container.decodeIfPresent(Int64.self, forKey: .lastSyncedAt).map { t in TimeInterval(t) }
+    }
 }

@@ -66,9 +66,24 @@ public protocol SyncStatus: SyncStatusData, Sendable {
 }
 
 /// Current information about a ``SyncStreamSubscription``.
-public struct SyncStreamStatus {
+public struct SyncStreamStatus: Sendable {
     /// If the sync status is currently downloading, information about download progress related to this stream.
     public let progress: ProgressWithOperations?
     /// The ``SyncSubscriptionDescription`` providing information about the subscription.
     public let subscription: SyncSubscriptionDescription
+    
+    enum CodingKeys: CodingKey { case progress }
+    
+    init(subscription: SyncSubscriptionDescription, progress: ProgressWithOperations? = nil) {
+        self.subscription = subscription
+        self.progress = progress
+    }
+    
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.progress = try container.decode(ProgressCounters.self, forKey: .progress)
+        
+        // Parse from same decoder (it's [flatten]ed in Rust)
+        self.subscription = try SyncSubscriptionDescription(from: decoder)
+    }
 }

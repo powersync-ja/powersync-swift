@@ -9,7 +9,8 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     let logger: any LoggerProtocol
     private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
     private let encoder = JSONEncoder()
-    let currentStatus: SyncStatus
+    private let syncCoordinator = SyncCoordinator()
+    internal let syncStatus = SwiftSyncStatus()
     private let dbFilename: String
 
     init(
@@ -23,13 +24,14 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         /// The kotlin PowerSyncDatabase.identifier currently prepends `null` to the dbFilename (for the directory).
         /// FIXME. Update this once we support database directory configuration.
         self.dbFilename = dbFilename
-        currentStatus = KotlinSyncStatus(
-            baseStatus: kotlinDatabase.currentStatus
-        )
+    }
+    
+    var currentStatus: any SyncStatus {
+        syncStatus
     }
 
-    func waitForFirstSync() async throws {
-        try await kotlinDatabase.waitForFirstSync()
+    func waitForFirstSync() async {
+        await syncStatus.waitFor { $0.hasSynced == true }
     }
 
     func updateSchema(schema: any SchemaProtocol) async throws {
@@ -38,38 +40,21 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         )
     }
 
-    func waitForFirstSync(priority: Int32) async throws {
-        try await kotlinDatabase.waitForFirstSync(
-            priority: priority
-        )
+    func waitForFirstSync(priority: Int32) async {
+        let priority = BucketPriority(priority)
+        await syncStatus.waitFor { $0.statusForPriority(priority).hasSynced == true }
     }
 
     func syncStream(name: String, params: JsonParam?) -> any SyncStream {
         let rawStream = kotlinDatabase.syncStream(name: name, parameters: params?.mapValues { $0.toKotlinMap() })
-        return KotlinSyncStream(kotlinStream: rawStream)
+        fatalError("todo")
     }
     
     func connect(
         connector: PowerSyncBackendConnectorProtocol,
         options: ConnectOptions?
-    ) async throws {
-        let connectorAdapter = swiftBackendConnectorToPowerSyncConnector(connector: SwiftBackendConnectorBridge(
-            swiftBackendConnector: connector, db: self
-        ))
-
-        let resolvedOptions = options ?? ConnectOptions()
-        try await kotlinDatabase.connect(
-            connector: connectorAdapter,
-            crudThrottleMs: Int64(resolvedOptions.crudThrottle * 1000),
-            retryDelayMs: Int64(resolvedOptions.retryDelay * 1000),
-            params: resolvedOptions.params.mapValues { $0.toKotlinMap() },
-            options: createSyncOptions(
-                newClient: resolvedOptions.newClientImplementation,
-                userAgent: userAgent(),
-                loggingConfig: resolvedOptions.clientConfiguration?.requestLogger?.toKotlinConfig()
-            ),
-            appMetadata: resolvedOptions.appMetadata
-        )
+    ) async {
+        await syncCoordinator.connect(db: self, connector: connector, options: options ?? ConnectOptions())
     }
 
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
@@ -103,11 +88,13 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         try await kotlinDatabase.getPowerSyncVersion()
     }
 
-    func disconnect() async throws {
-        try await kotlinDatabase.disconnect()
+    func disconnect() async {
+        await syncCoordinator.disconnect()
     }
 
     func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws {
+        await disconnect()
+
         try await kotlinDatabase.disconnectAndClear(
             clearLocal: clearLocal,
             soft: soft
@@ -432,6 +419,8 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
             )
         }
     }
+    
+    static let maxOpId = Int64.max
 }
 
 func openKotlinDBDefault(
