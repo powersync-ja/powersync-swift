@@ -5,6 +5,7 @@ enum PowerSyncControlArguments {
     case textLine(line: String)
     case binaryLine(line: ContiguousArray<UInt8>)
     case completedUpload
+    case didRefreshToken
     case connectionEstablished
     case responseStreamEnd
     case updateSubscriptions(streams: [StreamKey])
@@ -28,6 +29,9 @@ enum PowerSyncControlArguments {
             param = line
         case .completedUpload:
             op = "completed_upload"
+            param = nil
+        case .didRefreshToken:
+            op = "refreshed_token"
             param = nil
         case .connectionEstablished:
             op = "connection"

@@ -1,12 +1,13 @@
+/// Manages a connection task for a PowerSync database.
 actor SyncCoordinator {
     private var activeSync: Task<Void, any Error>?
     
-    func connect(db: KotlinPowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions) async {
+    func connect(db: KotlinPowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: HttpClient) async {
         if let task = activeSync {
             await self.finishSyncTask(task: task)
         }
         
-        let sync = StreamingSyncClient(db: db, connector: connector)
+        let sync = StreamingSyncClient(db: db, connector: connector, httpClient: client, options: options)
         activeSync = sync.run()
     }
     
@@ -16,6 +17,15 @@ actor SyncCoordinator {
         }
         
         await self.finishSyncTask(task: task)
+    }
+    
+    /// Executes an inner function, but only if no connection is active or scheduled.
+    func guardNotConnected<T>(inner: () async throws -> T, ifConnected: () throws -> Never) async rethrows -> T {
+        if activeSync == nil {
+            return try await inner();
+        } else {
+            try ifConnected()
+        }
     }
     
     private func finishSyncTask(task: Task<Void, any Error>) async {

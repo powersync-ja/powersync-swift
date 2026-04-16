@@ -6,8 +6,8 @@ actor CachingCredentialsConnector {
         self.inner = inner
     }
     
-    func fetchCredentials() async throws -> PowerSyncCredentials? {
-        if let credentials = self.cachedCredentials {
+    func fetchCredentials(allowCached: Bool = true) async throws -> PowerSyncCredentials? {
+        if let credentials = self.cachedCredentials, allowCached {
             return credentials
         }
         

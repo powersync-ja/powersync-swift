@@ -7,20 +7,19 @@ fileprivate let tag = "StreamingSyncClient"
 final class StreamingSyncClient: Sendable {
     let db: KotlinPowerSyncDatabaseImpl
     let options: ConnectOptions
-    let events = BroadcastStream<PowerSyncControlArguments>()
     let connector: CachingCredentialsConnector
     let httpClient: any HttpClient
     
     init(
         db: KotlinPowerSyncDatabaseImpl,
         connector: PowerSyncBackendConnectorProtocol,
-        httpClient: any HttpClient = PlatformHttpClient.shared,
-        options: ConnectOptions = ConnectOptions()
+        httpClient: any HttpClient,
+        options: ConnectOptions,
     ) {
         self.db = db
         self.connector = CachingCredentialsConnector(inner: connector)
         self.httpClient = httpClient
-        self.options = ConnectOptions()
+        self.options = options
     }
     
     /// Starts a task driving uploads and downloads by repeatedly connecting to the PowerSync service,
@@ -31,9 +30,9 @@ final class StreamingSyncClient: Sendable {
     func run() -> Task<Void, any Error> {
         Task(name: "StreamingSyncClient.run") {
             let signals = SyncSignals()
-            async let download = try downloadLoop(signals: signals)
-
-            try await download
+            async let download = downloadLoop(signals: signals)
+            
+            let _ = try await download
         }
     }
     
@@ -48,7 +47,7 @@ final class StreamingSyncClient: Sendable {
             .map { _ in () }
         let allTriggers = AsyncAlgorithms.merge(watch, signals.signalCrudUpload.subscribe())
         
-        for try await item in allTriggers {
+        for try await _ in allTriggers {
             try await uploadAllCrud()
         }
     }
@@ -134,7 +133,7 @@ The next upload iteration will be delayed.
     
     private func getWriteCheckpoint() async throws -> String {
         let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
-        var (_, request) = try await authenticatedRequest { endpoint in
+        let (_, request) = try await authenticatedRequest { endpoint in
             endpoint
                 .appending(path: "write-checkpoint2.json")
                 .appending(queryItems: [.init(name: "client_id", value: clientId)])
@@ -148,14 +147,6 @@ The next upload iteration will be delayed.
             throw PowerSyncError.operationFailed(message: "Error getting write checkpoint: \(response.statusCode)")
         }
         
-        struct WriteCheckpointData: Decodable {
-            let write_checkpoint: String
-        }
-        
-        struct WriteCheckpointResponse: Decodable {
-            let data: WriteCheckpointData
-        }
-        
         let body = try StreamingSyncClient.jsonDecoder.decode(WriteCheckpointResponse.self, from: data)
         return body.data.write_checkpoint
     }
@@ -165,7 +156,11 @@ The next upload iteration will be delayed.
         
         while (!Task.isCancelled) {
             do {
-                result = try await ActiveSyncIteration(syncClient: self, signals: signals).run()
+                // This async let ensures each iteration is a task scoped to this block. This allows us to spawn
+                // aditional tasks in run() that would get cancelled when the main iteration is complete.
+                async let iteration = ActiveSyncIteration(syncClient: self, signals: signals).run()
+                
+                result = try await iteration
             } catch {
                 result = SyncIterationResult()
                 
@@ -226,21 +221,20 @@ The next upload iteration will be delayed.
 
 private struct ActiveSyncIteration: Sendable {
     private let syncClient: StreamingSyncClient
-    private let localEvents: AsyncStream<PowerSyncControlArguments>
+    private let localEvents = BroadcastStream<PowerSyncControlArguments>()
     private let signals: SyncSignals
 
     init(syncClient: StreamingSyncClient, signals: SyncSignals) {
         self.syncClient = syncClient
-        self.localEvents = syncClient.events.subscribe()
         self.signals = signals
     }
     
     func run() async throws -> SyncIterationResult {
         let initialInstructions = try await powersyncControl(.start(StartSyncIteration(
-            parameters: [:],
+            parameters: syncClient.options.params,
             includeDefaults: true,
             activeStreams: [],
-            appMetadata: [:]
+            appMetadata: syncClient.options.appMetadata,
         )))
         
         var controlArgs: (any AsyncSequence<PowerSyncControlArguments, any Error>)?
@@ -248,7 +242,7 @@ private struct ActiveSyncIteration: Sendable {
         for instruction in initialInstructions {
             if case .establishSyncStream(request: let request) = instruction {
                 let serviceEvents = try await syncClient.fetchSyncLines(request: request)
-                controlArgs = AsyncAlgorithms.merge(serviceEvents, localEvents)
+                controlArgs = AsyncAlgorithms.merge(serviceEvents, localEvents.subscribe())
             } else {
                 try await self.execute(instr: instruction)
             }
@@ -281,7 +275,20 @@ private struct ActiveSyncIteration: Sendable {
             }
         }
         
-        return SyncIterationResult()
+        // We use an immediately-awaited Task.detached here because running the stop command shouldn't
+        // get aborted.
+        return try await Task.detached {
+            let control = try await powersyncControl(.stop)
+            for instr in control {
+                if case let .closeSyncStream(hideDisconnect) = instr {
+                    return SyncIterationResult(hideDisconnect: hideDisconnect)
+                }
+                
+                try await execute(instr: instr)
+            }
+
+            return SyncIterationResult()
+        }.value
     }
 
     private func powersyncControl(_ args: PowerSyncControlArguments) async throws -> [Instruction] {
@@ -314,9 +321,13 @@ private struct ActiveSyncIteration: Sendable {
             if didExpire {
                 await syncClient.invalidateCredentials()
             } else {
-                signals.triggerAsyncFetchCredentials()
+                Task {
+                    let _ = try await syncClient.connector.fetchCredentials(allowCached: false)
+                    syncClient.db.logger.debug("Stopping because new credentials are available", tag: tag)
+                    // Token has been refreshed, start another iteration
+                    localEvents.dispatch(event: .didRefreshToken)
+                }
             }
-            fatalError("todo: fetchCredentials")
         case .flushFileSystem:
             // Noop on native platforms.
             break;
@@ -375,15 +386,18 @@ private struct SyncIterationResult {
     }
 }
 
-struct SyncSignals {
+private struct SyncSignals {
     let signalCrudUpload = BroadcastStream<Void>()
-    let prefetchCredentials = BroadcastStream<Void>()
     
     func triggerAsyncCrudUpload() {
         self.signalCrudUpload.dispatch(event: ())
     }
-    
-    func triggerAsyncFetchCredentials() {
-        self.prefetchCredentials.dispatch(event: ())
-    }
+}
+
+struct WriteCheckpointData: Codable {
+    let write_checkpoint: String
+}
+
+struct WriteCheckpointResponse: Codable {
+    let data: WriteCheckpointData
 }

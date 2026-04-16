@@ -12,11 +12,13 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     private let syncCoordinator = SyncCoordinator()
     internal let syncStatus = SwiftSyncStatus()
     private let dbFilename: String
+    private let httpClient: HttpClient
 
     init(
         kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase,
         dbFilename: String,
-        logger: DatabaseLogger
+        logger: DatabaseLogger,
+        httpClient: HttpClient
     ) {
         self.logger = logger
         self.kotlinDatabase = kotlinDatabase
@@ -24,6 +26,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         /// The kotlin PowerSyncDatabase.identifier currently prepends `null` to the dbFilename (for the directory).
         /// FIXME. Update this once we support database directory configuration.
         self.dbFilename = dbFilename
+        self.httpClient = httpClient
     }
     
     var currentStatus: any SyncStatus {
@@ -35,8 +38,13 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     }
 
     func updateSchema(schema: any SchemaProtocol) async throws {
-        try await kotlinDatabase.updateSchema(
-            schema: KotlinAdapter.Schema.toKotlin(schema)
+        try await syncCoordinator.guardNotConnected(
+            inner: {
+                try await kotlinDatabase.updateSchema(
+                    schema: KotlinAdapter.Schema.toKotlin(schema)
+                )
+            },
+            ifConnected: { throw PowerSyncError.operationFailed(message: "Cannot update schema while connected") }
         )
     }
 
@@ -54,7 +62,12 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         connector: PowerSyncBackendConnectorProtocol,
         options: ConnectOptions?
     ) async {
-        await syncCoordinator.connect(db: self, connector: connector, options: options ?? ConnectOptions())
+        await syncCoordinator.connect(
+            db: self,
+            connector: connector,
+            options: options ?? ConnectOptions(),
+            client: httpClient
+        )
     }
 
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
@@ -328,6 +341,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     }
 
     func close() async throws {
+        await disconnect()
         try await kotlinDatabase.close()
     }
 
@@ -427,7 +441,8 @@ func openKotlinDBDefault(
     schema: Schema,
     dbFilename: String,
     logger: DatabaseLogger,
-    initialStatements: [String] = []
+    initialStatements: [String] = [],
+    httpClient: HttpClient = PlatformHttpClient.shared
 ) -> PowerSyncDatabaseProtocol {
     let rc = sqlite3_initialize()
     if rc != 0 {
@@ -453,7 +468,8 @@ func openKotlinDBDefault(
     return KotlinPowerSyncDatabaseImpl(
         kotlinDatabase: kotlinDatabase,
         dbFilename: dbFilename,
-        logger: logger
+        logger: logger,
+        httpClient: httpClient
     )
 }
 
@@ -471,7 +487,8 @@ func openKotlinDBWithPool(
             logger: logger.kLogger
         ),
         dbFilename: identifier,
-        logger: logger
+        logger: logger,
+        httpClient: PlatformHttpClient.shared
     )
 }
 
