@@ -58,12 +58,12 @@ public struct Index: IndexProtocol, Encodable {
         try container.encode(name, forKey: .name)
         var columnsContainer = container.nestedUnkeyedContainer(forKey: .columns)
         for column in columns {
-            enum CodingKeys: CodingKey {
+            enum IndexedColumnCodingKeys: CodingKey {
                 case name
                 case ascending
             }
 
-            var container = columnsContainer.nestedContainer(keyedBy: CodingKeys.self)
+            var container = columnsContainer.nestedContainer(keyedBy: IndexedColumnCodingKeys.self)
             try container.encode(column.column, forKey: .name)
             try container.encode(column.ascending, forKey: .ascending)
         }

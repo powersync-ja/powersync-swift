@@ -1,5 +1,3 @@
-import Foundation
-
 public protocol SchemaProtocol: Sendable {
     ///
     /// Tables used in Schema
@@ -54,6 +52,10 @@ public struct Schema: SchemaProtocol, Encodable {
         }
         
         for table in rawTables {
+            // Only check for duplicate names if the raw table has a fixed local schema
+            // name. By default, the name in raw tables refers to the name of the table as
+            // defined in Sync Streams. The local table populated by put/delete statements
+            // might be different and we can't check that.
             if let schema = table.schema {
                 let name = schema.tableName ?? table.name
                 if !tableNames.insert(name).inserted {
@@ -64,8 +66,17 @@ public struct Schema: SchemaProtocol, Encodable {
             try table.validate()
         }
     }
-    
-    internal static let encoder = JSONEncoder()
+
+    public func encode(to encoder: any Encoder) throws {
+        enum CodingKeys: String, CodingKey {
+            case tables
+            case rawTables = "raw_tables"
+        }
+
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.tables, forKey: .tables)
+        try container.encode(self.rawTables, forKey: .rawTables)
+    }
 }
 
 public enum SchemaError: Error {

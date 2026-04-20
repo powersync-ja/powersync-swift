@@ -285,7 +285,7 @@ final class TableTests: XCTestCase {
 """)
     }
 
-    func testRawTableSerialize() throws {
+    func testRawTableSerializeSimple() throws {
         let table = RawTable(
             name: "users",
             put: PendingStatement(sql: "SELECT 1", parameters: [.id]),
@@ -319,4 +319,33 @@ final class TableTests: XCTestCase {
 }
 """)
     }
+
+    func testRawTableSerializeWithOptions() throws {
+        let table = RawTable(
+            name: "users",
+            schema: RawTableSchema(
+                syncedColumns: ["foo"],
+                options: TableOptions(insertOnly: true)
+            )
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting.insert(.prettyPrinted)
+        encoder.outputFormatting.insert(.sortedKeys)
+        let serialized = String(data: try encoder.encode(table), encoding: .utf8)
+
+        XCTAssertEqual(serialized, """
+{
+  "ignore_empty_update" : false,
+  "include_metadata" : false,
+  "insert_only" : true,
+  "local_only" : false,
+  "name" : "users",
+  "synced_columns" : [
+    "foo"
+  ],
+  "table_name" : "users"
+}
+""")
+    }
+
 }

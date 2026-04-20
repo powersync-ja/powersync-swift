@@ -132,7 +132,7 @@ internal enum TableOptionsCodingKeys<T: CodingKey>: CodingKey {
     case includeMetadata
     case includeOldOnlyWhenChanged
     case ignoreEmptyUpdate
-     
+
     // We don't use these for decoding, so we can return nil here.
     init?(stringValue: String) {
         return nil

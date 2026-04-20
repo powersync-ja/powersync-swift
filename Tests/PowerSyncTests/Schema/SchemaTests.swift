@@ -122,4 +122,12 @@ final class SchemaTests: XCTestCase {
         XCTAssertEqual(schema.tables[0].name, users.name)
         XCTAssertEqual(schema.tables[1].name, posts.name)
     }
+    
+    func testEncode() throws {
+        let schema = Schema()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting.insert(.sortedKeys)
+        let serialized = String(data: try encoder.encode(schema), encoding: .utf8)
+        XCTAssertEqual(serialized, #"{"raw_tables":[],"tables":[]}"#)
+    }
 }

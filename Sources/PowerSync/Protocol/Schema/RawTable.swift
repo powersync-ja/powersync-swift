@@ -1,3 +1,5 @@
+import Foundation
+
 /// A table that is managed by the user instead of being auto-created and migrated by the PowerSync SDK.
 ///
 /// These tables give application developers full control over the table (including table and column constraints).
@@ -57,11 +59,21 @@ public struct RawTable: BaseTableProtocol, Encodable {
     /// 
     /// The output of this can be passed to the `powersync_create_raw_table_crud_trigger` SQL
     /// function to define triggers for this table.
-    public func jsonDescription() throws -> String {
-        let serialized = try Schema.encoder.encode(self)
-        return String(data: serialized, encoding: .utf8)!
+    public func jsonDescription() -> String {
+        let encoder = JSONEncoder()
+        do {
+            let serialized = try encoder.encode(self)
+            return String(data: serialized, encoding: .utf8)!
+        } catch {
+            // An older version of the Swift SDK used to implement this method in Kotlin.
+            // That could also throw an exception (which would crash the process), but that
+            // was overlooked due to a missing @Throws annotation.
+            // Now, we can't mark this as throws without breaking backwards compatibility.
+            // We should conver this to be throwing in a future major release.
+            fatalError("Serializing a raw table failed: \(error)")
+        }
     }
-    
+
     internal func validate() throws(TableError) {
         if let schema {
             try schema.options.validate(tableName: name)
