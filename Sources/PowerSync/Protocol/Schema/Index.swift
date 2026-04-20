@@ -12,7 +12,7 @@ public protocol IndexProtocol: Sendable {
     var columns: [IndexedColumnProtocol] { get }
 }
 
-public struct Index: IndexProtocol {
+public struct Index: IndexProtocol, Encodable {
     public let name: String
     public let columns: [IndexedColumnProtocol]
 
@@ -46,5 +46,26 @@ public struct Index: IndexProtocol {
         column: String
     ) -> Index {
         return ascending(name: name, columns: [column])
+    }
+    
+    public func encode(to encoder: any Encoder) throws {
+        enum CodingKeys: CodingKey {
+            case name
+            case columns
+        }
+
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        var columnsContainer = container.nestedUnkeyedContainer(forKey: .columns)
+        for column in columns {
+            enum CodingKeys: CodingKey {
+                case name
+                case ascending
+            }
+
+            var container = columnsContainer.nestedContainer(keyedBy: CodingKeys.self)
+            try container.encode(column.column, forKey: .name)
+            try container.encode(column.ascending, forKey: .ascending)
+        }
     }
 }

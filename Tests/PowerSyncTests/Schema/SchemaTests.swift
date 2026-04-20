@@ -66,7 +66,22 @@ final class SchemaTests: XCTestCase {
             XCTAssertEqual(tableName, "users")
         }
     }
-    
+
+    func testDuplicateTableOneRaw() {
+        let schema = Schema(
+            makeValidTable(name: "users"),
+            RawTable(name: "source_from_sync_streams", schema: RawTableSchema(tableName: "users"))
+        )
+
+        XCTAssertThrowsError(try schema.validate()) { error in
+            guard case SchemaError.duplicateTableName(let tableName) = error else {
+                XCTFail("Expected duplicateTableName error")
+                return
+            }
+            XCTAssertEqual(tableName, "users")
+        }
+    }
+
     func testCascadingTableValidation() {
         let schema = Schema(
             makeValidTable(name: "users"),

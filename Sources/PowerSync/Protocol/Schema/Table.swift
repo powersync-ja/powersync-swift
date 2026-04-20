@@ -30,7 +30,7 @@ private let MAX_AMOUNT_OF_COLUMNS = 63
 ///
 /// A single table in the schema.
 ///
-public struct Table: TableProtocol {
+public struct Table: TableProtocol, Encodable {
     public let name: String
     public let columns: [Column]
     public let indexes: [Index]
@@ -119,15 +119,7 @@ public struct Table: TableProtocol {
             throw TableError.invalidViewName(viewName: viewNameOverride)
         }
 
-        if localOnly {
-            if trackPreviousValues != nil {
-                throw TableError.trackPreviousForLocalTable(tableName: name)
-            }
-            if trackMetadata {
-                throw TableError.metadataForLocalTable(tableName: name)
-            }
-        }
-
+        try options.validate(tableName: name)
         var columnNames = Set<String>(["id"])
 
         for column in columns {
@@ -183,6 +175,23 @@ public struct Table: TableProtocol {
 
             indexNames.insert(index.name)
         }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        enum CodingKeys: String, CodingKey {
+            case name
+            case viewName = "view_name"
+            case columns
+            case indexes
+        }
+        typealias Keys = TableOptionsCodingKeys<CodingKeys>
+        
+        var container = encoder.container(keyedBy: Keys.self)
+        try container.encode(name, forKey: .outer(.name))
+        try container.encodeIfPresent(viewNameOverride, forKey: .outer(.viewName))
+        try container.encode(columns, forKey: .outer(.columns))
+        try container.encode(indexes, forKey: .outer(.indexes))
+        try options.serializeTo(container)
     }
 }
 

@@ -1,3 +1,5 @@
+import Foundation
+
 public protocol SchemaProtocol: Sendable {
     ///
     /// Tables used in Schema
@@ -12,7 +14,7 @@ public protocol SchemaProtocol: Sendable {
     func validate() throws
 }
 
-public struct Schema: SchemaProtocol {
+public struct Schema: SchemaProtocol, Encodable {
     public let tables: [Table]
     public let rawTables: [RawTable]
 
@@ -50,7 +52,20 @@ public struct Schema: SchemaProtocol {
             }
             try table.validate()
         }
+        
+        for table in rawTables {
+            if let schema = table.schema {
+                let name = schema.tableName ?? table.name
+                if !tableNames.insert(name).inserted {
+                    throw SchemaError.duplicateTableName(name)
+                }
+            }
+            
+            try table.validate()
+        }
     }
+    
+    internal static let encoder = JSONEncoder()
 }
 
 public enum SchemaError: Error {
