@@ -158,10 +158,31 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { !$0.connected }
         await waitForStatus(db.currentStatus) { $0.connected }
     }
-    
-    // TODO: "handles checkpoints during uploads" test
-    
-    // TODO: "handles write made while offline" test
+
+    @Test func uploadsOfflineWrites() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in channel }
+        let db = openDatabase(mockClient)
+        mockClient.writeCheckpoint.store(1, ordering: .sequentiallyConsistent)
+
+        try await db.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["local write"])
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        
+        var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
+        try #require(try await query.next() == ["local write"])
+        
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
+        try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
+            checksum: 0,
+            op_id: "1",
+            object_id: "1",
+            object_type: "users",
+            op: .put,
+            data: #"{"id": "test1", "name": "from server"}"#,
+        )])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        try #require(try await query.next() == ["from server"])
+    }
     
     @Test func tokenExpired() async throws {
         final class BackendConnector: PowerSyncBackendConnectorProtocol {
@@ -635,11 +656,11 @@ let defaultSchema = Schema(tables: [
     ),
 ])
 
-private func openDatabase(_ client: any HttpClient, schema: Schema = defaultSchema) -> PowerSyncDatabaseProtocol {
+private func openDatabase(_ client: any HttpClient, schema: Schema = defaultSchema, logger: any LoggerProtocol = DefaultLogger()) -> PowerSyncDatabaseProtocol {
     return openKotlinDBDefault(
         schema: schema,
         dbFilename: ":memory:",
-        logger: DatabaseLogger(DefaultLogger()),
+        logger: DatabaseLogger(logger),
         httpClient: client
     )
 }
@@ -650,11 +671,23 @@ let testCredentials = PowerSyncCredentials(
 )
 
 private final class TestConnector: PowerSyncBackendConnectorProtocol {
+    private let uploadDataCallback: @Sendable (_ database: any PowerSyncDatabaseProtocol) async throws -> ()
+    
+    init(
+        uploadDataCallback: @Sendable @escaping (_: any PowerSyncDatabaseProtocol) async throws -> Void = { db in
+            let tx = try await db.getNextCrudTransaction()
+            try await tx?.complete()
+    }) {
+        self.uploadDataCallback = uploadDataCallback
+    }
+    
     func fetchCredentials() async throws -> PowerSyncCredentials? {
         return testCredentials
     }
 
-    func uploadData(database _: any PowerSync.PowerSyncDatabaseProtocol) async throws {}
+    func uploadData(database: any PowerSync.PowerSyncDatabaseProtocol) async throws {
+        try await self.uploadDataCallback(database)
+    }
 }
 
 private final class Signal: Sendable {

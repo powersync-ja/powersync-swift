@@ -31,8 +31,9 @@ final class StreamingSyncClient: Sendable {
         Task(name: "StreamingSyncClient.run") {
             let signals = SyncSignals()
             async let download = downloadLoop(signals: signals)
+            async let upload = uploadLoop(signals: signals)
             
-            let _ = try await download
+            let _ = try await (download, upload)
         }
     }
 
@@ -45,6 +46,9 @@ final class StreamingSyncClient: Sendable {
         
         for try await _ in allTriggers {
             try await uploadAllCrud()
+            
+            db.logger.debug("crud upload: notify completion", tag: tag)
+            signals.notifyCrudUploadComplete()
         }
     }
     
@@ -55,7 +59,7 @@ final class StreamingSyncClient: Sendable {
             defer { db.syncStatus.mutateStatus { $0.uploading = false } }
             
             do {
-                let nextItem = try await db.getOptional("SELECT id FROM ps_crud ORDER BY id LIMIT 1", mapper: { cursor in try cursor.getInt64(index: 1) })
+                let nextItem = try await db.getOptional("SELECT id FROM ps_crud ORDER BY id LIMIT 1", mapper: { cursor in try cursor.getInt64(index: 0) })
                 if let nextItem {
                     if nextItem == lastUploadItem {
                         db.logger.warning("""
@@ -97,7 +101,7 @@ The next upload iteration will be delayed.
     
     private func uploadLocalTarget() async throws {
         guard let _ = try await db.getOptional(
-            sql: "SELECT 1 FROM ps_bucket WHERE name = '$local' AND target_op = ?",
+            sql: "SELECT 1 FROM ps_buckets WHERE name = '$local' AND target_op = ?",
             parameters: [KotlinPowerSyncDatabaseImpl.maxOpId],
             mapper: { cursor in () }
         ) else {
@@ -227,7 +231,11 @@ private struct ActiveSyncIteration: Sendable {
     }
     
     func run() async throws -> SyncIterationResult {
+        // Notify the core extension for changed Sync Stream subscriptions, as we might have to reconnect.
         async let _ = watchSyncStreams()
+        // Notify the core extension for completed crud uploads, as we might want to retry applying a
+        // checkpoint in that case.
+        async let _ = watchCompletedCrudUploads()
 
         let initialInstructions = try await powersyncControl(.start(StartSyncIteration(
             parameters: syncClient.options.params,
@@ -344,6 +352,13 @@ private struct ActiveSyncIteration: Sendable {
             self.localEvents.dispatch(event: .updateSubscriptions(streams: change))
         }
     }
+    
+    private func watchCompletedCrudUploads() async throws {
+        let uploads = signals.signalCrudUploadComplete.subscribe()
+        for await _ in uploads {
+            self.localEvents.dispatch(event: .completedUpload)
+        }
+    }
 }
 
 /// Wraps an HTTP response by mapping it to control invocations for lines. This also adds an "connection established" / "response ended" prefix and suffix.
@@ -395,9 +410,14 @@ private struct SyncIterationResult {
 
 private struct SyncSignals {
     let signalCrudUpload = BroadcastStream<Void>()
-    
+    let signalCrudUploadComplete = BroadcastStream<Void>()
+
     func triggerAsyncCrudUpload() {
         self.signalCrudUpload.dispatch(event: ())
+    }
+    
+    func notifyCrudUploadComplete() {
+        self.signalCrudUploadComplete.dispatch(event: ())
     }
 }
 
