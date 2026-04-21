@@ -2,8 +2,14 @@ import Foundation
 
 /// An internal protocol for HTTP clients, we use this to mock clients in tests.
 protocol HttpClient: Sendable {
-    func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any AsyncSequence<SyncLine, any Error> & Sendable)
+    func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any SyncLineResponse)
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data)
+}
+
+protocol SyncLineResponse: Sendable, AsyncSequence where AsyncIterator: SyncLineResponseIterator {}
+
+protocol SyncLineResponseIterator: AsyncIteratorProtocol {
+    mutating func next() async throws -> SyncLine?
 }
 
 enum SyncLine {
@@ -15,16 +21,15 @@ enum SyncLine {
 struct PlatformHttpClient: HttpClient {
     let session: URLSession
     
-    func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any AsyncSequence<SyncLine, any Error> & Sendable) {
+    func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any SyncLineResponse) {
         let (bytes, response) = try await session.bytes(for: request)
         let jsonStreamMimeType = "application/x-ndjson"
         
         if response.mimeType != jsonStreamMimeType {
             throw PowerSyncError.operationFailed(message: "Invalid sync lines response, (expected \(jsonStreamMimeType), got \(response.mimeType, default: "")")
         }
-        
-        let syncLines = bytes.lines.map { line in SyncLine.text(contents: line) }
-        return (response as! HTTPURLResponse, syncLines)
+
+        return (response as! HTTPURLResponse, PlatformSyncLineResponse(lines: bytes.lines))
     }
     
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data) {
@@ -33,6 +38,25 @@ struct PlatformHttpClient: HttpClient {
     }
     
     static let shared = PlatformHttpClient(session: .shared)
+}
+
+private struct PlatformSyncLineResponse<Base>: SyncLineResponse where Base : AsyncSequence, Base.Element == UInt8, Base: Sendable {
+    let lines: AsyncLineSequence<Base>
+    
+    func makeAsyncIterator() -> some SyncLineResponseIterator {
+        return PlatformSyncLineResponseIterator<Base>(inner: lines.makeAsyncIterator())
+    }
+}
+
+private struct PlatformSyncLineResponseIterator<Base>: SyncLineResponseIterator where Base : AsyncSequence, Base.Element == UInt8, Base: Sendable {
+    typealias Element = SyncLine
+
+    var inner: AsyncLineSequence<Base>.AsyncIterator
+
+    mutating func next() async throws -> SyncLine? {
+        let line = try await inner.next()
+        return line.map { SyncLine.text(contents: $0) }
+    }
 }
 
 struct LoggingClient: HttpClient {
@@ -51,7 +75,7 @@ struct LoggingClient: HttpClient {
         logger.requestLevel == .all || logger.requestLevel == .body
     }
 
-    func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any Sendable & AsyncSequence<SyncLine, any Error>) {
+    func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any SyncLineResponse) {
         logRequest(request: request)
         do {
             let (response, lines) = try await inner.receiveSyncLines(request: request)
@@ -118,20 +142,20 @@ struct LoggingClient: HttpClient {
     }
 }
 
-private struct LogSyncLines: AsyncSequence<SyncLine, any Error>, Sendable {
+private struct LogSyncLines: SyncLineResponse, Sendable {
     typealias AsyncIterator = LogSyncLinesIterator
     
     let logger: LoggingClient
-    let inner: any AsyncSequence<SyncLine, any Error> & Sendable
+    let inner: any SyncLineResponse
 
     func makeAsyncIterator() -> LogSyncLinesIterator {
         LogSyncLinesIterator(logger: logger, inner: inner.makeAsyncIterator())
     }
 }
 
-private struct LogSyncLinesIterator: AsyncIteratorProtocol<SyncLine, any Error> {
+private struct LogSyncLinesIterator: SyncLineResponseIterator {
     let logger: LoggingClient
-    var inner: any AsyncIteratorProtocol<SyncLine, any Error>
+    var inner: any SyncLineResponseIterator
     
     mutating func next() async throws -> SyncLine? {
         let line = try await self.inner.next()

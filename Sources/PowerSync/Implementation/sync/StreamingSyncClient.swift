@@ -92,7 +92,7 @@ The next upload iteration will be delayed.
 
                 db.logger.error("Error uploading crud: \(error)", tag: tag)
                 do {
-                    try await Task.sleep(for: .seconds(self.options.retryDelay))
+                    try await sleepForSeconds(seconds: self.options.retryDelay)
                 } catch {
                     // Cancelled, abort
                     return
@@ -136,9 +136,8 @@ The next upload iteration will be delayed.
     private func getWriteCheckpoint() async throws -> String {
         let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
         let (_, request) = try await authenticatedRequest { endpoint in
-            endpoint
-                .appending(path: "write-checkpoint2.json")
-                .appending(queryItems: [.init(name: "client_id", value: clientId)])
+            endpoint.path += "/write-checkpoint2.json"
+            endpoint.queryItems = [.init(name: "client_id", value: clientId)]
         }
         let (response, data) = try await httpClient.readFully(request: request)
         
@@ -172,7 +171,7 @@ The next upload iteration will be delayed.
             
             if !result.hideDisconnect {
                 do {
-                    try await Task.sleep(for: .seconds(options.retryDelay))
+                    try await sleepForSeconds(seconds: options.retryDelay)
                 } catch {
                     // Cancelled
                     break
@@ -185,15 +184,19 @@ The next upload iteration will be delayed.
         await self.connector.invalidateCachedCredentials()
     }
     
-    private func authenticatedRequest(buildUrl: (URL) -> URL) async throws -> (URL, URLRequest) {
+    private func authenticatedRequest(buildUrl: (inout URLComponents) -> ()) async throws -> (URL, URLRequest) {
         guard let credentials = try await connector.fetchCredentials() else {
             throw PowerSyncError.operationFailed(message: "fetchCredentials() returned nil")
         }
         
-        guard let base = URL(string: credentials.endpoint) else {
+        guard var base = URLComponents(string: credentials.endpoint) else {
             throw PowerSyncError.operationFailed(message: "Invalid backend connector URL: \(credentials.endpoint)")
         }
-        let url = buildUrl(base)
+        buildUrl(&base)
+        guard let url = base.url else {
+            throw PowerSyncError.operationFailed(message: "Invalid resolved backend connector URL: \(base)")
+        }
+
         var request = URLRequest(url: url)
         request.setValue("Token \(credentials.token)", forHTTPHeaderField: "Authorization")
         request.setValue(await userAgent(), forHTTPHeaderField: "User-Agent")
@@ -201,7 +204,7 @@ The next upload iteration will be delayed.
     }
     
     fileprivate func fetchSyncLines(request: JsonParam) async throws -> ControlInvocationsFromStream {
-        var (url, httpRequest) = try await authenticatedRequest { endpoint in endpoint.appending(path: "sync/stream") }
+        var (url, httpRequest) = try await authenticatedRequest { endpoint in endpoint.path += "/sync/stream" }
         httpRequest.httpMethod = "POST"
         httpRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         httpRequest.setValue("application/x-ndjson", forHTTPHeaderField: "Accept")
@@ -246,9 +249,9 @@ private struct ActiveSyncIteration: Sendable {
             activeStreams: syncClient.db.syncCoordinator.streams.currentStreams,
             appMetadata: syncClient.options.appMetadata,
         )))
-        
-        var controlArgs: (any AsyncSequence<PowerSyncControlArguments, any Error>)?
-        
+
+        var controlArgs: AsyncMerge2Sequence<ControlInvocationsFromStream, AsyncStream<PowerSyncControlArguments>>?
+
         for instruction in initialInstructions {
             if case .establishSyncStream(request: let request) = instruction {
                 let serviceEvents = try await syncClient.fetchSyncLines(request: request)
@@ -257,12 +260,12 @@ private struct ActiveSyncIteration: Sendable {
                 try await self.execute(instr: instruction)
             }
         }
-        
+
         guard let controlArgs else {
             // Rust client didn't ask for a connection?? Ok then, end the iteration and retry
             return SyncIterationResult()
         }
-        
+
         var hadSyncLine = false
         for try await arg in controlArgs {
             let control = try await powersyncControl(arg)
@@ -270,10 +273,10 @@ private struct ActiveSyncIteration: Sendable {
                 if case let .closeSyncStream(hideDisconnect) = instr {
                     return SyncIterationResult(hideDisconnect: hideDisconnect)
                 }
-                
+
                 try await execute(instr: instr)
             }
-            
+
             if !hadSyncLine && arg.isSyncLine() {
                 // Trigger a crud upload when receiving the first sync line: We could have
                 // pending local writes made while disconnected, so in addition to listening on
@@ -368,7 +371,7 @@ fileprivate struct ControlInvocationsFromStream: AsyncSequence, Sendable {
     typealias AsyncIterator = ControlInvocationsFromStreamIterator
     typealias Element = PowerSyncControlArguments
 
-    let sequence: any AsyncSequence<SyncLine, any Error> & Sendable
+    let sequence: any SyncLineResponse
     
     func makeAsyncIterator() -> ControlInvocationsFromStreamIterator {
         .beforeStart(self.sequence)
@@ -378,8 +381,8 @@ fileprivate struct ControlInvocationsFromStream: AsyncSequence, Sendable {
 fileprivate enum ControlInvocationsFromStreamIterator: AsyncIteratorProtocol {
     typealias Element = PowerSyncControlArguments
 
-    case beforeStart(any AsyncSequence<SyncLine, any Error>)
-    case isReceiving(any AsyncIteratorProtocol<SyncLine, any Error>)
+    case beforeStart(any SyncLineResponse)
+    case isReceiving(any SyncLineResponseIterator)
     case eof
     
     mutating func next() async throws -> PowerSyncControlArguments? {
@@ -429,4 +432,8 @@ struct WriteCheckpointData: Codable {
 
 struct WriteCheckpointResponse: Codable {
     let data: WriteCheckpointData
+}
+
+private func sleepForSeconds(seconds: TimeInterval) async throws {
+    try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_00))
 }

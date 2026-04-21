@@ -55,9 +55,9 @@ if let corePath = localCoreExtension {
 let package = Package(
     name: packageName,
     platforms: [
-        .iOS(.v18),
-        .macOS(.v15),
-        .watchOS(.v11),
+        .iOS(.v15),
+        .macOS(.v12),
+        .watchOS(.v9),
         .tvOS(.v15),
     ],
     products: [

@@ -1,6 +1,5 @@
 import AsyncAlgorithms
 @testable import PowerSync
-import Synchronization
 import Testing
 
 @Suite()
@@ -163,7 +162,7 @@ class InMemorySyncIntegrationTests {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let mockClient = MockHttpClient { request in channel }
         let db = openDatabase(mockClient)
-        mockClient.writeCheckpoint.store(1, ordering: .sequentiallyConsistent)
+        mockClient.writeCheckpoint = 1
 
         try await db.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["local write"])
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
@@ -185,11 +184,11 @@ class InMemorySyncIntegrationTests {
     }
     
     @Test func tokenExpired() async throws {
-        final class BackendConnector: PowerSyncBackendConnectorProtocol {
-            let fetchCredentialsCalls = Atomic(0)
+        final actor BackendConnector: PowerSyncBackendConnectorProtocol {
+            var fetchCredentialsCalls = 0
             
             func fetchCredentials() async throws -> PowerSyncCredentials? {
-                fetchCredentialsCalls.add(1, ordering: .sequentiallyConsistent)
+                fetchCredentialsCalls += 1
                 return testCredentials
             }
 
@@ -203,13 +202,13 @@ class InMemorySyncIntegrationTests {
         
         try await channel.pushLine(.keepAlive(tokenExpiresIn: 4000))
         await waitForStatus(db.currentStatus) { $0.connected }
-        try #require(connector.fetchCredentialsCalls.load(ordering: .sequentiallyConsistent) == 1)
+        try #require(await connector.fetchCredentialsCalls == 1)
 
         // Should invalidate credentials when token expires
         try await channel.pushLine(.keepAlive(tokenExpiresIn: 0))
         await waitForStatus(db.currentStatus) { !$0.connected }
         await waitForStatus(db.currentStatus) { $0.connected }
-        try #require(connector.fetchCredentialsCalls.load(ordering: .sequentiallyConsistent) == 2)
+        try #require(await connector.fetchCredentialsCalls == 2)
     }
     
     @Test func tokenThrows() async throws {
