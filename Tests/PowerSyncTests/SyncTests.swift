@@ -390,6 +390,26 @@ class InMemorySyncIntegrationTests {
         })))
         try (try #require(await status.next())).expectProgress(total: (12, 12))
     }
+    
+    @Test func requestLogger() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpClient { request in channel })
+        let lines: Mutex<[String]> = Mutex([])
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(
+            clientConfiguration: SyncClientConfiguration(requestLogger: SyncRequestLoggerConfiguration(requestLevel: .all, logHandler: { line in
+                lines.withLock { $0.append(line) }
+            }))
+        ))
+        await waitForStatus(db.currentStatus) { $0.connected }
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "0", buckets: [BucketChecksum(bucket: "a", checksum: 0)])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
+        try await db.waitForFirstSync()
+        
+        let logEntries = lines.withLock { $0 }
+        try #require(logEntries.contains("Starting request to POST https://powersynctest.example.org/sync/stream"))
+        try #require(logEntries.contains(#"Response line: {"checkpoint_complete":{"last_op_id":"0"}}"#))
+    }
 }
 
 let defaultSchema = Schema(tables: [

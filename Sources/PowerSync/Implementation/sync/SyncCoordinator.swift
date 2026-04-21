@@ -7,6 +7,11 @@ actor SyncCoordinator {
             await self.finishSyncTask(task: task)
         }
         
+        var client = client
+        if let logger = options.clientConfiguration?.requestLogger {
+            client = LoggingClient(inner: client, logger: logger)
+        }
+
         let sync = StreamingSyncClient(db: db, connector: connector, httpClient: client, options: options)
         activeSync = sync.run()
     }
