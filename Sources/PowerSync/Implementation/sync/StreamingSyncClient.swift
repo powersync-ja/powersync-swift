@@ -30,8 +30,8 @@ final class StreamingSyncClient: Sendable {
     func run() -> Task<Void, any Error> {
         Task(name: "StreamingSyncClient.run") {
             let signals = SyncSignals()
-            async let download = downloadLoop(signals: signals)
-            async let upload = uploadLoop(signals: signals)
+            async let download: () = downloadLoop(signals: signals)
+            async let upload: () = uploadLoop(signals: signals)
             
             let _ = try await (download, upload)
         }

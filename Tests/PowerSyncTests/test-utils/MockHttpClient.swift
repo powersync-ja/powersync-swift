@@ -21,8 +21,8 @@ final class MockHttpClient: HttpClient {
         self.handleSyncLines = handleSyncLines
     }
     
-    func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, SyncLineResponse) {
-        try #require(request.url?.path() == "/sync/stream")
+    func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any SyncLineResponse) {
+        try #require(request.url?.path == "/sync/stream")
 
         let channel = try await handleSyncLines(request)
         let response = HTTPURLResponse(url: request.url!, mimeType: "application/x-ndjson", expectedContentLength: 0, textEncodingName: "utf-8")
@@ -32,7 +32,7 @@ final class MockHttpClient: HttpClient {
     
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data) {
         // The sync client only uses this method to get /write-checkpoint2.json.
-        try #require(request.url?.path() == "/write-checkpoint2.json")
+        try #require(request.url?.path == "/write-checkpoint2.json")
 
         let checkpoint = writeCheckpoint
         let body = WriteCheckpointResponse(data: WriteCheckpointData(write_checkpoint: String(checkpoint)))
