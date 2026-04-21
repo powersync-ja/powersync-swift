@@ -76,18 +76,27 @@ struct Checkpoint {
     var last_op_id: String
     var buckets: [BucketChecksum]
     var writeCheckpoint: String? = nil
+    var streams: [StreamDescription] = []
     
     enum CodingKeys: String, CodingKey {
         case last_op_id
         case buckets
         case writeCheckpoint = "write_checkpoint"
+        case streams
     }
     
     func encodeToContainer(_ container: inout KeyedEncodingContainer<CodingKeys>) throws {
         try container.encode(self.last_op_id, forKey: .last_op_id)
         try container.encode(self.buckets, forKey: .buckets)
         try container.encode(self.writeCheckpoint, forKey: .writeCheckpoint)
+        try container.encode(self.streams, forKey: .streams)
     }
+}
+
+struct StreamDescription: Encodable {
+    var name: String
+    var is_default: Bool
+    var errors: [Never] = []
 }
 
 struct OplogEntry: Encodable {
@@ -113,6 +122,7 @@ struct BucketChecksum: Encodable {
     var checksum: Int32
     var count: Int? = nil
     var lastOpId: String? = nil
+    var subscriptions: [BucketSubscriptionReason]? = nil
     
     enum CodingKeys: String, CodingKey {
         case bucket
@@ -120,6 +130,7 @@ struct BucketChecksum: Encodable {
         case checksum
         case count
         case last_op_id = "last_op_id"
+        case subscriptions
     }
     
     func encode(to encoder: any Encoder) throws {
@@ -129,6 +140,27 @@ struct BucketChecksum: Encodable {
         try container.encode(self.checksum, forKey: .checksum)
         try container.encode(self.count, forKey: .count)
         try container.encode(self.lastOpId, forKey: .last_op_id)
+        try container.encodeIfPresent(self.subscriptions, forKey: .subscriptions)
+    }
+}
+
+enum BucketSubscriptionReason: Encodable {
+    case defaultStream(Int)
+    case explicitSubscription(Int)
+    
+    enum CodingKeys: String, CodingKey {
+        case defaultStream = "default"
+        case explicitSubscription = "sub"
+    }
+    
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .defaultStream(let idx):
+            try container.encode(idx, forKey: .defaultStream)
+        case .explicitSubscription(let idx):
+            try container.encode(idx, forKey: .explicitSubscription)
+        }
     }
 }
 

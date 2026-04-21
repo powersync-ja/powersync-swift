@@ -9,7 +9,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     let logger: any LoggerProtocol
     private let kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase
     private let encoder = JSONEncoder()
-    private let syncCoordinator = SyncCoordinator()
+    let syncCoordinator = SyncCoordinator()
     internal let syncStatus = SwiftSyncStatus()
     private let dbFilename: String
     private let httpClient: HttpClient
@@ -53,14 +53,28 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         )
     }
 
+    func resolveOfflineSyncStatusIfNotConnected() async throws {
+        try await syncCoordinator.guardNotConnected(inner: {
+            try await resolveOfflineSyncStatus()
+        }, ifConnected: {})
+    }
+    
+    private func resolveOfflineSyncStatus() async throws {
+        let offlineSyncStatus = try await get("SELECT powersync_offline_sync_status()") { cursor in
+            let raw = try cursor.getString(index: 0)
+            return try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: raw.data(using: .utf8)!)
+        }
+
+        syncStatus.mutateStatus { $0 = MutableSyncStatus(core: offlineSyncStatus) }
+    }
+    
     func waitForFirstSync(priority: Int32) async {
         let priority = BucketPriority(priority)
         await syncStatus.waitFor { $0.statusForPriority(priority).hasSynced == true }
     }
 
     func syncStream(name: String, params: JsonParam?) -> any SyncStream {
-        let rawStream = kotlinDatabase.syncStream(name: name, parameters: params?.mapValues { $0.toKotlinMap() })
-        fatalError("todo")
+        PendingSyncStream(db: self, name: name, parameters: params)
     }
     
     func connect(

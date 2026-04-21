@@ -410,6 +410,217 @@ class InMemorySyncIntegrationTests {
         try #require(logEntries.contains("Starting request to POST https://powersynctest.example.org/sync/stream"))
         try #require(logEntries.contains(#"Response line: {"checkpoint_complete":{"last_op_id":"0"}}"#))
     }
+    
+    @Test func canDisableDefaultStreams() async throws {
+        let didConnect = Signal()
+        let db = openDatabase(MockHttpClient { request in
+            let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
+            if case let .object(options) = body["streams"] {
+                try #require(options["include_defaults"] == .bool(false))
+            } else {
+                Issue.record("Should have streams key in body")
+            }
+
+            await didConnect.complete()
+            return AsyncThrowingChannel()
+        })
+        
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(
+            includeDefaultStreams: false
+        ))
+        await didConnect.await()
+    }
+    
+    @Test func subscribesWithStreams() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpClient { request in
+            let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
+            if case let .object(streams) = body["streams"] {
+                try #require(streams["include_defaults"] == .bool(true))
+                try #require(streams["subscriptions"] == .array([
+                    .object([
+                        "stream": .string("stream"),
+                        "parameters": .object(["foo": .string("a")]),
+                        "override_priority": .null
+                    ]),
+                    .object([
+                        "stream": .string("stream"),
+                        "parameters": .object(["foo": .string("b")]),
+                        "override_priority": .int(1)
+                    ])
+                ]))
+            } else {
+                Issue.record("Should have streams key in body")
+            }
+            
+            return channel
+        })
+        
+        let a = try await db.syncStream(name:"stream", params: ["foo": .string("a")]).subscribe()
+        let b = try await db.syncStream(name: "stream", params: ["foo": .string("b")]).subscribe(ttl: nil, priority: .init(1))
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await waitForStatus(db.currentStatus) { $0.connected }
+        var statusUpdates = db.currentStatus.asFlow().makeAsyncIterator()
+        
+        // Without an initial checkpoint, sync streams should not be marked as active
+        try #require(db.currentStatus.forStream(stream: a)?.subscription.hasSynced == false)
+        try #require(db.currentStatus.forStream(stream: b)?.subscription.hasSynced == false)
+        
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [
+            BucketChecksum(
+                bucket: "a",
+                priority: BucketPriority(3),
+                checksum: 0,
+                subscriptions: [.explicitSubscription(0)]
+            ),
+            BucketChecksum(
+                bucket: "b",
+                priority: BucketPriority(1),
+                checksum: 0,
+                subscriptions: [.explicitSubscription(1)]
+            )
+        ], streams: [StreamDescription(name: "stream", is_default: false)])))
+        
+        // Subscriptions should be active now, but not marked as synced
+        do {
+            let status = try #require(await statusUpdates.next())
+            for subscription in [a, b] {
+                let status = try #require(status.forStream(stream: subscription))
+                try #require(status.subscription.active)
+                try #require(status.subscription.lastSyncedAt == nil)
+                try #require(status.subscription.hasExplicitSubscription)
+            }
+        }
+        
+        try await channel.pushLine(.checkpointPartiallyComplete(lastOpId: "0", priority: BucketPriority(1)))
+        do {
+            let status = try #require(await statusUpdates.next())
+            try #require(status.forStream(stream: a)!.subscription.lastSyncedAt == nil)
+            try #require(status.forStream(stream: b)!.subscription.lastSyncedAt != nil)
+            try await b.waitForFirstSync()
+        }
+        
+        try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
+        try await a.waitForFirstSync()
+    }
+    
+    @Test func reportsDefaultStreams() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpClient { request in channel })
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        
+        await waitForStatus(db.currentStatus) { $0.connected }
+        var statusUpdates = db.currentStatus.asFlow().makeAsyncIterator()
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "0", buckets: [], streams: [StreamDescription(name: "default_stream", is_default: true)])))
+        
+        let status = try #require(await statusUpdates.next())
+        let stream = try #require(status.syncStreams?.first)
+        try #require(stream.subscription.name == "default_stream")
+        try #require(stream.subscription.parameters == nil)
+        try #require(stream.subscription.isDefault)
+        try #require(!stream.subscription.hasExplicitSubscription)
+    }
+    
+    @Test func changesSubscriptionsDynamically() async throws {
+        let lastRequest = AsyncMutex<JsonParam?>(nil)
+        let db = openDatabase(MockHttpClient { request in
+            let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
+            await lastRequest.withMutex { $0 = body }
+            return AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        })
+        
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await waitForStatus(db.currentStatus) { $0.connected }
+        let request = try #require(await lastRequest.inner)
+        if case let .object(streams) = request["streams"] {
+            try #require(streams["subscriptions"] == .array([]))
+        } else {
+            Issue.record("Should have streams key in body")
+        }
+
+        // Adding a new subscription should reconnect
+        let subscription = try await db.syncStream(name: "a", params: nil).subscribe()
+        await waitForStatus(db.currentStatus) { !$0.connected }
+        await waitForStatus(db.currentStatus) { $0.connected }
+        let secondRequest = try #require(await lastRequest.inner)
+        if case let .object(streams) = secondRequest["streams"] {
+            try #require(streams["subscriptions"] == .array([
+                .object([
+                    "stream": .string("a"),
+                    "parameters": .null,
+                    "override_priority": .null,
+                ])
+            ]))
+        } else {
+            Issue.record("Should have streams key in body")
+        }
+        let _ = consume subscription
+    }
+    
+    @Test func subscriptionsUpdateWhileOffline() async throws {
+        let db = openDatabase(PlatformHttpClient.shared)
+        var statusUpdates = db.currentStatus.asFlow().makeAsyncIterator()
+        
+        // Subscribing while offline should add the stream to subscriptions reported in the status.
+        let subscription = try await db.syncStream(name: "a", params: nil).subscribe()
+        let status = try #require(await statusUpdates.next())
+        let _ = try #require(status.forStream(stream: subscription))
+    }
+    
+    @Test func unsubscribingMultipleTimesHasNoEffect() async throws {
+        let db = openDatabase(MockHttpClient { request in
+            let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
+            if case let .object(streams) = body["streams"] {
+                try #require(streams["subscriptions"] == .array([
+                    .object([
+                        "stream": .string("a"),
+                        "parameters": .null,
+                        "override_priority": .null
+                    ]),
+                ]))
+            } else {
+                Issue.record("Should have streams key in body")
+            }
+            
+            return AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        })
+        
+        let a = try await db.syncStream(name: "a", params: nil).subscribe()
+        let aAgain = try await db.syncStream(name: "a", params: nil).subscribe()
+        try await a.unsubscribe()
+        try await a.unsubscribe()
+        
+        // Pretend the streams are expired, they should still be requested because the
+        // core extension extends the lifetime of streams currently referenced before connecting
+        try await db.execute("UPDATE ps_stream_subscriptions SET expires_at = unixepoch() - 1000")
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await waitForStatus(db.currentStatus) { $0.connected }
+        
+        let _ = consume aAgain
+    }
+    
+    @Test func unsubscribeAll() async throws {
+        let didConnect = Signal()
+        let db = openDatabase(MockHttpClient { request in
+            let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
+            if case let .object(streams) = body["streams"] {
+                // While we did request a stream, we called unsubscribeAll() before connecting. So it should not
+                // be part of the request.
+                try #require(streams["subscriptions"] == .array([]))
+            } else {
+                Issue.record("Should have streams key in body")
+            }
+            
+            await didConnect.complete()
+            return AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        })
+        
+        let a = try await db.syncStream(name: "a", params: nil).subscribe()
+        try await db.syncStream(name: "a", params: nil).unsubscribeAll()
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await didConnect.await()
+        let _ = consume a
+    }
 }
 
 let defaultSchema = Schema(tables: [
@@ -421,7 +632,7 @@ let defaultSchema = Schema(tables: [
     ),
 ])
 
-private func openDatabase(_ client: MockHttpClient, schema: Schema = defaultSchema) -> PowerSyncDatabaseProtocol {
+private func openDatabase(_ client: any HttpClient, schema: Schema = defaultSchema) -> PowerSyncDatabaseProtocol {
     return openKotlinDBDefault(
         schema: schema,
         dbFilename: ":memory:",

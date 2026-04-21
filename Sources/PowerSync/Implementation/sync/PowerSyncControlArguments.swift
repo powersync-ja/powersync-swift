@@ -77,7 +77,7 @@ struct StartSyncIteration: Encodable {
     }
 }
 
-struct StreamKey: Codable {
+struct StreamKey: Codable, Equatable, Hashable {
     let name: String
-    let params: JsonParam
+    let params: JsonParam?
 }

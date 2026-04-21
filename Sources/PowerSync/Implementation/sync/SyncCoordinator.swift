@@ -1,5 +1,6 @@
 /// Manages a connection task for a PowerSync database.
 actor SyncCoordinator {
+    nonisolated let streams = StreamTracker()
     private var activeSync: Task<Void, any Error>?
     
     func connect(db: KotlinPowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: HttpClient) async {
@@ -25,11 +26,11 @@ actor SyncCoordinator {
     }
     
     /// Executes an inner function, but only if no connection is active or scheduled.
-    func guardNotConnected<T>(inner: () async throws -> T, ifConnected: () throws -> Never) async rethrows -> T {
+    func guardNotConnected<T>(inner: () async throws -> T, ifConnected: () async throws -> T) async rethrows -> T {
         if activeSync == nil {
             return try await inner();
         } else {
-            try ifConnected()
+            return try await ifConnected()
         }
     }
     

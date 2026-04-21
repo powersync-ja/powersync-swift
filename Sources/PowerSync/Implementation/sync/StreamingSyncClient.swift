@@ -227,11 +227,13 @@ private struct ActiveSyncIteration: Sendable {
     }
     
     func run() async throws -> SyncIterationResult {
+        async let _ = watchSyncStreams()
+
         let initialInstructions = try await powersyncControl(.start(StartSyncIteration(
             parameters: syncClient.options.params,
             schema: await syncClient.db.schema.inner,
-            includeDefaults: true,
-            activeStreams: [],
+            includeDefaults: syncClient.options.includeDefaultStreams,
+            activeStreams: syncClient.db.syncCoordinator.streams.currentStreams,
             appMetadata: syncClient.options.appMetadata,
         )))
         
@@ -333,6 +335,13 @@ private struct ActiveSyncIteration: Sendable {
             syncClient.db.syncStatus.mutateStatus {
                 $0.internalDownloadError = nil
             }
+        }
+    }
+    
+    private func watchSyncStreams() async throws {
+        let changes = syncClient.db.syncCoordinator.streams.streamsChanged.subscribe()
+        for await change in changes {
+            self.localEvents.dispatch(event: .updateSubscriptions(streams: change))
         }
     }
 }
