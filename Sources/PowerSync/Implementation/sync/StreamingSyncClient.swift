@@ -56,7 +56,9 @@ final class StreamingSyncClient: Sendable {
         var lastUploadItem: Int64? = nil
         
         while (true) {
-            defer { db.syncStatus.mutateStatus { $0.uploading = false } }
+            defer {
+                db.syncStatus.maybeMutateStatus(shouldUpdate: { $0.uploading }, apply: { $0.uploading = false })
+            }
             
             do {
                 let nextItem = try await db.getOptional("SELECT id FROM ps_crud ORDER BY id LIMIT 1", mapper: { cursor in try cursor.getInt64(index: 0) })
@@ -79,13 +81,13 @@ The next upload iteration will be delayed.
                     break
                 }
             } catch {
+                if error is CancellationError {
+                    return
+                }
+                
                 db.syncStatus.mutateStatus {
                     $0.uploading = false
                     $0.internalUploadError = error
-                }
-                
-                if error is CancellationError {
-                    return
                 }
 
                 db.logger.error("Error uploading crud: \(error)", tag: tag)

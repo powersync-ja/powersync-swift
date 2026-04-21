@@ -123,14 +123,28 @@ final class SwiftSyncStatus: SyncStatus {
     }
     
     internal func mutateStatus(update: (_ status: inout MutableSyncStatus) -> Void) {
-        self.current.withLock {
-            update(&$0.inner)
-            $0.snapshot = SyncStatusDataImpl(status: $0.inner)
-        }
-        
-        self.listeners.dispatch(event: self)
+        maybeMutateStatus(shouldUpdate: { _ in true }, apply: update)
     }
     
+    internal func maybeMutateStatus(
+        shouldUpdate: (_ status: borrowing MutableSyncStatus) -> Bool,
+        apply: (_ status: inout MutableSyncStatus) -> Void
+    ) {
+        let didUpdate = self.current.withLock {
+            if shouldUpdate($0.inner) {
+                apply(&$0.inner)
+                $0.snapshot = SyncStatusDataImpl(status: $0.inner)
+                return true
+            } else {
+                return false
+            }
+        }
+        
+        if didUpdate {
+            self.listeners.dispatch(event: self)
+        }
+    }
+
     func asFlow() -> AsyncStream<any SyncStatusData> {
         self.listeners.subscribe(addInitial: self)
     }
