@@ -35,10 +35,6 @@ final class StreamingSyncClient: Sendable {
             let _ = try await download
         }
     }
-    
-    private func watchPsCrudChanges(signals: SyncSignals) async throws {
-
-    }
 
     private func uploadLoop(signals: SyncSignals) async throws {
         // TODO: Replace with better watch mechanism
@@ -232,6 +228,7 @@ private struct ActiveSyncIteration: Sendable {
     func run() async throws -> SyncIterationResult {
         let initialInstructions = try await powersyncControl(.start(StartSyncIteration(
             parameters: syncClient.options.params,
+            schema: await syncClient.db.schema.inner,
             includeDefaults: true,
             activeStreams: [],
             appMetadata: syncClient.options.appMetadata,

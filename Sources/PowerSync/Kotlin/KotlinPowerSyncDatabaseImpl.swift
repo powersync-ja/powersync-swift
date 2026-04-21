@@ -13,12 +13,14 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     internal let syncStatus = SwiftSyncStatus()
     private let dbFilename: String
     private let httpClient: HttpClient
+    let schema: AsyncMutex<Schema>
 
     init(
         kotlinDatabase: PowerSyncKotlin.PowerSyncDatabase,
         dbFilename: String,
         logger: DatabaseLogger,
-        httpClient: HttpClient
+        httpClient: HttpClient,
+        schema: Schema
     ) {
         self.logger = logger
         self.kotlinDatabase = kotlinDatabase
@@ -27,6 +29,7 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
         /// FIXME. Update this once we support database directory configuration.
         self.dbFilename = dbFilename
         self.httpClient = httpClient
+        self.schema = AsyncMutex(schema)
     }
     
     var currentStatus: any SyncStatus {
@@ -40,6 +43,8 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     func updateSchema(schema: any SchemaProtocol) async throws {
         try await syncCoordinator.guardNotConnected(
             inner: {
+                await self.schema.withMutex { $0 = Schema(other: schema) }
+
                 try await kotlinDatabase.updateSchema(
                     schema: KotlinAdapter.Schema.toKotlin(schema)
                 )
@@ -469,7 +474,8 @@ func openKotlinDBDefault(
         kotlinDatabase: kotlinDatabase,
         dbFilename: dbFilename,
         logger: logger,
-        httpClient: httpClient
+        httpClient: httpClient,
+        schema: schema
     )
 }
 
@@ -488,7 +494,8 @@ func openKotlinDBWithPool(
         ),
         dbFilename: identifier,
         logger: logger,
-        httpClient: PlatformHttpClient.shared
+        httpClient: PlatformHttpClient.shared,
+        schema: schema
     )
 }
 

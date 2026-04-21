@@ -20,6 +20,11 @@ public struct Schema: SchemaProtocol, Encodable {
         self.tables = tables
         self.rawTables = rawTables
     }
+    
+    init(other: SchemaProtocol) {
+        self.tables = other.tables
+        self.rawTables = other.rawTables
+    }
 
     ///
     /// Convenience initializer with variadic parameters

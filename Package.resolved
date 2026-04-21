@@ -1,5 +1,5 @@
 {
-  "originHash" : "3165e395f09f43046349a7f58470df039b67a3cc3e2ce3d2c3ee2635489c6fb7",
+  "originHash" : "ad5382ed9d817fca8fdec89f15357bf19a77421c7ea034496baf99710ab60846",
   "pins" : [
     {
       "identity" : "csqlite",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
       "state" : {
-        "revision" : "aa35758afca6cc97db836e1545ad28e4c5ddc50d",
-        "version" : "0.4.12"
+        "revision" : "05c2af384558011f0915d757b6677f5dcbbc5c54",
+        "version" : "0.4.13"
       }
     },
     {

@@ -61,15 +61,16 @@ enum PowerSyncControlArguments {
     }
 }
 
-struct StartSyncIteration: Codable {
+struct StartSyncIteration: Encodable {
     let parameters: JsonParam
-    // TODO: Schema
+    let schema: Schema
     let includeDefaults: Bool
     let activeStreams: [StreamKey]
     let appMetadata: [String: String]
     
     enum CodingKeys: String, CodingKey {
         case parameters
+        case schema
         case includeDefaults = "include_defaults"
         case activeStreams = "active_streams"
         case appMetadata = "app_metadata"

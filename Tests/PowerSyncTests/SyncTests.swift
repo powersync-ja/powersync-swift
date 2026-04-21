@@ -231,17 +231,114 @@ class InMemorySyncIntegrationTests {
         await connector.prefetchCalled.await()
         // Should still be connected before prefetch completes
         try #require(db.currentStatus.connected == true)
-        
+
         // After the prefetch completes, we should reconnect.
         await connector.completePrefetch.complete()
         await waitForStatus(db.currentStatus) { !$0.connected }
         await waitForStatus(db.currentStatus) { $0.connected }
         try #require(await connector.fetchCredentialsCount == 2)
     }
+
+    @Test func rawTablesWithImplicitStatements() async throws {
+        struct List: Equatable {
+            let id: String
+            let name: String
+        }
+        
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpClient { request in channel }, schema: Schema(RawTable(name: "lists", schema: RawTableSchema())))
+        
+        try await db.execute("CREATE TABLE lists (id TEXT NOT NULL PRIMARY KEY, name TEXT)")
+        var query = try db.watch("SELECT * FROM lists") { cursor in
+            List(id: try cursor.getString(index: 0), name: try cursor.getString(index: 1))
+        }.makeAsyncIterator()
+        try #require(try await query.next() == [])
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)])))
+        try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [
+            OplogEntry(
+                checksum: 0,
+                op_id: "1",
+                object_id: "my_list",
+                object_type: "lists",
+                op: .put,
+                data: #"{"name": "custom list"}"#
+            )
+        ])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        try #require(try await query.next() == [List(id: "my_list", name: "custom list")])
+        
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "2", buckets: [BucketChecksum(bucket: "a", checksum: 0)])))
+        try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [
+            OplogEntry(
+                checksum: 0,
+                op_id: "2",
+                object_id: "my_list",
+                object_type: "lists",
+                op: .remove,
+            )
+        ])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "2"))
+        try #require(try await query.next() == [])
+    }
     
-    // TODO: Raw table tests (requires serializable schema)
+    @Test func rawTablesWithExplicitStatements() async throws {
+        struct List: Equatable {
+            let id: String
+            let name: String
+            let rest: String
+        }
+        
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpClient { request in channel }, schema: Schema(RawTable(
+            name: "lists",
+            put: PendingStatement(sql: "INSERT OR REPLACE INTO lists (id, name, _rest) VALUES (?, ?, ?)", parameters: [
+                .id,
+                .column("name"),
+                .rest
+            ]),
+            delete: PendingStatement(sql: "DELETE FROM lists WHERE id = ?", parameters: [
+                .id
+            ]),
+        )))
+        
+        try await db.execute("CREATE TABLE lists (id TEXT NOT NULL PRIMARY KEY, name TEXT, _rest TEXT)")
+        var query = try db.watch("SELECT * FROM lists") { cursor in
+            List(id: try cursor.getString(index: 0), name: try cursor.getString(index: 1), rest: try cursor.getString(index: 2))
+        }.makeAsyncIterator()
+        try #require(try await query.next() == [])
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)])))
+        try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [
+            OplogEntry(
+                checksum: 0,
+                op_id: "1",
+                object_id: "my_list",
+                object_type: "lists",
+                op: .put,
+                data: #"{"name": "custom list", "additional_column": "foo"}"#
+            )
+        ])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        try #require(try await query.next() == [List(id: "my_list", name: "custom list", rest: #"{"additional_column":"foo"}"#)])
+        
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "2", buckets: [BucketChecksum(bucket: "a", checksum: 0)])))
+        try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [
+            OplogEntry(
+                checksum: 0,
+                op_id: "2",
+                object_id: "my_list",
+                object_type: "lists",
+                op: .remove,
+            )
+        ])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "2"))
+        try #require(try await query.next() == [])
+    }
     
-    @Test(.disabled("Blocked on https://github.com/powersync-ja/powersync-sqlite-core/pull/174")) func endsIterationOnHttpClose() async throws {
+    @Test func endsIterationOnHttpClose() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let db = openDatabase(MockHttpClient { request in channel })
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
@@ -250,7 +347,7 @@ class InMemorySyncIntegrationTests {
         channel.finish()
         await waitForStatus(db.currentStatus) { !$0.connected }
     }
-    
+
     @Test func syncProgress() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let db = openDatabase(MockHttpClient { request in channel })
@@ -280,16 +377,16 @@ class InMemorySyncIntegrationTests {
     }
 }
 
-private func openDatabase(_ client: MockHttpClient) -> PowerSyncDatabaseProtocol {
-    let schema = Schema(tables: [
-        Table(
-            name: "users",
-            columns: [
-                .text("name"),
-            ]
-        ),
-    ])
+let defaultSchema = Schema(tables: [
+    Table(
+        name: "users",
+        columns: [
+            .text("name"),
+        ]
+    ),
+])
 
+private func openDatabase(_ client: MockHttpClient, schema: Schema = defaultSchema) -> PowerSyncDatabaseProtocol {
     return openKotlinDBDefault(
         schema: schema,
         dbFilename: ":memory:",
