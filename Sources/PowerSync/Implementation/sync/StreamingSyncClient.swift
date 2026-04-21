@@ -190,6 +190,7 @@ The next upload iteration will be delayed.
         let url = buildUrl(base)
         var request = URLRequest(url: url)
         request.setValue("Token \(credentials.token)", forHTTPHeaderField: "Authorization")
+        request.setValue(await userAgent(), forHTTPHeaderField: "User-Agent")
         return (url, request)
     }
     

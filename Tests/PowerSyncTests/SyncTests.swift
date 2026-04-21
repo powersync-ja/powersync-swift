@@ -5,10 +5,24 @@ import Testing
 
 @Suite()
 class InMemorySyncIntegrationTests {
+    @Test func setsHeaders() async throws {
+        let didConnect = Signal()
+        let db = openDatabase(MockHttpClient { request in
+            try #require(request.value(forHTTPHeaderField: "User-Agent")!.contains("powersync-swift/"))
+            try #require(request.value(forHTTPHeaderField: "Authorization") == "Token test-token")
+            await didConnect.complete()
+            return AsyncThrowingChannel()
+        })
+        
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await didConnect.await()
+    }
+    
     @Test func useParameters() async throws {
         let didConnect = Signal()
         let db = openDatabase(MockHttpClient { request in
-            try #require(request["parameters"] == .object(["foo": .string("bar")]))
+            let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
+            try #require(body["parameters"] == .object(["foo": .string("bar")]))
             await didConnect.complete()
             return AsyncThrowingChannel()
         })
@@ -23,7 +37,8 @@ class InMemorySyncIntegrationTests {
     @Test func useAppMetadata() async throws {
         let didConnect = Signal()
         let db = openDatabase(MockHttpClient { request in
-            try #require(request["app_metadata"] == .object(["app_version": .string("1.0.0")]))
+            let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
+            try #require(body["app_metadata"] == .object(["app_version": .string("1.0.0")]))
             await didConnect.complete()
             return AsyncThrowingChannel()
         })

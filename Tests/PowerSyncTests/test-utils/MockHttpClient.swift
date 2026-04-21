@@ -6,17 +6,16 @@ import Synchronization
 
 final class MockHttpClient: HttpClient {
     let writeCheckpoint: Atomic<Int32> = Atomic(1000)
-    let handleSyncLines: @Sendable (_ body: JsonParam) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>
+    let handleSyncLines: @Sendable (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>
 
-    init(handleSyncLines: @Sendable @escaping (_ body: JsonParam) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>) {
+    init(handleSyncLines: @Sendable @escaping (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>) {
         self.handleSyncLines = handleSyncLines
     }
     
     func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any Sendable & AsyncSequence<PowerSync.SyncLine, any Error>) {
         try #require(request.url?.path() == "/sync/stream")
 
-        let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
-        let channel = try await handleSyncLines(body)
+        let channel = try await handleSyncLines(request)
         let response = HTTPURLResponse(url: request.url!, mimeType: "application/x-ndjson", expectedContentLength: 0, textEncodingName: "utf-8")
 
         return (response, channel)
