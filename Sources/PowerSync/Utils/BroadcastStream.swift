@@ -21,8 +21,15 @@ final class BroadcastStream<T: Sendable>: Sendable {
         }
     }
 
-    func subscribe(bufferingPolicy: AsyncStream<T>.Continuation.BufferingPolicy = .unbounded) -> AsyncStream<T> {
+    func subscribe(
+        bufferingPolicy: AsyncStream<T>.Continuation.BufferingPolicy = .unbounded,
+        addInitial: T? = nil
+    ) -> AsyncStream<T> {
         return AsyncStream(bufferingPolicy: bufferingPolicy) { continuation in
+            if let addInitial {
+                continuation.yield(addInitial)
+            }
+            
             self.register(continuation: continuation)
         }
     }

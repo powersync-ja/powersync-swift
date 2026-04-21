@@ -132,14 +132,10 @@ final class SwiftSyncStatus: SyncStatus {
     }
     
     func asFlow() -> AsyncStream<any SyncStatusData> {
-        self.listeners.subscribe()
+        self.listeners.subscribe(addInitial: self)
     }
     
     func waitFor(_ predicate: (borrowing SwiftSyncStatus) -> Bool) async {
-        if predicate(self) {
-            return
-        }
-        
         for await _ in self.asFlow() {
             if predicate(self) {
                 return

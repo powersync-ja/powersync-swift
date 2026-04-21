@@ -369,6 +369,7 @@ class InMemorySyncIntegrationTests {
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
         await waitForStatus(db.currentStatus) { $0.connected }
         var status = db.currentStatus.asFlow().makeAsyncIterator()
+        let _ = await status.next() // Skip initial
         
         // Send checkpoint with 10 ops, progress should be 0/10
         try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "10", buckets: [BucketChecksum(bucket: "a", checksum: 0, count: 10)])))
@@ -461,6 +462,7 @@ class InMemorySyncIntegrationTests {
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
         await waitForStatus(db.currentStatus) { $0.connected }
         var statusUpdates = db.currentStatus.asFlow().makeAsyncIterator()
+        let _ = await statusUpdates.next() // Skip initial
         
         // Without an initial checkpoint, sync streams should not be marked as active
         try #require(db.currentStatus.forStream(stream: a)?.subscription.hasSynced == false)
@@ -511,6 +513,7 @@ class InMemorySyncIntegrationTests {
         
         await waitForStatus(db.currentStatus) { $0.connected }
         var statusUpdates = db.currentStatus.asFlow().makeAsyncIterator()
+        let _ = await statusUpdates.next() // Skip initial
         try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "0", buckets: [], streams: [StreamDescription(name: "default_stream", is_default: true)])))
         
         let status = try #require(await statusUpdates.next())
