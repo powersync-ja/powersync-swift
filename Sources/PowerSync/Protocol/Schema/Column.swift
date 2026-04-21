@@ -15,14 +15,26 @@ public protocol ColumnProtocol: Equatable, Sendable {
     var type: ColumnData { get }
 }
 
-public enum ColumnData: Sendable {
+public enum ColumnData: Sendable, Encodable {
     case text
     case integer
     case real
+    
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .text:
+            try container.encode("text")
+        case .integer:
+            try container.encode("integer")
+        case .real:
+            try container.encode("real")
+        }
+    }
 }
 
 /// A single column in a table schema.
-public struct Column: ColumnProtocol {
+public struct Column: ColumnProtocol, Encodable {
     public let name: String
     public let type: ColumnData
 

@@ -230,4 +230,122 @@ final class TableTests: XCTestCase {
         
         XCTAssertNoThrow(try table.validate())
     }
+    
+    func testSerialize() throws {
+        let table = Table(
+            name: "users",
+            columns: makeValidColumns(),
+            indexes: [makeValidIndex()],
+            localOnly: false,
+            insertOnly: false,
+            trackPreviousValues: TrackPreviousValuesOptions(columnFilter: ["name"], onlyWhenChanged: true)
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting.insert(.prettyPrinted)
+        encoder.outputFormatting.insert(.sortedKeys)
+        let serialized = String(data: try encoder.encode(table), encoding: .utf8)
+
+        XCTAssertEqual(serialized, """
+{
+  "columns" : [
+    {
+      "name" : "name",
+      "type" : "text"
+    },
+    {
+      "name" : "age",
+      "type" : "integer"
+    },
+    {
+      "name" : "score",
+      "type" : "real"
+    }
+  ],
+  "ignore_empty_update" : false,
+  "include_metadata" : false,
+  "include_old" : [
+    "name"
+  ],
+  "include_old_only_when_changed" : true,
+  "indexes" : [
+    {
+      "columns" : [
+        {
+          "ascending" : true,
+          "name" : "name"
+        }
+      ],
+      "name" : "test_index"
+    }
+  ],
+  "insert_only" : false,
+  "local_only" : false,
+  "name" : "users"
+}
+""")
+    }
+
+    func testRawTableSerializeSimple() throws {
+        let table = RawTable(
+            name: "users",
+            put: PendingStatement(sql: "SELECT 1", parameters: [.id]),
+            delete: PendingStatement(sql: "SELECT 2", parameters: [.column("a"), .rest]),
+            clear: "SELECT 3"
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting.insert(.prettyPrinted)
+        encoder.outputFormatting.insert(.sortedKeys)
+        let serialized = String(data: try encoder.encode(table), encoding: .utf8)
+
+        XCTAssertEqual(serialized, """
+{
+  "clear" : "SELECT 3",
+  "delete" : {
+    "params" : [
+      {
+        "Column" : "a"
+      },
+      "Rest"
+    ],
+    "sql" : "SELECT 2"
+  },
+  "name" : "users",
+  "put" : {
+    "params" : [
+      "Id"
+    ],
+    "sql" : "SELECT 1"
+  }
+}
+""")
+    }
+
+    func testRawTableSerializeWithOptions() throws {
+        let table = RawTable(
+            name: "users",
+            schema: RawTableSchema(
+                syncedColumns: ["foo"],
+                options: TableOptions(insertOnly: true)
+            )
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting.insert(.prettyPrinted)
+        encoder.outputFormatting.insert(.sortedKeys)
+        let serialized = String(data: try encoder.encode(table), encoding: .utf8)
+
+        XCTAssertEqual(serialized, """
+{
+  "ignore_empty_update" : false,
+  "include_metadata" : false,
+  "insert_only" : true,
+  "local_only" : false,
+  "name" : "users",
+  "synced_columns" : [
+    "foo"
+  ],
+  "table_name" : "users"
+}
+""")
+    }
+
 }

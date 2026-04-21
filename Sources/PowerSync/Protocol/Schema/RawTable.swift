@@ -1,3 +1,5 @@
+import Foundation
+
 /// A table that is managed by the user instead of being auto-created and migrated by the PowerSync SDK.
 ///
 /// These tables give application developers full control over the table (including table and column constraints).
@@ -11,7 +13,7 @@
 ///
 /// Note that raw tables are only supported when ``ConnectOptions/newClientImplementation``
 /// is enabled.
-public struct RawTable: BaseTableProtocol {
+public struct RawTable: BaseTableProtocol, Encodable {
     /// The name of the table as it appears in sync rules.
     ///
     /// This doesn't necessarily have to match the statement that ``RawTable/put`` and ``RawTable/delete``
@@ -58,11 +60,52 @@ public struct RawTable: BaseTableProtocol {
     /// The output of this can be passed to the `powersync_create_raw_table_crud_trigger` SQL
     /// function to define triggers for this table.
     public func jsonDescription() -> String {
-        return KotlinAdapter.Table.toKotlin(self).jsonDescription()
+        let encoder = JSONEncoder()
+        do {
+            let serialized = try encoder.encode(self)
+            return String(data: serialized, encoding: .utf8)!
+        } catch {
+            // An older version of the Swift SDK used to implement this method in Kotlin.
+            // That could also throw an exception (which would crash the process), but that
+            // was overlooked due to a missing @Throws annotation.
+            // Now, we can't mark this as throws without breaking backwards compatibility.
+            // We should conver this to be throwing in a future major release.
+            fatalError("Serializing a raw table failed: \(error)")
+        }
+    }
+
+    internal func validate() throws(TableError) {
+        if let schema {
+            try schema.options.validate(tableName: name)
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        enum CodingKeys: String, CodingKey {
+            case name
+            case put
+            case delete
+            case clear
+            // For schema
+            case tableName = "table_name"
+            case syncedColumns = "synced_columns"
+        }
+        typealias Keys = TableOptionsCodingKeys<CodingKeys>
+
+        var container = encoder.container(keyedBy: Keys.self)
+        try container.encode(name, forKey: .outer(.name))
+        try container.encodeIfPresent(put, forKey: .outer(.put))
+        try container.encodeIfPresent(delete, forKey: .outer(.delete))
+        try container.encodeIfPresent(clear, forKey: .outer(.clear))
+        if let schema {
+            try container.encode(schema.tableName ?? name, forKey: .outer(.tableName))
+            try container.encodeIfPresent(schema.syncedColumns, forKey: .outer(.syncedColumns))
+            try schema.options.serializeTo(container)
+        }
     }
 }
 
-/// THe schema of a ``RawTable`` in the local database.
+/// The schema of a ``RawTable`` in the local database.
 /// 
 /// This information is optional when declaring raw tables. However, providing it allows the sync
 /// client to infer ``RawTable/put`` and ``RawTable/delete`` statements automatically.
@@ -95,7 +138,7 @@ public struct RawTableSchema: Sendable {
 }
 
 /// A statement to run to sync server-side changes into a local raw table.
-public struct PendingStatement: Sendable {
+public struct PendingStatement: Sendable, Encodable {
     /// The SQL statement to execute.
     public let sql: String
     /// For parameters in the prepared statement, the values to fill in.
@@ -108,10 +151,21 @@ public struct PendingStatement: Sendable {
         self.sql = sql
         self.parameters = parameters
     }
+
+    public func encode(to encoder: any Encoder) throws {
+        enum CodingKeys: String, CodingKey {
+            case sql
+            case parameters = "params"
+         }
+
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.sql, forKey: .sql)
+        try container.encode(self.parameters, forKey: .parameters)
+    }
 }
 
 /// A parameter that can be used in a ``PendingStatement``.
-public enum PendingStatementParameter: Sendable {
+public enum PendingStatementParameter: Sendable, Encodable {
     /// A value that resolves to the textual id of the row to insert, update or delete.
     case id
     /// A value that resolves to the value of a column in a `PUT` operation for inserts or updates.
@@ -122,4 +176,22 @@ public enum PendingStatementParameter: Sendable {
     /// Resolves to a JSON object containing all columns from the synced row that haven't been matched
     /// by a ``PendingStatementParameter/column`` value in the same statement.
     case rest
+
+    public func encode(to encoder: any Encoder) throws {
+        switch self {
+        case .id:
+            var container = encoder.singleValueContainer()
+            try container.encode("Id")
+        case .column(let name):
+            enum CodingKeys: String, CodingKey {
+                case column = "Column"
+            }
+
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(name, forKey: .column)
+        case .rest:
+            var container = encoder.singleValueContainer()
+            try container.encode("Rest")
+        }
+    }
 }

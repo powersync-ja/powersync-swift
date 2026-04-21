@@ -71,6 +71,26 @@ public struct TableOptions: TableOptionsProtocol {
         self.trackPreviousValues = trackPreviousValues
         self.ignoreEmptyUpdates = ignoreEmptyUpdates
     }
+    
+    internal func validate(tableName: String) throws(TableError) {
+        if localOnly {
+            if trackPreviousValues != nil {
+                throw TableError.trackPreviousForLocalTable(tableName: tableName)
+            }
+            if trackMetadata {
+                throw TableError.metadataForLocalTable(tableName: tableName)
+            }
+        }
+    }
+
+    internal func serializeTo<T: CodingKey>(_ container: KeyedEncodingContainer<TableOptionsCodingKeys<T>>) throws {
+        var container = container
+        try container.encode(localOnly, forKey: .localOnly)
+        try container.encode(insertOnly, forKey: .insertOnly)
+        try container.encode(trackMetadata, forKey: .includeMetadata)
+        try container.encode(ignoreEmptyUpdates, forKey: .ignoreEmptyUpdate)
+        try trackPreviousValues?.serializeTo(container)
+    }
 }
 
 /// Options to include old values in ``CrudEntry/previousValues`` for update statements.
@@ -90,5 +110,58 @@ public struct TrackPreviousValuesOptions: Sendable {
     public init(columnFilter: [String]? = nil, onlyWhenChanged: Bool = false) {
         self.columnFilter = columnFilter
         self.onlyWhenChanged = onlyWhenChanged
+    }
+
+    internal func serializeTo<T: CodingKey>(_ container: KeyedEncodingContainer<TableOptionsCodingKeys<T>>) throws {
+        var container = container
+        if let columnFilter {
+            try container.encode(columnFilter, forKey: .diffIncludeOld)
+        } else {
+            try container.encode(true, forKey: .diffIncludeOld)
+        }
+        try container.encode(onlyWhenChanged, forKey: .includeOldOnlyWhenChanged)
+    }
+}
+
+/// Coding keys for table options (which are always embedded into another outer object.
+internal enum TableOptionsCodingKeys<T: CodingKey>: CodingKey {
+    case outer(T)
+    case diffIncludeOld
+    case localOnly
+    case insertOnly
+    case includeMetadata
+    case includeOldOnlyWhenChanged
+    case ignoreEmptyUpdate
+
+    // We don't use these for decoding, so we can return nil here.
+    init?(stringValue: String) {
+        return nil
+    }
+    init?(intValue: Int) {
+        return nil
+    }
+
+    var stringValue: String {
+        switch self {
+        case .outer(let field):
+            return field.stringValue
+        case .diffIncludeOld:
+            return "include_old"
+        case .localOnly:
+            return "local_only"
+        case .insertOnly:
+            return "insert_only"
+        case .includeMetadata:
+            return "include_metadata"
+        case .includeOldOnlyWhenChanged:
+            return "include_old_only_when_changed"
+        case .ignoreEmptyUpdate:
+            return "ignore_empty_update"
+        }
+    }
+
+    // We'll only encode into string-keyed dictionaries (JSON objects).
+    var intValue: Int? {
+        nil
     }
 }
