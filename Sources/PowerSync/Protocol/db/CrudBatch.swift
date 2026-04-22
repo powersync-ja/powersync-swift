@@ -42,6 +42,6 @@ internal func completeCrudItems(_ db: any PowerSyncDatabaseProtocol, _ lastItemI
                 return
             }
         }
-        try tx.execute(sql: "UPDATE ps_buckets SET target_op = ? WHERE name = '$local'", parameters: [KotlinPowerSyncDatabaseImpl.maxOpId])
+        try tx.execute(sql: "UPDATE ps_buckets SET target_op = ? WHERE name = '$local'", parameters: [PowerSyncDatabaseImpl.maxOpId])
     }
 }

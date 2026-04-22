@@ -5,13 +5,13 @@ import Synchronization
 fileprivate let tag = "StreamingSyncClient"
 
 final class StreamingSyncClient: Sendable {
-    let db: KotlinPowerSyncDatabaseImpl
+    let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
     let connector: CachingCredentialsConnector
     let httpClient: any HttpClient
     
     init(
-        db: KotlinPowerSyncDatabaseImpl,
+        db: PowerSyncDatabaseImpl,
         connector: PowerSyncBackendConnectorProtocol,
         httpClient: any HttpClient,
         options: ConnectOptions,
@@ -104,7 +104,7 @@ The next upload iteration will be delayed.
     private func uploadLocalTarget() async throws {
         guard let _ = try await db.getOptional(
             sql: "SELECT 1 FROM ps_buckets WHERE name = '$local' AND target_op = ?",
-            parameters: [KotlinPowerSyncDatabaseImpl.maxOpId],
+            parameters: [PowerSyncDatabaseImpl.maxOpId],
             mapper: { cursor in () }
         ) else {
             return // Nothing to update

@@ -13,18 +13,6 @@ public protocol SqlCursor {
     /// - Returns: The `Bool` value if present, or `nil` if the value is null.
     func getBooleanOptional(index: Int) -> Bool?
 
-    /// Retrieves a `Bool` value from the specified column name.
-    /// - Parameter name: The name of the column.
-    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
-    /// - Returns: The `Bool` value.
-    func getBoolean(name: String) throws -> Bool
-
-    /// Retrieves an optional `Bool` value from the specified column name.
-    /// - Parameter name: The name of the column.
-    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
-    /// - Returns: The `Bool` value if present, or `nil` if the value is null.
-    func getBooleanOptional(name: String) throws -> Bool?
-
     /// Retrieves a `Double` value from the specified column name.
     /// - Parameter name: The name of the column.
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
@@ -35,18 +23,6 @@ public protocol SqlCursor {
     /// - Parameter index: The zero-based index of the column.
     /// - Returns: The `Double` value if present, or `nil` if the value is null.
     func getDoubleOptional(index: Int) -> Double?
-
-    /// Retrieves a `Double` value from the specified column name.
-    /// - Parameter name: The name of the column.
-    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
-    /// - Returns: The `Double` value.
-    func getDouble(name: String) throws -> Double
-
-    /// Retrieves an optional `Double` value from the specified column name.
-    /// - Parameter name: The name of the column.
-    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
-    /// - Returns: The `Double` value if present, or `nil` if the value is null.
-    func getDoubleOptional(name: String) throws -> Double?
 
     /// Retrieves an `Int` value from the specified column name.
     /// - Parameter name: The name of the column.
@@ -59,18 +35,6 @@ public protocol SqlCursor {
     /// - Returns: The `Int` value if present, or `nil` if the value is null.
     func getIntOptional(index: Int) -> Int?
 
-    /// Retrieves an `Int` value from the specified column name.
-    /// - Parameter name: The name of the column.
-    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
-    /// - Returns: The `Int` value.
-    func getInt(name: String) throws -> Int
-
-    /// Retrieves an optional `Int` value from the specified column name.
-    /// - Parameter name: The name of the column.
-    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
-    /// - Returns: The `Int` value if present, or `nil` if the value is null.
-    func getIntOptional(name: String) throws -> Int?
-
     /// Retrieves an `Int64` value from the specified column name.
     /// - Parameter name: The name of the column.
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
@@ -81,18 +45,6 @@ public protocol SqlCursor {
     /// - Parameter index: The zero-based index of the column.
     /// - Returns: The `Int64` value if present, or `nil` if the value is null.
     func getInt64Optional(index: Int) -> Int64?
-
-    /// Retrieves an `Int64` value from the specified column name.
-    /// - Parameter name: The name of the column.
-    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
-    /// - Returns: The `Int64` value.
-    func getInt64(name: String) throws -> Int64
-
-    /// Retrieves an optional `Int64` value from the specified column name.
-    /// - Parameter name: The name of the column.
-    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
-    /// - Returns: The `Int64` value if present, or `nil` if the value is null.
-    func getInt64Optional(name: String) throws -> Int64?
 
     /// Retrieves a `String` value from the specified column name.
     /// - Parameter name: The name of the column.
@@ -105,23 +57,101 @@ public protocol SqlCursor {
     /// - Returns: The `String` value if present, or `nil` if the value is null.
     func getStringOptional(index: Int) -> String?
 
-    /// Retrieves a `String` value from the specified column name.
-    /// - Parameter name: The name of the column.
-    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
-    /// - Returns: The `String` value.
-    func getString(name: String) throws -> String
-
-    /// Retrieves an optional `String` value from the specified column name.
-    /// - Parameter name: The name of the column.
-    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
-    /// - Returns: The `String` value if present, or `nil` if the value is null.
-    func getStringOptional(name: String) throws -> String?
-
     /// The number of columns in the result set.
     var columnCount: Int { get }
 
     /// A dictionary mapping column names to their zero-based indices.
     var columnNames: [String: Int] { get }
+}
+
+extension SqlCursor {
+    private func resolveIndex(name: String) throws(SqlCursorError) -> Int {
+        if let index = self.columnNames[name] {
+            return index
+        } else {
+            throw .columnNotFound(name)
+        }
+    }
+
+    /// Retrieves a `Bool` value from the specified column name.
+    /// - Parameter name: The name of the column.
+    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
+    /// - Returns: The `Bool` value.
+    func getBoolean(name: String) throws -> Bool {
+        return try self.getBoolean(index: try self.resolveIndex(name: name))
+    }
+
+    /// Retrieves an optional `Bool` value from the specified column name.
+    /// - Parameter name: The name of the column.
+    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
+    /// - Returns: The `Bool` value if present, or `nil` if the value is null.
+    func getBooleanOptional(name: String) throws -> Bool? {
+        return self.getBooleanOptional(index: try self.resolveIndex(name: name))
+    }
+
+    /// Retrieves a `Double` value from the specified column name.
+    /// - Parameter name: The name of the column.
+    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
+    /// - Returns: The `Double` value.
+    func getDouble(name: String) throws -> Double {
+        return try self.getDouble(index: try self.resolveIndex(name: name))
+    }
+
+    /// Retrieves an optional `Double` value from the specified column name.
+    /// - Parameter name: The name of the column.
+    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
+    /// - Returns: The `Double` value if present, or `nil` if the value is null.
+    func getDoubleOptional(name: String) throws -> Double? {
+        return self.getDoubleOptional(index: try self.resolveIndex(name: name))
+    }
+
+    /// Retrieves an `Int` value from the specified column name.
+    /// - Parameter name: The name of the column.
+    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
+    /// - Returns: The `Int` value.
+    func getInt(name: String) throws -> Int {
+        return try self.getInt(index: try self.resolveIndex(name: name))
+    }
+
+    /// Retrieves an optional `Int` value from the specified column name.
+    /// - Parameter name: The name of the column.
+    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
+    /// - Returns: The `Int` value if present, or `nil` if the value is null.
+    func getIntOptional(name: String) throws -> Int? {
+        return self.getIntOptional(index: try self.resolveIndex(name: name))
+    }
+
+    /// Retrieves an `Int64` value from the specified column name.
+    /// - Parameter name: The name of the column.
+    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
+    /// - Returns: The `Int64` value.
+    func getInt64(name: String) throws -> Int64 {
+        return try self.getInt64(index: try self.resolveIndex(name: name))
+    }
+
+    /// Retrieves an optional `Int64` value from the specified column name.
+    /// - Parameter name: The name of the column.
+    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
+    /// - Returns: The `Int64` value if present, or `nil` if the value is null.
+    func getInt64Optional(name: String) throws -> Int64? {
+        return self.getInt64Optional(index: try self.resolveIndex(name: name))
+    }
+
+    /// Retrieves a `String` value from the specified column name.
+    /// - Parameter name: The name of the column.
+    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
+    /// - Returns: The `String` value.
+    func getString(name: String) throws -> String {
+        return try self.getString(index: try self.resolveIndex(name: name))
+    }
+
+    /// Retrieves an optional `String` value from the specified column name.
+    /// - Parameter name: The name of the column.
+    /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
+    /// - Returns: The `String` value if present, or `nil` if the value is null.
+    func getStringOptional(name: String) throws -> String? {
+        return self.getStringOptional(index: try self.resolveIndex(name: name))
+    }
 }
 
 /// An error type representing issues encountered while working with a `SqlCursor`.

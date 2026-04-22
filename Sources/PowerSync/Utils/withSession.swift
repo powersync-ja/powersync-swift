@@ -47,8 +47,5 @@ public func withSession<ReturnType>(
     db: OpaquePointer,
     action: @escaping () throws -> ReturnType
 ) throws -> WithSessionResult<ReturnType> {
-    return try kotlinWithSession(
-        db: db,
-        action: action
-    )
+    fatalError("todo")
 }

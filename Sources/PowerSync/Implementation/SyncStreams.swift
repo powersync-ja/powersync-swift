@@ -14,7 +14,7 @@ final class StreamTracker: Sendable {
         streamsChanged.dispatch(event: currentStreams)
     }
     
-    fileprivate func subscriptionsCommand(db: KotlinPowerSyncDatabaseImpl, request: RustSubscriptionChangeRequest) async throws {
+    fileprivate func subscriptionsCommand(db: PowerSyncDatabaseImpl, request: RustSubscriptionChangeRequest) async throws {
         let _ = try await db.writeTransaction { tx in
             let payload = String(data: try StreamingSyncClient.jsonEncoder.encode(request), encoding: .utf8)
             try tx.execute(sql: "SELECT powersync_control(?, ?)", parameters: [
@@ -26,7 +26,7 @@ final class StreamTracker: Sendable {
         try await db.resolveOfflineSyncStatusIfNotConnected()
     }
     
-    fileprivate func subscribe(db: KotlinPowerSyncDatabaseImpl, stream: PendingSyncStream, ttl: TimeInterval?, priority: BucketPriority?) async throws -> SyncSubscriptionImplementation {
+    fileprivate func subscribe(db: PowerSyncDatabaseImpl, stream: PendingSyncStream, ttl: TimeInterval?, priority: BucketPriority?) async throws -> SyncSubscriptionImplementation {
         let key = stream.key
         try await subscriptionsCommand(
             db: db,
@@ -80,7 +80,7 @@ final class StreamTracker: Sendable {
 
 /// A Sync Stream that can be subscribed to.
 struct PendingSyncStream: SyncStream {
-    let db: KotlinPowerSyncDatabaseImpl
+    let db: PowerSyncDatabaseImpl
     let name: String
     let parameters: JsonParam?
     
@@ -101,10 +101,10 @@ struct PendingSyncStream: SyncStream {
 }
 
 final class SyncSubscriptionImplementation: SyncStreamSubscription {
-    private let db: KotlinPowerSyncDatabaseImpl
+    private let db: PowerSyncDatabaseImpl
     private let key: StreamKey
 
-    init(db: KotlinPowerSyncDatabaseImpl, key: StreamKey) {
+    init(db: PowerSyncDatabaseImpl, key: StreamKey) {
         self.db = db
         self.key = key
     }

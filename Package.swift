@@ -5,10 +5,6 @@ import PackageDescription
 
 let packageName = "PowerSync"
 
-// Set this to the absolute path of your Kotlin SDK checkout if you want to use a local Kotlin
-// build. Also see docs/LocalBuild.md for details
-let localKotlinSdkOverride: String? = nil
-
 // Set this to the absolute path of your powersync-sqlite-core checkout if you want to use a
 // local build of the core extension.
 let localCoreExtension: String? = nil
@@ -20,24 +16,6 @@ let localCoreExtension: String? = nil
 // towards a local framework build
 var conditionalDependencies: [Package.Dependency] = []
 var conditionalTargets: [Target] = []
-var kotlinTargetDependency = Target.Dependency.target(name: "PowerSyncKotlin")
-
-if let kotlinSdkPath = localKotlinSdkOverride {
-    // We can't depend on local XCFrameworks outside of this project's root, so there's a Package.swift
-    // in the PowerSyncKotlin project pointing towards a local build.
-    conditionalDependencies.append(.package(path: "\(kotlinSdkPath)/internal/PowerSyncKotlin"))
-
-    kotlinTargetDependency = .product(name: "PowerSyncKotlin", package: "PowerSyncKotlin")
-} else {
-    // Not using a local build, so download from releases
-    conditionalTargets.append(
-        .binaryTarget(
-            name: "PowerSyncKotlin",
-            url:
-            "https://github.com/powersync-ja/powersync-kotlin/releases/download/v1.11.2/PowersyncKotlinRelease.zip",
-            checksum: "bd4f9a4411a10a30bd67c3231d1d0d0dde42f0ec19161ccbd26d4e58b31efdfd"
-        ))
-}
 
 var corePackageName = "powersync-sqlite-core-swift"
 if let corePath = localCoreExtension {
@@ -84,7 +62,8 @@ let package = Package(
     dependencies: conditionalDependencies + [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.9.0"),
         .package(url: "https://github.com/powersync-ja/CSQLite.git", exact: "3.51.2"),
-        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.0")
+        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.0"),
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.4.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -92,11 +71,18 @@ let package = Package(
         .target(
             name: packageName,
             dependencies: [
-                kotlinTargetDependency,
-                .product(name: "PowerSyncSQLiteCore", package: corePackageName),
+                .target(name: "PowerSyncCoreShim"),
                 .product(name: "CSQLite", package: "CSQLite"),
-                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+                .product(name: "BasicContainers", package: "swift-collections"),
+                .product(name: "DequeModule", package: "swift-collections")
             ]
+        ),
+        .target(
+            name: "PowerSyncCoreShim",
+            dependencies: [
+                .product(name: "PowerSyncSQLiteCore", package: corePackageName),
+            ],
         ),
         .target(
             name: "PowerSyncGRDB",

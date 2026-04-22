@@ -90,7 +90,7 @@ final class GRDBTests: XCTestCase {
             pool: pool,
             schema: schema,
             identifier: dbIdentifier,
-            logger: DatabaseLogger(logger)
+            logger: logger
         )
 
         try await database.disconnectAndClear()

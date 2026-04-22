@@ -656,11 +656,12 @@ let defaultSchema = Schema(tables: [
 ])
 
 private func openDatabase(_ client: any HttpClient, schema: Schema = defaultSchema, logger: any LoggerProtocol = DefaultLogger()) -> PowerSyncDatabaseProtocol {
-    return openKotlinDBDefault(
-        schema: schema,
+    return PowerSyncDatabaseImpl(
         dbFilename: ":memory:",
-        logger: DatabaseLogger(logger),
-        httpClient: client
+        logger: logger,
+        pool: AsyncConnectionPool(location: .inMemory),
+        httpClient: client,
+        schema: schema,
     )
 }
 
