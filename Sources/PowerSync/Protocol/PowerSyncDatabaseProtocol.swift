@@ -191,40 +191,6 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
         options: ConnectOptions?
     ) async throws
 
-    /// Get a batch of crud data to upload.
-    ///
-    /// Returns nil if there is no data to upload.
-    ///
-    /// Use this from the `PowerSyncBackendConnector.uploadData` callback.
-    ///
-    /// Once the data have been successfully uploaded, call `CrudBatch.complete` before
-    /// requesting the next batch.
-    ///
-    /// - Parameter limit: Maximum number of updates to return in a single batch. Default is 100.
-    ///
-    /// This method does include transaction ids in the result, but does not group
-    /// data by transaction. One batch may contain data from multiple transactions,
-    /// and a single transaction may be split over multiple batches.
-    func getCrudBatch(limit: Int32) async throws -> CrudBatch?
-
-    /// Obtains an async iterator of completed transactions with local writes against the database.
-    ///
-    /// This is typically used from the ``PowerSyncBackendConnectorProtocol/uploadData(database:)`` callback.
-    /// Each entry emitted by teh returned flow is a full transaction containing all local writes made while that transaction was
-    /// active.
-    ///
-    /// Unlike ``getNextCrudTransaction()``, which always returns the oldest transaction that hasn't been
-    /// ``CrudTransaction/complete()``d yet, this iterator can be used to upload multiple transactions.
-    /// Calling ``CrudTransaction/complete()`` will mark that and all prior transactions returned by this iterator as
-    /// completed.
-    ///
-    /// This can be used to upload multiple transactions in a single batch, e.g. with
-    ///
-    /// ```Swift
-    ///
-    /// ```
-    func getCrudTransactions() -> CrudTransactions
-
     /// Convenience method to get the current version of PowerSync.
     func getPowerSyncVersion() async throws -> String
 
@@ -343,9 +309,60 @@ public extension PowerSyncDatabaseProtocol {
         try await disconnectAndClear(clearLocal: true, soft: soft)
     }
 
+    /// Get a batch of crud data to upload.
+    ///
+    /// Returns nil if there is no data to upload.
+    ///
+    /// Use this from the `PowerSyncBackendConnector.uploadData` callback.
+    ///
+    /// Once the data have been successfully uploaded, call `CrudBatch.complete` before
+    /// requesting the next batch.
+    ///
+    /// - Parameter limit: Maximum number of updates to return in a single batch. Default is 100.
+    ///
+    /// This method does include transaction ids in the result, but does not group
+    /// data by transaction. One batch may contain data from multiple transactions,
+    /// and a single transaction may be split over multiple batches.
     func getCrudBatch(limit: Int32 = 100) async throws -> CrudBatch? {
-        try await getCrudBatch(
-            limit: limit
+        var entries = try await getAll(
+            sql: "SELECT id, tx_id, data FROM ps_crud ORDER BY id ASC LIMIT ?",
+            parameters: [Int64(limit + 1)],
+            mapper: CrudEntry.fromCursor
         )
+
+        if entries.isEmpty {
+            return nil
+        }
+
+        let hasMore = entries.count > limit
+        if hasMore {
+            entries.removeLast()
+        }
+
+        return CrudBatch(
+            hasMore: hasMore,
+            crud: entries,
+            db: self
+        )
+    }
+
+    /// Obtains an async iterator of completed transactions with local writes against the database.
+    ///
+    /// This is typically used from the ``PowerSyncBackendConnectorProtocol/uploadData(database:)`` callback.
+    /// Each entry emitted by teh returned flow is a full transaction containing all local writes made while that transaction was
+    /// active.
+    ///
+    /// Unlike ``getNextCrudTransaction()``, which always returns the oldest transaction that hasn't been
+    /// ``CrudTransaction/complete()``d yet, this iterator can be used to upload multiple transactions.
+    /// Calling ``CrudTransaction/complete()`` will mark that and all prior transactions returned by this iterator as
+    /// completed.
+    ///
+    /// This can be used to upload multiple transactions in a single batch, e.g. with
+    ///
+    /// ```Swift
+    ///
+    /// ```
+    func getCrudTransactions() -> CrudTransactions {
+        CrudTransactions(db: self)
     }
 }
