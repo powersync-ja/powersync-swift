@@ -6,7 +6,7 @@ public protocol SqlCursor {
     /// - Parameter name: The name of the column.
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
     /// - Returns: The `Bool` value.
-    func getBoolean(index: Int) throws -> Bool
+    func getBoolean(index: Int) throws(SqlCursorError) -> Bool
 
     /// Retrieves a `Bool` value from the specified column index.
     /// - Parameter index: The zero-based index of the column.
@@ -17,7 +17,7 @@ public protocol SqlCursor {
     /// - Parameter name: The name of the column.
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
     /// - Returns: The `Double` value.
-    func getDouble(index: Int) throws -> Double
+    func getDouble(index: Int) throws(SqlCursorError) -> Double
 
     /// Retrieves a `Double` value from the specified column index.
     /// - Parameter index: The zero-based index of the column.
@@ -28,7 +28,7 @@ public protocol SqlCursor {
     /// - Parameter name: The name of the column.
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
     /// - Returns: The `Int` value.
-    func getInt(index: Int) throws -> Int
+    func getInt(index: Int) throws(SqlCursorError) -> Int
 
     /// Retrieves an `Int` value from the specified column index.
     /// - Parameter index: The zero-based index of the column.
@@ -39,7 +39,7 @@ public protocol SqlCursor {
     /// - Parameter name: The name of the column.
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
     /// - Returns: The `Int64` value.
-    func getInt64(index: Int) throws -> Int64
+    func getInt64(index: Int) throws(SqlCursorError) -> Int64
 
     /// Retrieves an `Int64` value from the specified column index.
     /// - Parameter index: The zero-based index of the column.
@@ -50,7 +50,7 @@ public protocol SqlCursor {
     /// - Parameter name: The name of the column.
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
     /// - Returns: The `String` value.
-    func getString(index: Int) throws -> String
+    func getString(index: Int) throws(SqlCursorError) -> String
 
     /// Retrieves a `String` value from the specified column index.
     /// - Parameter index: The zero-based index of the column.
@@ -65,9 +65,19 @@ public protocol SqlCursor {
 }
 
 extension SqlCursor {
-    private func resolveIndex(name: String) throws(SqlCursorError) -> Int {
+    private func withResolvedIndex<T>(name: String, read: (_ index: Int) throws(SqlCursorError) -> T) throws(SqlCursorError) -> T {
         if let index = self.columnNames[name] {
-            return index
+            do {
+                return try read(index)
+            } catch {
+                // Add correct column name instead of index
+                switch error {
+                case .columnNotFound(_):
+                    throw .columnNotFound(name)
+                case .nullValueFound(_):
+                    throw .nullValueFound(name)
+                }
+            }
         } else {
             throw .columnNotFound(name)
         }
@@ -78,7 +88,7 @@ extension SqlCursor {
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
     /// - Returns: The `Bool` value.
     func getBoolean(name: String) throws -> Bool {
-        return try self.getBoolean(index: try self.resolveIndex(name: name))
+        return try withResolvedIndex(name: name, read: self.getBoolean)
     }
 
     /// Retrieves an optional `Bool` value from the specified column name.
@@ -86,7 +96,7 @@ extension SqlCursor {
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
     /// - Returns: The `Bool` value if present, or `nil` if the value is null.
     func getBooleanOptional(name: String) throws -> Bool? {
-        return self.getBooleanOptional(index: try self.resolveIndex(name: name))
+        return try withResolvedIndex(name: name, read: self.getBooleanOptional)
     }
 
     /// Retrieves a `Double` value from the specified column name.
@@ -94,7 +104,7 @@ extension SqlCursor {
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
     /// - Returns: The `Double` value.
     func getDouble(name: String) throws -> Double {
-        return try self.getDouble(index: try self.resolveIndex(name: name))
+        return try withResolvedIndex(name: name, read: self.getDouble)
     }
 
     /// Retrieves an optional `Double` value from the specified column name.
@@ -102,7 +112,7 @@ extension SqlCursor {
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
     /// - Returns: The `Double` value if present, or `nil` if the value is null.
     func getDoubleOptional(name: String) throws -> Double? {
-        return self.getDoubleOptional(index: try self.resolveIndex(name: name))
+        return try withResolvedIndex(name: name, read: self.getDoubleOptional)
     }
 
     /// Retrieves an `Int` value from the specified column name.
@@ -110,7 +120,7 @@ extension SqlCursor {
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
     /// - Returns: The `Int` value.
     func getInt(name: String) throws -> Int {
-        return try self.getInt(index: try self.resolveIndex(name: name))
+        return try withResolvedIndex(name: name, read: self.getInt)
     }
 
     /// Retrieves an optional `Int` value from the specified column name.
@@ -118,7 +128,7 @@ extension SqlCursor {
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
     /// - Returns: The `Int` value if present, or `nil` if the value is null.
     func getIntOptional(name: String) throws -> Int? {
-        return self.getIntOptional(index: try self.resolveIndex(name: name))
+        return try withResolvedIndex(name: name, read: self.getIntOptional)
     }
 
     /// Retrieves an `Int64` value from the specified column name.
@@ -126,7 +136,7 @@ extension SqlCursor {
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
     /// - Returns: The `Int64` value.
     func getInt64(name: String) throws -> Int64 {
-        return try self.getInt64(index: try self.resolveIndex(name: name))
+        return try withResolvedIndex(name: name, read: self.getInt64)
     }
 
     /// Retrieves an optional `Int64` value from the specified column name.
@@ -134,7 +144,7 @@ extension SqlCursor {
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
     /// - Returns: The `Int64` value if present, or `nil` if the value is null.
     func getInt64Optional(name: String) throws -> Int64? {
-        return self.getInt64Optional(index: try self.resolveIndex(name: name))
+        return try withResolvedIndex(name: name, read: self.getInt64Optional)
     }
 
     /// Retrieves a `String` value from the specified column name.
@@ -142,7 +152,7 @@ extension SqlCursor {
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist, or `SqlCursorError.nullValueFound` if the value is null.
     /// - Returns: The `String` value.
     func getString(name: String) throws -> String {
-        return try self.getString(index: try self.resolveIndex(name: name))
+        return try withResolvedIndex(name: name, read: self.getString)
     }
 
     /// Retrieves an optional `String` value from the specified column name.
@@ -150,7 +160,7 @@ extension SqlCursor {
     /// - Throws: `SqlCursorError.columnNotFound` if the column does not exist.
     /// - Returns: The `String` value if present, or `nil` if the value is null.
     func getStringOptional(name: String) throws -> String? {
-        return self.getStringOptional(index: try self.resolveIndex(name: name))
+        return try withResolvedIndex(name: name, read: self.getStringOptional)
     }
 }
 

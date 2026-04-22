@@ -29,7 +29,7 @@ final class NativeConnectionContext: ConnectionContext {
             try $0.checkNotClosed()
 
             var stmt = try SqliteStatement(db: $0.lease, sql: sql)
-            try stmt.bind_values(parameters)
+            try stmt.bindValues(parameters)
             while try stmt.step() {
                 // Iterate through the statement.
             }
@@ -44,7 +44,7 @@ final class NativeConnectionContext: ConnectionContext {
             try $0.checkNotClosed()
             
             var stmt = try SqliteStatement(db: $0.lease, sql: sql)
-            try stmt.bind_values(parameters)
+            try stmt.bindValues(parameters)
             if try stmt.step() {
                 return try NativeConnectionContext.invokeMapper(stmt, mapper)
             } else {
@@ -58,7 +58,7 @@ final class NativeConnectionContext: ConnectionContext {
             try $0.checkNotClosed()
             
             var stmt = try SqliteStatement(db: $0.lease, sql: sql)
-            try stmt.bind_values(parameters)
+            try stmt.bindValues(parameters)
             var rows: [RowType] = []
             while try stmt.step() {
                 rows.append(try NativeConnectionContext.invokeMapper(stmt, mapper))
@@ -72,7 +72,7 @@ final class NativeConnectionContext: ConnectionContext {
             try $0.checkNotClosed()
             
             var stmt = try SqliteStatement(db: $0.lease, sql: sql)
-            try stmt.bind_values(parameters)
+            try stmt.bindValues(parameters)
             if try stmt.step() {
                 return try NativeConnectionContext.invokeMapper(stmt, mapper)
             } else {
@@ -133,21 +133,29 @@ struct SqliteStatement: ~Copyable {
         return resolvedColumnNames!
     }
     
-    borrowing func bind_values(_ parameters: [Any?]?) throws (PowerSyncError) {
+    borrowing func bindValues(_ parameters: [Any?]?) throws (PowerSyncError) {
         if let parameters {
             for (i, parameter) in parameters.enumerated() {
                 let index = Int32(i + 1)
 
-                if parameter == nil {
-                    try bind_value(index, nil)
+                let psDataType: PowerSyncDataType? = if let convertible = parameter as? PowerSyncDataTypeConvertible {
+                    convertible.psDataType
+                } else if let parameter {
+                    try PowerSyncDataType(from: parameter)
                 } else {
-                    try bind_value(index, try PowerSyncDataType(from: parameter!))
+                    nil
+                }
+
+                if let psDataType {
+                    try bindValue(index, psDataType)
+                } else {
+                    try bindValue(index, nil)
                 }
             }
         }
     }
     
-    borrowing func bind_value(_ index: Int32, _ parameter: PowerSyncDataType?) throws (PowerSyncError) {
+    borrowing func bindValue(_ index: Int32, _ parameter: PowerSyncDataType?) throws (PowerSyncError) {
         let rc: Int32
         
         switch parameter {
@@ -231,8 +239,28 @@ class StatementCursor: SqlCursor {
         stmtPtr = nil
     }
     
-    private func withStatement<R>(_ body: (borrowing SqliteStatement) throws -> R) rethrows -> R {
+    private func withStatement<R>(_ body: (borrowing SqliteStatement) -> R) -> R {
         if let stmtPtr {
+            return body(stmtPtr.pointee)
+        }
+        
+        fatalError("Cursor used outside of callback")
+    }
+
+    private func checkColumnNotNull(stmt: borrowing SqliteStatement, index: Int) throws(SqlCursorError) {
+        if index < 0 || index >= stmt.columnCount {
+            throw SqlCursorError.nullValueFound("invalid index \(index)")
+        }
+        
+        let type = sqlite3_column_type(stmt.stmt, Int32(index))
+        if type == SQLITE_NULL {
+            throw SqlCursorError.nullValueFound("\(index)")
+        }
+    }
+
+    private func withStatementCheckNotNull<R>(_ index: Int, body: (borrowing SqliteStatement) throws (SqlCursorError) -> R) throws (SqlCursorError) -> R {
+        if let stmtPtr {
+            try self.checkColumnNotNull(stmt: stmtPtr.pointee, index: index)
             return try body(stmtPtr.pointee)
         }
         
@@ -246,19 +274,8 @@ class StatementCursor: SqlCursor {
     var columnNames: [String : Int] {
         return withStatement { stmt in stmt.columnNames }
     }
-    
-    func checkColumnNotNull(stmt: borrowing SqliteStatement, index: Int) throws(SqlCursorError) {
-        if index < 0 || index >= stmt.columnCount {
-            throw SqlCursorError.nullValueFound("invalid index \(index)")
-        }
-        
-        let type = sqlite3_column_type(stmt.stmt, Int32(index))
-        if type == SQLITE_NULL {
-            throw SqlCursorError.nullValueFound("at index \(index)")
-        }
-    }
 
-    func getBoolean(index: Int) throws -> Bool {
+    func getBoolean(index: Int) throws(SqlCursorError) -> Bool {
         return try getInt(index: index) == 0 ? false : true
     }
 
@@ -270,9 +287,8 @@ class StatementCursor: SqlCursor {
         }
     }
 
-    func getDouble(index: Int) throws -> Double {
-        return try withStatement { stmt in
-            try self.checkColumnNotNull(stmt: stmt, index: index)
+    func getDouble(index: Int) throws(SqlCursorError) -> Double {
+        return try withStatementCheckNotNull(index) { stmt in
             return sqlite3_column_double(stmt.stmt, Int32(index))
         }
     }
@@ -285,7 +301,7 @@ class StatementCursor: SqlCursor {
         }
     }
 
-    func getInt(index: Int) throws -> Int {
+    func getInt(index: Int) throws(SqlCursorError) -> Int {
         return Int(try getInt64(index: index))
     }
     
@@ -297,9 +313,8 @@ class StatementCursor: SqlCursor {
         }
     }
 
-    func getInt64(index: Int) throws -> Int64 {
-        return try withStatement { stmt in
-            try self.checkColumnNotNull(stmt: stmt, index: index)
+    func getInt64(index: Int) throws(SqlCursorError) -> Int64 {
+        return try withStatementCheckNotNull(index) { stmt in
             return sqlite3_column_int64(stmt.stmt, Int32(index))
         }
     }
@@ -312,9 +327,8 @@ class StatementCursor: SqlCursor {
         }
     }
 
-    func getString(index: Int) throws -> String {
-        return try withStatement { stmt in
-            try self.checkColumnNotNull(stmt: stmt, index: index)
+    func getString(index: Int) throws(SqlCursorError) -> String {
+        return try withStatementCheckNotNull(index) { stmt in
             let length = sqlite3_column_bytes(stmt.stmt, Int32(index))
             if length == 0 {
                 return ""

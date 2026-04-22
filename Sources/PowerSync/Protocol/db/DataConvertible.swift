@@ -41,7 +41,7 @@ extension PowerSyncDataType {
             self = .data(data)
             return
         }
-        
+
         throw .operationFailed(message: "Invalid parameter, expected Bool, String, Int64, Int32, Double or Data")
     }
 }

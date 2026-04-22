@@ -10,7 +10,7 @@ func poolRead<T>(_ pool: borrowing SQLiteConnectionPoolProtocol, action: @escapi
 
 func poolWrite<T>(_ pool: borrowing SQLiteConnectionPoolProtocol, action: @escaping @Sendable (_: any ConnectionContext) throws -> T) async throws -> T {
     let result = UnsafeSendable<T>()
-    try await pool.read { lease in
+    try await pool.write { lease in
         let context = NativeConnectionContext(lease)
         result.resolve(value: try action(context))
     }

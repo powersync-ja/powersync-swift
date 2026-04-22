@@ -23,6 +23,7 @@ public func PowerSyncDatabase(
     }
     let pool = AsyncConnectionPool(location: location, initialStatements: initialStatements)
     return PowerSyncDatabaseImpl(
+        dbFilename: dbFilename,
         logger: logger,
         pool: pool,
         httpClient: PlatformHttpClient.shared,

@@ -43,7 +43,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+            SQLite failure (code 1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
             """)
         }
     }
@@ -130,7 +130,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
+            SQLite failure (code 1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
             """)
         }
     }
@@ -214,7 +214,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
+            SQLite failure (code 1): SQL logic error, no such table: usersfail for SQL: SELECT id, name, email FROM usersfail WHERE id = ?
             """)
         }
     }
@@ -297,7 +297,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: EXPLAIN SELECT name FROM usersfail ORDER BY id
+            SQLite failure (code 1): SQL logic error, no such table: usersfail for SQL: EXPLAIN SELECT name FROM usersfail ORDER BY id
             """)
         }
     }
@@ -386,7 +386,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+            SQLite failure (code 1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
             """)
         }
     }
@@ -406,7 +406,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
+            SQLite failure (code 1): SQL logic error, no such table: usersfail for SQL: INSERT INTO usersfail (id, name, email) VALUES (?, ?, ?)
             """)
         }
 
@@ -449,7 +449,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
             }
         } catch {
             XCTAssertEqual(error.localizedDescription, """
-            SqliteException(1): SQL logic error, no such table: usersfail for SQL: SELECT COUNT(*) FROM usersfail
+            SQLite failure (code 1): SQL logic error, no such table: usersfail for SQL: SELECT COUNT(*) FROM usersfail
             """)
         }
     }
@@ -536,7 +536,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         let warningIndex = testWriter.getLogs().firstIndex(
             where: { value in
-                value.contains("debug: PowerSyncVersion")
+                value.contains("debug: Opened connection. SQLite version")
             }
         )
 
@@ -646,19 +646,17 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(result[1], JoinOutput(name: "Test User", description: "task 2", comment: "comment 2"))
     }
 
-    /*
     func testCloseWithDeleteDatabase() async throws {
         let fileManager = FileManager.default
         let testDbFilename = "test_delete_\(UUID().uuidString).db"
 
         // Get the database directory using the helper function
-        let databaseDirectory = try appleDefaultDatabaseDirectory()
+        let databaseDirectory = try DatabaseLocation.appleDefaultDatabaseDirectory()
 
         // Create a database with a real file
         let testDatabase = PowerSyncDatabase(
             schema: schema,
             dbFilename: testDbFilename,
-            logger: DatabaseLogger(DefaultLogger())
         )
 
         // Perform some operations to ensure the database file is created
@@ -691,13 +689,12 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         let testDbFilename = "test_no_delete_\(UUID().uuidString).db"
 
         // Get the database directory using the helper function
-        let databaseDirectory = try appleDefaultDatabaseDirectory()
+        let databaseDirectory = try DatabaseLocation.appleDefaultDatabaseDirectory()
 
         // Create a database with a real file
         let testDatabase = PowerSyncDatabase(
             schema: schema,
             dbFilename: testDbFilename,
-            logger: DatabaseLogger(DefaultLogger())
         )
 
         // Perform some operations to ensure the database file is created
@@ -718,7 +715,7 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
 
         // Clean up: delete all SQLite files using the helper function
         try deleteSQLiteFiles(dbFilename: testDbFilename, in: databaseDirectory)
-    }*/
+    }
     
     func testSubscriptionsUpdateStateWhileOffline() async throws {
         var streams = database.currentStatus.asFlow().makeAsyncIterator()

@@ -113,36 +113,10 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     
     func close(deleteDatabase: Bool) async throws {
         try await close()
-        if deleteDatabase {
-            try await self.deleteDatabase()
-        }
-    }
-
-    private func deleteDatabase() async throws {
-        if let dbFilename {
+        if deleteDatabase, let dbFilename {
             // We can use the supplied dbLocation when we support that in future
             let directory = try DatabaseLocation.appleDefaultDatabaseDirectory()
-            let fileManager = FileManager.default
-            
-            // SQLite files to delete:
-            // 1. Main database file: dbFilename
-            // 2. WAL file: dbFilename-wal
-            // 3. SHM file: dbFilename-shm
-            // 4. Journal file: dbFilename-journal (for rollback journal mode, though WAL mode typically doesn't use it)
-
-            let filesToDelete = [
-                dbFilename,
-                "\(dbFilename)-wal",
-                "\(dbFilename)-shm",
-                "\(dbFilename)-journal"
-            ]
-            
-            for filename in filesToDelete {
-                let fileUrl = directory.appendingPathComponent(filename)
-                if fileManager.fileExists(atPath: fileUrl.path) {
-                    try fileManager.removeItem(at: fileUrl)
-                }
-            }
+            try deleteSQLiteFiles(dbFilename: dbFilename, in: directory)
         }
     }
     
@@ -330,6 +304,30 @@ private actor DatabaseInitizalizationActor {
         if !closed {
             closed = true
             try await action()
+        }
+    }
+}
+
+func deleteSQLiteFiles(dbFilename: String, in directory: URL) throws {
+    let fileManager = FileManager.default
+    
+    // SQLite files to delete:
+    // 1. Main database file: dbFilename
+    // 2. WAL file: dbFilename-wal
+    // 3. SHM file: dbFilename-shm
+    // 4. Journal file: dbFilename-journal (for rollback journal mode, though WAL mode typically doesn't use it)
+
+    let filesToDelete = [
+        dbFilename,
+        "\(dbFilename)-wal",
+        "\(dbFilename)-shm",
+        "\(dbFilename)-journal"
+    ]
+    
+    for filename in filesToDelete {
+        let fileUrl = directory.appendingPathComponent(filename)
+        if fileManager.fileExists(atPath: fileUrl.path) {
+            try fileManager.removeItem(at: fileUrl)
         }
     }
 }

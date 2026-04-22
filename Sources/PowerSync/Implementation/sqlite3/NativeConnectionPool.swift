@@ -55,12 +55,11 @@ final class NativeConnectionPool: Sendable {
         if let readers {
             let acquiredReaders = try await readers.acquire(count: readers.count)
             var readerLeases: [RawConnectionLease] = []
-            var i = 0
-            while i < acquiredReaders.acquiredItems.count {
-                readerLeases.append(write.acquiredItems[i].asLease())
-                i += 1
+            
+            let span = acquiredReaders.acquiredItems.span
+            for idx in span.indices {
+                readerLeases.append(span[idx].asLease())
             }
-
             try await onConnection(writeLease, readerLeases)
         } else {
             try await onConnection(writeLease, [])
@@ -79,11 +78,9 @@ final class NativeConnectionPool: Sendable {
         
         // Close the write connection first
         write.acquiredItems[0].close()
-        if var acquiredReaders {
-            var i = 0
-            while i < acquiredReaders.acquiredItems.count {
-                acquiredReaders.acquiredItems[i].close()
-                i += 1
+        if var span = acquiredReaders?.acquiredItems.mutableSpan {
+            for idx in span.indices {
+                span[idx].close()
             }
         }
     }
