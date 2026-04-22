@@ -88,15 +88,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         let priority = BucketPriority(priority)
         await syncStatus.waitFor { $0.statusForPriority(priority).hasSynced == true }
     }
-    
-    func getCrudTransactions() -> CrudTransactions {
-        CrudTransactions(db: self)
-    }
-    
-    func getCrudBatch(limit: Int32) async throws -> CrudBatch? {
-        
-    }
-    
+
     func getPowerSyncVersion() async throws -> String {
         try await initialize()
         // Set during initialization
