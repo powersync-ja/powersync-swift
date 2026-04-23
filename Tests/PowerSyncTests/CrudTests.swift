@@ -318,4 +318,19 @@ final class CrudTests: XCTestCase {
         XCTAssertEqual(write.opData?["name"], "updated_name")
         XCTAssertEqual(write.previousValues?["name"], "user")
     }
+
+    func testCustomWriteCheckpoints() async throws {
+        try await database.execute(
+            sql: "INSERT INTO users (id, name) VALUES (uuid(), 'a')",
+            parameters: []
+        )
+
+        let tx = try await database.getNextCrudTransaction()!
+        try await tx.complete(writeCheckpoint: "123")
+
+        let targetOp = try await database.get("SELECT target_op FROM ps_buckets WHERE name = '$local'") {
+            try $0.getInt(index: 0)
+        }
+        XCTAssertEqual(targetOp, 123)
+    }
 }
