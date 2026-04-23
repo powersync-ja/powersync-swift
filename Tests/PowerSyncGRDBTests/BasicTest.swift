@@ -427,7 +427,7 @@ final class GRDBTests: XCTestCase {
 
         let warningIndex = logs.getLogs().firstIndex(
             where: { value in
-                value.contains("debug: PowerSyncVersion")
+                value.contains("debug: Opened connection. SQLite version")
             }
         )
 

@@ -22,50 +22,55 @@ final class NativeConnectionPool: Sendable {
         self.handleUpdates = handleUpdates
     }
 
-    private func dispatchWrites(lease: RawConnectionLease) throws {
-        let ctx = NativeConnectionContext(lease)
-        let affectedTables = try ctx.get(sql: "SELECT powersync_update_hooks('get')", parameters: []) {
-            let decoder = JSONDecoder()
-            return try decoder.decode(Set<String>.self, from: try $0.getString(index: 0).data(using: .utf8)!)
-        }
+    private func dispatchWrites(lease: NativeConnectionLease) throws {
+        try lease.withIterator(sql: "SELECT powersync_update_hooks('get')", parameters: []) { rows in
+            var rows = rows
+            let affectedTables = try rows.next {
+                let decoder = JSONDecoder()
+                return try decoder.decode(Set<String>.self, from: try $0.getString(index: 0).data(using: .utf8)!)
+            }
 
-        if !affectedTables.isEmpty {
-            self.handleUpdates(affectedTables)
+            if let affectedTables, !affectedTables.isEmpty {
+                self.handleUpdates(affectedTables)
+            }
         }
     }
 
-    func read(onConnection: @Sendable (RawConnectionLease) async throws -> Void) async throws {
+    func read<T>(onConnection: (NativeConnectionLease) async throws -> T) async throws -> T {
         // No dedicated readers? Acquire write connection for this then
         let semaphore = readers ?? writer
         let connection = try await semaphore.acquire(count: 1)
         let lease = connection.acquiredItems[0].asLease()
-        try await onConnection(lease)
+        return try await onConnection(lease)
     }
 
-    func write(onConnection: @Sendable (RawConnectionLease) async throws -> Void) async throws {
+    func write<T>(onConnection: (NativeConnectionLease) async throws -> T) async throws -> T {
         let connection = try await writer.acquire(count: 1)
         let lease = connection.acquiredItems[0].asLease()
-        try await onConnection(lease)
+        let result = try await onConnection(lease)
         try dispatchWrites(lease: lease)
+        return result
     }
     
-    func withAllConnections(onConnection: @Sendable (RawConnectionLease, [RawConnectionLease]) async throws -> Void) async throws {
+    func withAllConnections<T>(onConnection: (NativeConnectionLease, [NativeConnectionLease]) async throws -> T) async throws -> T{
         let write = try await writer.acquire(count: 1)
         let writeLease = write.acquiredItems[0].asLease()
+        let result: T
         if let readers {
             let acquiredReaders = try await readers.acquire(count: readers.count)
-            var readerLeases: [RawConnectionLease] = []
+            var readerLeases: [NativeConnectionLease] = []
             
             let span = acquiredReaders.acquiredItems.span
             for idx in span.indices {
                 readerLeases.append(span[idx].asLease())
             }
-            try await onConnection(writeLease, readerLeases)
+            result = try await onConnection(writeLease, readerLeases)
         } else {
-            try await onConnection(writeLease, [])
+            result = try await onConnection(writeLease, [])
         }
         
         try dispatchWrites(lease: writeLease)
+        return result
     }
     
     func close() async throws {
@@ -107,12 +112,47 @@ struct RawSqliteConnection: ~Copyable {
         sqlite3_close_v2(connection)
     }
     
-    func asLease() -> RawConnectionLease {
+    func asLease() -> NativeConnectionLease {
         precondition(!closed)
-        return RawConnectionLease(pointer: self.connection)
+        return NativeConnectionLease(pointer: self.connection)
     }
 }
 
-struct RawConnectionLease: SQLiteConnectionLease, @unchecked Sendable {
+struct NativeConnectionLease: SQLiteConnectionLease, @unchecked Sendable {
     let pointer: OpaquePointer
+
+    func execute(sql: String, parameters: [PowerSyncDataType?]) throws -> Int64 {
+        do {
+            var stmt = try NativeSqliteStatement(db: pointer, sql: sql)
+            try stmt.bindValues(parameters)
+            while try stmt.step() {
+                // Iterate through the statement.
+            }
+        }
+
+        return sqlite3_changes64(pointer)
+    }
+
+    func withIterator<T>(sql: String, parameters: [PowerSyncDataType?], callback: (SQLiteStatementIteratorProtocol) throws -> T) throws -> T {
+        var stmt = try NativeSqliteStatement(db: pointer, sql: sql)
+        try stmt.bindValues(parameters)
+        return try withUnsafeMutablePointer(to: &stmt) { ptr in
+            let iterator = NativeStatementIterator(stmt: ptr)
+            return try callback(iterator)
+        }
+    }
+}
+
+private struct NativeStatementIterator: SQLiteStatementIteratorProtocol {
+    var stmt: UnsafeMutablePointer<NativeSqliteStatement>
+    
+    func next<T>(callback: (any SqlCursor) throws -> T) throws -> T? {
+        if try stmt.pointee.step() {
+            let cursor = StatementCursor(stmt)
+            defer { cursor.invalidate() }
+            return try callback(cursor)
+        } else {
+            return nil
+        }
+    }
 }

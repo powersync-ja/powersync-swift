@@ -80,7 +80,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
     }
     
     private func configureConnection(connection: borrowing RawSqliteConnection, isWriter: Bool) throws {
-        let context = NativeConnectionContext(connection.asLease())
+        let context = connection.asLease()
         for stmt in initialStatements {
             let _ = try context.execute(sql: stmt, parameters: [])
         }
@@ -98,8 +98,10 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
         if isWriter {
             // Older versions of the SDK used to set up an empty schema and raise the user version to 1.
             // Keep doing that for consistency.
-            let version = try context.get(sql: "pragma user_version", parameters: []) { try $0.getInt(index: 0) }
-            if version < 1 {
+            let version = try context.withIterator(sql: "pragma user_version", parameters: []) { rows in
+                try rows.next { try $0.getInt(index: 0) }
+            }
+            if let version, version < 1 {
                 let _ = try context.execute(sql: "pragma user_version = 1", parameters: [])
             }
             
@@ -142,23 +144,23 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
         }
     }
 
-    func read(onConnection: @escaping @Sendable (any SQLiteConnectionLease) throws -> Void) async throws {
+    func read<T>(onConnection: @escaping @Sendable (any SQLiteConnectionLease) throws -> T) async throws -> T {
         let pool = try await obtainInner()
-        try await pool.read { connection in
+        return try await pool.read { connection in
+            return try await runBlocking { try onConnection(connection) }
+        }
+    }
+
+    func write<T>(onConnection: @escaping @Sendable (any SQLiteConnectionLease) throws -> T) async throws -> T{
+        let pool = try await obtainInner()
+        return try await pool.write { connection in
             try await runBlocking { try onConnection(connection) }
         }
     }
     
-    func write(onConnection: @escaping @Sendable (any SQLiteConnectionLease) throws -> Void) async throws {
+    func withAllConnections<T>(onConnection: @escaping @Sendable (any SQLiteConnectionLease, [any SQLiteConnectionLease]) throws -> T) async throws -> T {
         let pool = try await obtainInner()
-        try await pool.write { connection in
-            try await runBlocking { try onConnection(connection) }
-        }
-    }
-    
-    func withAllConnections(onConnection: @escaping @Sendable (any SQLiteConnectionLease, [any SQLiteConnectionLease]) throws -> Void) async throws {
-        let pool = try await obtainInner()
-        try await pool.withAllConnections { writer, readers in
+        return try await pool.withAllConnections { writer, readers in
             try await runBlocking { try onConnection(writer, readers) }
         }
     }

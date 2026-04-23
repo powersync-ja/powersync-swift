@@ -118,6 +118,11 @@ private struct SemaphoreState<T: ~Copyable>: ~Copyable {
     }
 
     private mutating func deactivateWaiter(waiter: SemaphoreWaitNode) {
+        if !waiter.isActive {
+            return
+        }
+        
+        waiter.isActive = false
         let prev = waiter.prev
         let next = waiter.next
 
@@ -196,6 +201,7 @@ private final class SemaphoreWaitNode: @unchecked Sendable {
     var acquiredItems: Int
     var itemsBuffer: UnsafeMutableRawPointer? // pointer to [T; requestedItems]
     var continuation: CheckedContinuation<(), any Error>
+    var isActive = true
     var prev: SemaphoreWaitNode?
     var next: SemaphoreWaitNode?
 

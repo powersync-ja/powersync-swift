@@ -1,7 +1,6 @@
 import Foundation
 
-// Represents the set of types that are supported
-/// by the PowerSync Kotlin Multiplatform SDK
+// Represents the set of types that are supported as parameters for SQlite statements.
 public enum PowerSyncDataType {
     case bool(Bool)
     case string(String)

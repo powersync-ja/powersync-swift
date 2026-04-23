@@ -8,7 +8,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     private let dbFilename: String?
     private let httpClient: HttpClient
     private let initializer = DatabaseInitizalizationActor()
-    fileprivate let pool: any SQLiteConnectionPoolProtocol
+    fileprivate let queries: ConnectionPoolQueries
     let schema: AsyncMutex<Schema>
 
     init(
@@ -22,7 +22,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         self.logger = logger
         self.schema = AsyncMutex(schema)
         self.httpClient = httpClient
-        self.pool = pool
+        self.queries = ConnectionPoolQueries(pool: pool)
     }
     
     var currentStatus: any SyncStatus {
@@ -41,7 +41,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     
     fileprivate func resolveOfflineSyncStatus() async throws {
         // We can't use get() here because it runs as part of the initialization step.
-        let offlineSyncStatus = try await poolRead(pool) { connection in
+        let offlineSyncStatus = try await queries.readLock { connection in
             try connection.get(sql: "SELECT powersync_offline_sync_status()", parameters: []) { cursor in
                 let raw = try cursor.getString(index: 0)
                 return try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: raw.data(using: .utf8)!)
@@ -64,7 +64,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
     
     fileprivate func applySchema(schema: Schema) async throws {
-        try await poolWithAll(pool) { writer, readers in
+        try await queries.withAll { writer, readers in
             let encoded = try StreamingSyncClient.jsonEncoder.encode(schema)
             guard let asString = String(data: encoded, encoding: .utf8) else {
                 throw PowerSyncError.operationFailed(message: "Could not serialize schema")
@@ -107,7 +107,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         try await initialize()
         try await initializer.close {
             await syncCoordinator.disconnect()
-            try await pool.close()
+            try await queries.pool.close()
         }
     }
     
@@ -119,61 +119,11 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             try deleteSQLiteFiles(dbFilename: dbFilename, in: directory)
         }
     }
-    
+
     func connect(connector: any PowerSyncBackendConnectorProtocol, options: ConnectOptions?) async throws {
         await syncCoordinator.connect(db: self, connector: connector, options: options ?? ConnectOptions(), client: httpClient)
     }
-    
-    func watch<RowType>(options: WatchOptions<RowType>) throws -> AsyncThrowingStream<[RowType], any Error> {
-        AsyncThrowingStream { continuation in
-            // Create an outer task to monitor cancellation
-            let task = Task {
-                do {
-                    try await initialize()
-                    let watchedTables = try await self.getQuerySourceTables(
-                        sql: options.sql,
-                        parameters: options.parameters
-                    )
 
-                    let updateNotifications = pool.tableUpdates.filter { changedTables in
-                        changedTables.contains(where: watchedTables.contains)
-                    }.map { _ in () }
-                    // Allows emitting the first result even if there aren't changes
-                    let withInitial = AsyncAlgorithms.merge([()].async, updateNotifications)
-                    let throttled = AsyncThrottleSequence(inner: withInitial, duration: options.throttle)
-
-                    for try await _ in throttled {
-                        // Check if the outer task is cancelled
-                        try Task.checkCancellation()
-
-                        try continuation.yield(await self.getAll(
-                            sql: options.sql,
-                            parameters: options.parameters,
-                            mapper: options.mapper
-                        ))
-                    }
-
-                    continuation.finish()
-                } catch {
-                    if error is CancellationError {
-                        continuation.finish()
-                    } else {
-                        continuation.finish(throwing: error)
-                    }
-                }
-            }
-
-            // Propagate cancellation from the outer task to the inner task
-            continuation.onTermination = { @Sendable _ in
-                task.cancel() // This cancels the inner task when the stream is terminated
-            }
-        }
-    }
-    
-    func watch<RowType>(sql: String, parameters: [(any Sendable)?]?, mapper: @escaping @Sendable (any SqlCursor) throws -> RowType) throws -> AsyncThrowingStream<[RowType], any Error> {
-        return try watch(options: WatchOptions(sql: sql, parameters: parameters, mapper: mapper))
-    }
-    
     func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws {
         try await initialize()
         try await syncCoordinator.disconnectAndThen {
@@ -187,89 +137,26 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             
             do {
                 let flags = flags
-                let _ = try await poolWrite(pool) { ctx in try ctx.execute(sql: "SELECT powersync_clear(?)", parameters: [flags]) }
+                let _ = try await queries.writeLock { ctx in try ctx.execute(sql: "SELECT powersync_clear(?)", parameters: [flags]) }
             }
         }
     }
-    
-    func writeLock<R>(callback: @escaping @Sendable (any ConnectionContext) throws -> R) async throws -> R {
+
+    func writeLock<R: Sendable>(callback: @escaping @Sendable (any ConnectionContext) throws -> R) async throws -> R {
         try await initialize()
-        return try await poolWrite(pool, action: callback)
+        return try await queries.writeLock(callback: callback)
     }
-    
-    func readLock<R>(callback: @escaping @Sendable (any ConnectionContext) throws -> R) async throws -> R {
+
+    func readLock<R: Sendable>(callback: @escaping @Sendable (any ConnectionContext) throws -> R) async throws -> R {
         try await initialize()
-        return try await poolRead(pool, action: callback)
-    }
-    
-    func writeTransaction<R>(callback: @escaping @Sendable (any Transaction) throws -> R) async throws -> R {
-        return try await writeLock { ctx in try TransactionImpl.run(conn: ctx, callback: callback) }
-    }
-    
-    func readTransaction<R>(callback: @escaping @Sendable (any Transaction) throws -> R) async throws -> R {
-        return try await readLock { ctx in try TransactionImpl.run(conn: ctx, callback: callback) }
+        return try await queries.readLock(callback: callback)
     }
 
-    private func getQuerySourceTables(
-        sql: String,
-        parameters: [Sendable?]
-    ) async throws -> Set<String> {
-        let rows = try await getAll(
-            sql: "EXPLAIN \(sql)",
-            parameters: parameters,
-            mapper: { cursor in
-                try ExplainQueryResult(
-                    addr: cursor.getString(index: 0),
-                    opcode: cursor.getString(index: 1),
-                    p1: cursor.getInt64(index: 2),
-                    p2: cursor.getInt64(index: 3),
-                    p3: cursor.getInt64(index: 4)
-                )
-            }
-        )
-
-        let rootPages = rows.compactMap { row in
-            if (row.opcode == "OpenRead" || row.opcode == "OpenWrite") &&
-                row.p3 == 0 && row.p2 != 0
-            {
-                return row.p2
-            }
-            return nil
-        }
-
-        do {
-            let pagesData = try StreamingSyncClient.jsonEncoder.encode(rootPages)
-            guard let pagesString = String(data: pagesData, encoding: .utf8) else {
-                throw PowerSyncError.operationFailed(
-                    message: "Failed to convert pages data to UTF-8 string"
-                )
-            }
-
-            let tableRows = try await getAll(
-                sql: "SELECT tbl_name FROM sqlite_master WHERE rootpage IN (SELECT json_each.value FROM json_each(?))",
-                parameters: [
-                    pagesString,
-                ]
-            ) { try $0.getString(index: 0) }
-
-            return Set(tableRows)
-        } catch {
-            throw PowerSyncError.operationFailed(
-                message: "Could not determine watched query tables",
-                underlyingError: error
-            )
-        }
+    func watch<RowType: Sendable>(options: WatchOptions<RowType>) throws -> AsyncThrowingStream<[RowType], any Error> {
+        return try queries.watch(options: options)
     }
-    
+
     static let maxOpId = Int64.max
-}
-
-private struct ExplainQueryResult {
-    let addr: String
-    let opcode: String
-    let p1: Int64
-    let p2: Int64
-    let p3: Int64
 }
 
 private actor DatabaseInitizalizationActor {
@@ -285,7 +172,7 @@ private actor DatabaseInitizalizationActor {
             return
         }
 
-        powerSyncVersion = try await poolWrite(db.pool) { conn in
+        powerSyncVersion = try await db.queries.writeLock { conn in
             let sqliteVersion = try conn.get(sql: "SELECT sqlite_version()", parameters: []) { try $0.getString(index: 0) }
             let powerSyncVersion = try conn.get(sql: "SELECT powersync_rs_version()", parameters: []) { try $0.getString(index: 0) }
 

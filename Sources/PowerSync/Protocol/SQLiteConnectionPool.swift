@@ -4,7 +4,16 @@ import Foundation
 public protocol SQLiteConnectionLease {
     /// Pointer to the underlying SQLite connection.
     /// This pointer should not be used outside of the closure which provided the lease.
-    var pointer: OpaquePointer { get }
+    var pointer: OpaquePointer { borrowing get }
+
+    /// Executes an SQL statement and returns the amount of rows affected.
+    func execute(sql: String, parameters: [PowerSyncDataType?]) throws -> Int64
+
+    func withIterator<T>(sql: String, parameters: [PowerSyncDataType?], callback: (_: SQLiteStatementIteratorProtocol) throws -> T) throws -> T
+}
+
+public protocol SQLiteStatementIteratorProtocol {
+    func next<T>(callback: (_ cursor: SqlCursor) throws -> T) throws -> T?
 }
 
 /// An implementation of a connection pool providing asynchronous access to a single writer and multiple readers.
@@ -13,22 +22,22 @@ public protocol SQLiteConnectionPoolProtocol: Sendable {
     var tableUpdates: AsyncStream<Set<String>> { get }
 
     /// Calls the callback with a read-only connection temporarily leased from the pool.
-    func read(
-        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> Void,
-    ) async throws
+    func read<T: Sendable>(
+        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> T,
+    ) async throws -> T
 
     /// Calls the callback with a read-write connection temporarily leased from the pool.
-    func write(
-        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> Void,
-    ) async throws
+    func write<T: Sendable>(
+        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> T,
+    ) async throws -> T
 
     /// Invokes the callback with all connections leased from the pool.
-    func withAllConnections(
+    func withAllConnections<T: Sendable>(
         onConnection: @Sendable @escaping (
             _ writer: SQLiteConnectionLease,
             _ readers: [SQLiteConnectionLease]
-        ) throws -> Void,
-    ) async throws
+        ) throws -> T,
+    ) async throws -> T
 
     /// Closes the connection pool and associated resources.
     func close() async throws
