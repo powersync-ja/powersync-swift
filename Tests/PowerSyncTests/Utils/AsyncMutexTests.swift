@@ -5,11 +5,11 @@ import Testing
 struct AsyncSemaphoreTests {
     @Test func dispatchesItemsInOrder() async throws {
         let semaphore = AsyncSemaphore(from: ["a", "b", "c"])
-        
+
         let grant1 = try await semaphore.acquire(count: 1)
         let grant2 = try await semaphore.acquire(count: 1)
         let grant3 = try await semaphore.acquire(count: 1)
-        
+
         try #require(grant1.acquiredItems[0] == "a")
         try #require(grant2.acquiredItems[0] == "b")
         try #require(grant3.acquiredItems[0] == "c")
@@ -17,7 +17,7 @@ struct AsyncSemaphoreTests {
     
     @Test @MainActor func returnsReleasedItemsToWaiters() async throws {
         let semaphore = AsyncSemaphore(from: ["x"])
-        
+
         let grant1 = try await semaphore.acquire(count: 1)
         var hasSecond = false
 
@@ -37,27 +37,27 @@ struct AsyncSemaphoreTests {
         let semaphore = AsyncSemaphore(from: ["a", "b", "c"])
         let grant1 = try await semaphore.acquire(count: 1)
         let grant2 = try await semaphore.acquire(count: 1)
-        
+
         var hasAll = false
         let acquireAllTask = Task {
             let _ = try await semaphore.acquire(count: 3)
             hasAll = false
         }
-        
+
         await Task.yield()
         try #require(!hasAll)
-        
+
         let _ = consume grant1
         await Task.yield()
         try #require(!hasAll) // Still waiting for item2
-        
+
         let _ = consume grant2
         let _ = await acquireAllTask.result
     }
     
     @Test func canReturnMultiple() async throws {
         let semaphore = AsyncSemaphore(from: ["a", "b"])
-        
+
         let grantAll = try await semaphore.acquire(count: 2)
 
         let hasOther = Task {
@@ -68,19 +68,19 @@ struct AsyncSemaphoreTests {
             try #require(anotherGrant.acquiredItems[0] == "a")
             return true
         }
-        
+
         let _ = consume grantAll
         let _ = try await hasOther.value
     }
     
     @Test func canAbort() async throws {
         let semaphore = AsyncSemaphore(from: ["a"])
-        
+
         let grant1 = try await semaphore.acquire(count: 1)
-        
         let second = Task {
             await #expect(throws: CancellationError.self) {
                 let _ = try await semaphore.acquire(count: 1)
+                print("has items")
             }
         }
         let third = Task {
@@ -88,11 +88,36 @@ struct AsyncSemaphoreTests {
             try #require(grant.acquiredItems[0] == "a")
             return
         }
-        
+
         await Task.yield()
         second.cancel()
-        
+        let _ = await second.result
+
         let _ = consume grant1
-        let _ = await (second.result, third.result)
+        try (await third.result).get()
+    }
+    
+    @Test func canAbortPartial() async throws {
+        let semaphore = AsyncSemaphore(from: ["a", "b"])
+        let grant1 = try await semaphore.acquire(count: 1)
+        let second = Task {
+            await #expect(throws: CancellationError.self) {
+                let _ = try await semaphore.acquire(count: 2)
+            }
+        }
+        let third = Task {
+            let grant = try await semaphore.acquire(count: 2)
+            try #require(grant.acquiredItems[0] == "b")
+            try #require(grant.acquiredItems[1] == "a")
+            return
+        }
+
+        await Task.yield()
+        // At this point, second obtained value b from the semaphore, but it's still waiting
+        // for the second node. Aborting it should b into the semaphore.
+        second.cancel()
+        let _ = await second.result
+        let _ = consume grant1
+        try (await third.result).get()
     }
 }

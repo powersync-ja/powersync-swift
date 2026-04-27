@@ -19,7 +19,7 @@ struct Mutex<T: ~Copyable>: @unchecked Sendable, ~Copyable {
         self.value.deallocate()
     }
     
-    func withLock<R>(_ action: (_ value: inout T) throws -> R) rethrows -> R {
+    func withLock<R: ~Copyable>(_ action: (_ value: inout T) throws -> R) rethrows -> R {
         os_unfair_lock_lock(self.osLock)
         defer { os_unfair_lock_unlock(self.osLock) }
         
