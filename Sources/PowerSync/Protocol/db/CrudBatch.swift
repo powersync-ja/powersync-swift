@@ -19,16 +19,9 @@ public struct CrudBatch: Sendable {
     /// Call to remove the changes from the local queue, once successfully uploaded.
     ///
     /// `writeCheckpoint` is optional.
-    public func complete(writeCheckpoint: String?) async throws {
+    public func complete(writeCheckpoint: String? = nil) async throws {
         let lastId = crud.last!.clientId
-        try await completeCrudItems(self.db, lastId)
-    }
-
-    /// Call to remove the changes from the local queue, once successfully uploaded.
-    public func complete() async throws {
-        try await self.complete(
-            writeCheckpoint: nil
-        )
+        try await completeCrudItems(self.db, lastId, writeCheckpoint: writeCheckpoint)
     }
 }
 
