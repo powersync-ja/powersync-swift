@@ -91,12 +91,8 @@ struct NativeSqliteStatement: ~Copyable {
                 Int32(value.count),
                 free,
             )
-            
-            if rc != 0 {
-                free(buffer)
-            }
         }
-        
+
         if rc != 0 {
             try throwDatabaseError(db: self.db, sql: self.sql)
         }

@@ -59,11 +59,13 @@ enum DatabaseLocation {
 final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
     private let location: DatabaseLocation
     private let initialStatements: [String]
+    private let logger: any LoggerProtocol
     private let tableUpdatesStream = BroadcastStream<Set<String>>()
     private let inner: AsyncSemaphore<NativeConnectionPool?> = AsyncSemaphore(singleElement: nil)
 
-    init(location: DatabaseLocation, initialStatements: [String] = []) {
+    init(location: DatabaseLocation, logger: any LoggerProtocol, initialStatements: [String] = []) {
         self.location = location
+        self.logger = logger
         self.initialStatements = initialStatements
     }
     
@@ -84,17 +86,18 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
         for stmt in initialStatements {
             let _ = try context.execute(sql: stmt, parameters: [])
         }
-        
+
         if isWriter {
             let _ = try context.execute(sql: "pragma journal_mode = WAL", parameters: [])
         } else {
+            // This is mainly an additional safety element, we also open read connections SQLITE_READONLY.
             let _ = try context.execute(sql: "pragma query_only = TRUE", parameters: [])
         }
-        
+
         let _ = try context.execute(sql: "pragma journal_size_limit = \(6 * 1024 * 1024)", parameters: [])
         let _ = try context.execute(sql: "pragma busy_timeout = 30000", parameters: [])
         let _ = try context.execute(sql: "pragma cache_size = -\(50 * 1024)", parameters: [])
-        
+
         if isWriter {
             // Older versions of the SDK used to set up an empty schema and raise the user version to 1.
             // Keep doing that for consistency.
@@ -104,7 +107,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
             if let version, version < 1 {
                 let _ = try context.execute(sql: "pragma user_version = 1", parameters: [])
             }
-            
+
             let _ = try context.execute(sql: "select powersync_update_hooks('install')", parameters: [])
         }
     }
@@ -125,7 +128,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
                 try configureConnection(connection: writer, isWriter: true)
 
                 if case .inMemory = location {
-                    return NativeConnectionPool(singleConnection: writer, handleUpdates: handleUpdates)
+                    return NativeConnectionPool(singleConnection: writer, logger: logger, handleUpdates: handleUpdates)
                 } else {
                     let numReaders = 4
                     var readers = RigidDeque<RawSqliteConnection>(capacity: numReaders)
@@ -135,7 +138,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
                         readers.append(connection)
                     }
 
-                    return NativeConnectionPool(writer: writer, readers: readers, handleUpdates: handleUpdates)
+                    return NativeConnectionPool(writer: writer, readers: readers, logger: logger, handleUpdates: handleUpdates)
                 }
             }
             

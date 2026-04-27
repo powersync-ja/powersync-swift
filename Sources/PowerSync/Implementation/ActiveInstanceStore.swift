@@ -40,7 +40,7 @@ private final class ActiveDatabaseGroupData: Sendable {
 /// A collection  of PowerSync databases with the same path / identifier.
 ///
 /// We expect that each group will only ever have one database because we encourage users to write their databases as
-/// singletons. We print a warning when two databasees are part of the same group.
+/// singletons. We print a warning when two databases are part of the same group.
 /// Additionally, we want to avoid two databases in the same group having a sync stream open at the same time to avoid
 /// duplicate resources being used. For this reason, each active database group has a single sync coordinator actor
 /// responsible for initializing the sync process for all databases in the group.

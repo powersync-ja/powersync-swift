@@ -40,9 +40,9 @@ struct ConnectionPoolQueries: Sendable, Queries {
                     }.map { _ in () }
                     // Allows emitting the first result even if there aren't changes
                     let withInitial = AsyncAlgorithms.merge([()].async, updateNotifications)
-                    let throttled = AsyncThrottleSequence(inner: withInitial, duration: options.throttle)
+                    let merged = MergeItemSequence(inner: withInitial)
 
-                    for try await _ in throttled {
+                    for try await _ in merged {
                         // Check if the outer task is cancelled
                         try Task.checkCancellation()
 
@@ -51,6 +51,7 @@ struct ConnectionPoolQueries: Sendable, Queries {
                             parameters: options.parameters,
                             mapper: options.mapper
                         ))
+                        try await sleepForSeconds(seconds: options.throttle)
                     }
 
                     continuation.finish()

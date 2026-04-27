@@ -7,7 +7,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     let syncStatus = SwiftSyncStatus()
     private let dbFilename: String?
     private let httpClient: HttpClient
-    private let initializer = DatabaseInitizalizationActor()
+    private let initializer = DatabaseInitializationAction()
     fileprivate let queries: ConnectionPoolQueries
     let schema: AsyncMutex<Schema>
 
@@ -165,7 +165,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     static let maxOpId = Int64.max
 }
 
-private actor DatabaseInitizalizationActor {
+private actor DatabaseInitializationAction {
     private var isInitialized = false
     var powerSyncVersion: String?
     private var closed = false

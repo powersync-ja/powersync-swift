@@ -69,7 +69,7 @@ final class SqlCursorTests: XCTestCase {
             identifier: ":memory:",
             activeInstanceStore: DatabaseGroupCollection(),
             logger: DefaultLogger(),
-            pool: AsyncConnectionPool(location: .inMemory),
+            pool: AsyncConnectionPool(location: .inMemory, logger: DefaultLogger()),
             httpClient: PlatformHttpClient.shared,
             schema: schema,
         )

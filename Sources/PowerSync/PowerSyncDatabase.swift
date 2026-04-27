@@ -21,7 +21,7 @@ public func PowerSyncDatabase(
     } else {
         (DatabaseLocation.inDefaultDirectory(name: dbFilename), .shared)
     }
-    let pool = AsyncConnectionPool(location: location, initialStatements: initialStatements)
+    let pool = AsyncConnectionPool(location: location, logger: logger, initialStatements: initialStatements)
     return PowerSyncDatabaseImpl(
         dbFilename: dbFilename,
         identifier: dbFilename,

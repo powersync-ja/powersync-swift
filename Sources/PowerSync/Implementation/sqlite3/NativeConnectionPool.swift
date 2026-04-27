@@ -9,29 +9,45 @@ final class NativeConnectionPool: Sendable {
     private let writer: AsyncSemaphore<RawSqliteConnection>
     private let readers: AsyncSemaphore<RawSqliteConnection>?
     private let handleUpdates: @Sendable (_: Set<String>) -> ()
+    private let logger: any LoggerProtocol
 
-    init(writer: consuming RawSqliteConnection, readers: consuming RigidDeque<RawSqliteConnection>, handleUpdates: @escaping @Sendable (_: Set<String>) -> ()) {
+    init(
+        writer: consuming RawSqliteConnection,
+        readers: consuming RigidDeque<RawSqliteConnection>,
+        logger: any LoggerProtocol,
+        handleUpdates: @escaping @Sendable (_: Set<String>) -> (),
+    ) {
         self.writer = AsyncSemaphore(singleElement: writer)
         self.readers = AsyncSemaphore(readers)
         self.handleUpdates = handleUpdates
+        self.logger = logger
     }
     
-    init(singleConnection: consuming RawSqliteConnection, handleUpdates: @escaping @Sendable (_: Set<String>) -> ()) {
+    init(
+        singleConnection: consuming RawSqliteConnection,
+        logger: any LoggerProtocol,
+        handleUpdates: @escaping @Sendable (_: Set<String>) -> (),
+    ) {
         self.writer = AsyncSemaphore(singleElement: singleConnection)
         self.readers = nil
         self.handleUpdates = handleUpdates
+        self.logger = logger
     }
 
-    private func dispatchWrites(lease: NativeConnectionLease) throws {
-        try lease.withIterator(sql: "SELECT powersync_update_hooks('get')", parameters: []) { rows in
-            let affectedTables = try rows.next {
-                let decoder = JSONDecoder()
-                return try decoder.decode(Set<String>.self, from: try $0.getString(index: 0).data(using: .utf8)!)
-            }
+    private func dispatchWrites(lease: NativeConnectionLease) {
+        do {
+            try lease.withIterator(sql: "SELECT powersync_update_hooks('get')", parameters: []) { rows in
+                let affectedTables = try rows.next {
+                    let decoder = JSONDecoder()
+                    return try decoder.decode(Set<String>.self, from: try $0.getString(index: 0).data(using: .utf8)!)
+                }
 
-            if let affectedTables, !affectedTables.isEmpty {
-                self.handleUpdates(affectedTables)
+                if let affectedTables, !affectedTables.isEmpty {
+                    self.handleUpdates(affectedTables)
+                }
             }
+        } catch {
+            logger.warning("Could not read affected tables", tag: "NativeConnectionPool")
         }
     }
 
@@ -46,14 +62,16 @@ final class NativeConnectionPool: Sendable {
     func write<T>(onConnection: (NativeConnectionLease) async throws -> T) async throws -> T {
         let connection = try await writer.acquire(count: 1)
         let lease = connection.acquiredItems[0].asLease()
+        defer { dispatchWrites(lease: lease) }
         let result = try await onConnection(lease)
-        try dispatchWrites(lease: lease)
         return result
     }
     
     func withAllConnections<T>(onConnection: (NativeConnectionLease, [NativeConnectionLease]) async throws -> T) async throws -> T{
         let write = try await writer.acquire(count: 1)
         let writeLease = write.acquiredItems[0].asLease()
+        defer { dispatchWrites(lease: writeLease) }
+
         let result: T
         if let readers {
             let acquiredReaders = try await readers.acquire(count: readers.count)
@@ -67,8 +85,6 @@ final class NativeConnectionPool: Sendable {
         } else {
             result = try await onConnection(writeLease, [])
         }
-        
-        try dispatchWrites(lease: writeLease)
         return result
     }
     

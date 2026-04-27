@@ -7,7 +7,7 @@ final class ConnectionLeaseContext: ConnectionContext {
     }
 
     /// Maps any parameter array to typed SQLite values.
-    private func mapMarameters(_ parameters: [(any Sendable)?]?) throws -> [PowerSyncDataType?] {
+    private func mapParameters(_ parameters: [(any Sendable)?]?) throws -> [PowerSyncDataType?] {
         guard let parameters else {
             return []
         }
@@ -25,13 +25,13 @@ final class ConnectionLeaseContext: ConnectionContext {
 
     func execute(sql: String, parameters: [(any Sendable)?]?) throws -> Int64 {
         try lease.withLock { lease in
-            return try lease.execute(sql: sql, parameters: mapMarameters(parameters))
+            return try lease.execute(sql: sql, parameters: mapParameters(parameters))
         }
     }
 
     func getOptional<RowType>(sql: String, parameters: [(any Sendable)?]?, mapper: @escaping @Sendable (any SqlCursor) throws -> RowType) throws -> RowType? {
         try lease.withLock { lease in
-            try lease.withIterator(sql: sql, parameters: mapMarameters(parameters)) { rows in
+            try lease.withIterator(sql: sql, parameters: mapParameters(parameters)) { rows in
                 return try rows.next(callback: mapper)
             }
         }
@@ -39,7 +39,7 @@ final class ConnectionLeaseContext: ConnectionContext {
     
     func getAll<RowType>(sql: String, parameters: [(any Sendable)?]?, mapper: @escaping @Sendable (any SqlCursor) throws -> RowType) throws -> [RowType] {
         try lease.withLock { lease in
-            try lease.withIterator(sql: sql, parameters: mapMarameters(parameters)) { rows in
+            try lease.withIterator(sql: sql, parameters: mapParameters(parameters)) { rows in
                 var result: [RowType] = []
                 while let row = try rows.next(callback: mapper) {
                     result.append(row)
@@ -51,7 +51,7 @@ final class ConnectionLeaseContext: ConnectionContext {
     
     func get<RowType>(sql: String, parameters: [(any Sendable)?]?, mapper: @escaping @Sendable (any SqlCursor) throws -> RowType) throws -> RowType {
         try lease.withLock { lease in
-            try lease.withIterator(sql: sql, parameters: mapMarameters(parameters)) { rows in
+            try lease.withIterator(sql: sql, parameters: mapParameters(parameters)) { rows in
                 guard let cursor = try rows.next(callback: mapper) else {
                     throw PowerSyncError.operationFailed(message: "Expected \(sql) to return a row, but got an empty result set.")
                 }

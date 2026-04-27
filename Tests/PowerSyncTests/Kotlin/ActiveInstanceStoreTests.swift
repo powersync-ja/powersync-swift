@@ -4,7 +4,7 @@ import Testing
 @Suite
 struct MultipleInstanceTest {
     @Test func warnsAboutMultipleInstances() async throws {
-        let pool = AsyncConnectionPool(location: .inMemory)
+        let pool = AsyncConnectionPool(location: .inMemory, logger: DefaultLogger())
         let logWriter = TestLogWriterAdapter()
         let logger = DefaultLogger(minSeverity: .warning, writers: [logWriter])
         let schema = Schema()
@@ -21,7 +21,7 @@ struct MultipleInstanceTest {
     }
     
     @Test func doesNotWarnForClosedInstances() async throws {
-        let pool = AsyncConnectionPool(location: .inMemory)
+        let pool = AsyncConnectionPool(location: .inMemory, logger: DefaultLogger())
         let logWriter = TestLogWriterAdapter()
         let logger = DefaultLogger(minSeverity: .warning, writers: [logWriter])
         let schema = Schema()

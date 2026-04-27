@@ -419,6 +419,28 @@ final class KotlinPowerSyncDatabaseImplTests: XCTestCase {
         XCTAssertEqual(result, 0)
     }
 
+    func testFailedWritesStillEmitUpdateNotifications() async throws {
+        var query = try database.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
+        do {
+            let rows = try await query.next()
+            XCTAssertEqual(rows, [])
+        }
+
+        do {
+            try await database.writeLock { ctx in
+                try ctx.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["test user"])
+                throw PowerSyncError.operationFailed(message: "deliberate error from test")
+            }
+        } catch {
+            // Expected
+        }
+
+        do {
+            let rows = try await query.next()
+            XCTAssertEqual(rows, ["test user"])
+        }
+    }
+
     func testReadTransaction() async throws {
         _ = try await database.execute(
             sql: "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",

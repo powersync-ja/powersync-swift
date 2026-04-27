@@ -676,7 +676,7 @@ private func openDatabase(_ client: any HttpClient, schema: Schema = defaultSche
         identifier: ":memory:",
         activeInstanceStore: DatabaseGroupCollection(),
         logger: logger,
-        pool: AsyncConnectionPool(location: .inMemory),
+        pool: AsyncConnectionPool(location: .inMemory, logger: DefaultLogger()),
         httpClient: client,
         schema: schema,
     )
