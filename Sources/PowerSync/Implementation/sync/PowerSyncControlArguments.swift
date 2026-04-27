@@ -1,6 +1,6 @@
 /// Arguments to the `powersync_control()` SQL function driving the sync process.
 enum PowerSyncControlArguments {
-    case start(_ start: StartSyncIteration)
+    case start(start: StartSyncIteration)
     case stop
     case textLine(line: String)
     case binaryLine(line: ContiguousArray<UInt8>)

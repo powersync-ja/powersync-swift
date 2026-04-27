@@ -1,3 +1,4 @@
+/// Wraps a ``PowerSyncBackendConnectorProtocol`` to cache and invalidate credentials. 
 actor CachingCredentialsConnector {
     private let inner: PowerSyncBackendConnectorProtocol
     private var cachedCredentials: PowerSyncCredentials? = nil
@@ -21,6 +22,7 @@ actor CachingCredentialsConnector {
     }
     
     nonisolated func uploadData(database: any PowerSyncDatabaseProtocol) async throws {
+        // Nonisolated because we don't want this to block fetching credentials.
         try await self.inner.uploadData(database: database)
     }
 }

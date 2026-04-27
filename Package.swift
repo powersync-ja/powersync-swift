@@ -105,7 +105,6 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift")
             ]
         ),
-        .executableTarget(name: "SyncPlayground", dependencies: [.target(name: "PowerSync")]),
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]

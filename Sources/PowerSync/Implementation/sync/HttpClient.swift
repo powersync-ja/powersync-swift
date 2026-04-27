@@ -1,8 +1,17 @@
 import Foundation
 
-/// An internal protocol for HTTP clients, we use this to mock clients in tests.
+/// An internal protocol for HTTP clients.
+/// 
+/// Outside of tests, this is implemented by ``PlatformHttpClient`` as a thin wrapper around
+/// ``URLSession``. In tests, we can use a mock implementation to test the sync client instead.
+/// 
+/// This is an internal protocol and tailored towards what the sync client actually needs. It is not
+/// a general-purpose HTTP client. 
 protocol HttpClient: Sendable {
+    /// Start streaming a `/sync/stream` response body, emitting individual lines.
     func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any SyncLineResponse)
+
+    /// Read a full response body.
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data)
 }
 
@@ -29,6 +38,25 @@ struct PlatformHttpClient: HttpClient {
             throw PowerSyncError.operationFailed(message: "Invalid sync lines response, (expected \(jsonStreamMimeType), got \(response.mimeType, default: "")")
         }
 
+        struct PlatformSyncLineResponse<Base>: SyncLineResponse where Base : AsyncSequence, Base.Element == UInt8, Base: Sendable {
+            let lines: AsyncLineSequence<Base>
+
+            func makeAsyncIterator() -> some SyncLineResponseIterator {
+                return PlatformSyncLineResponseIterator<Base>(inner: lines.makeAsyncIterator())
+            }
+        }
+
+        struct PlatformSyncLineResponseIterator<Base>: SyncLineResponseIterator where Base : AsyncSequence, Base.Element == UInt8, Base: Sendable {
+            typealias Element = SyncLine
+
+            var inner: AsyncLineSequence<Base>.AsyncIterator
+
+            mutating func next() async throws -> SyncLine? {
+                let line = try await inner.next()
+                return line.map { SyncLine.text(contents: $0) }
+            }
+        }
+
         return (response as! HTTPURLResponse, PlatformSyncLineResponse(lines: bytes.lines))
     }
     
@@ -40,25 +68,7 @@ struct PlatformHttpClient: HttpClient {
     static let shared = PlatformHttpClient(session: .shared)
 }
 
-private struct PlatformSyncLineResponse<Base>: SyncLineResponse where Base : AsyncSequence, Base.Element == UInt8, Base: Sendable {
-    let lines: AsyncLineSequence<Base>
-    
-    func makeAsyncIterator() -> some SyncLineResponseIterator {
-        return PlatformSyncLineResponseIterator<Base>(inner: lines.makeAsyncIterator())
-    }
-}
-
-private struct PlatformSyncLineResponseIterator<Base>: SyncLineResponseIterator where Base : AsyncSequence, Base.Element == UInt8, Base: Sendable {
-    typealias Element = SyncLine
-
-    var inner: AsyncLineSequence<Base>.AsyncIterator
-
-    mutating func next() async throws -> SyncLine? {
-        let line = try await inner.next()
-        return line.map { SyncLine.text(contents: $0) }
-    }
-}
-
+/// A wrapper around a ``HttpClient`` emitting log events for responses and sync lines.
 struct LoggingClient: HttpClient {
     let inner: HttpClient
     let logger: SyncRequestLoggerConfiguration

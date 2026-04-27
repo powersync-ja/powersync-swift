@@ -1,10 +1,11 @@
+/// A raw sync status snapshot received from the core extension.
 struct CoreDownloadSyncStatus: Decodable, Sendable {
     let connected: Bool
     let connecting: Bool
     let priorityStatus: [PriorityStatusEntry]
     let downloading: CoreSyncDownloadProgress?
     let streams: [SyncStreamStatus]
-    
+
     enum CodingKeys: String, CodingKey {
         case connected
         case connecting
@@ -12,7 +13,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
         case downloading
         case streams
     }
-    
+
     init() {
         self.connected = false
         self.connecting = false
@@ -20,7 +21,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
         self.downloading = nil
         self.streams = []
     }
-    
+
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.connected = try container.decode(Bool.self, forKey: .connected)
@@ -42,7 +43,7 @@ struct BucketProgress: Decodable {
     let atLast:  Int64
     let sinceLast: Int64
     let targetCount: Int64
-    
+
     enum CodingKeys: String, CodingKey {
         case priority
         case atLast = "at_last"
@@ -68,6 +69,8 @@ struct ProgressCounters: Decodable, ProgressWithOperations {
     }
 }
 
+/// Wrapper to make ``SyncStreamStatus`` decodable without us having to implement that protocol
+/// publicly.
 private struct DecodableSyncStreamStatus: Decodable {
     let inner: SyncStreamStatus
     
