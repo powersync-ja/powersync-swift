@@ -19,16 +19,9 @@ public struct CrudBatch: Sendable {
     /// Call to remove the changes from the local queue, once successfully uploaded.
     ///
     /// `writeCheckpoint` is optional.
-    public func complete(writeCheckpoint: String?) async throws {
+    public func complete(writeCheckpoint: String? = nil) async throws {
         let lastId = crud.last!.clientId
-        try await completeCrudItems(self.db, lastId)
-    }
-
-    /// Call to remove the changes from the local queue, once successfully uploaded.
-    public func complete() async throws {
-        try await self.complete(
-            writeCheckpoint: nil
-        )
+        try await completeCrudItems(self.db, lastId, writeCheckpoint: writeCheckpoint)
     }
 }
 
@@ -42,6 +35,6 @@ internal func completeCrudItems(_ db: any PowerSyncDatabaseProtocol, _ lastItemI
                 return
             }
         }
-        try tx.execute(sql: "UPDATE ps_buckets SET target_op = ? WHERE name = '$local'", parameters: [KotlinPowerSyncDatabaseImpl.maxOpId])
+        try tx.execute(sql: "UPDATE ps_buckets SET target_op = 9223372036854775807 WHERE name = '$local'", parameters: nil)
     }
 }

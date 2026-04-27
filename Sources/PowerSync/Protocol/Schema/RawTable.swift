@@ -69,7 +69,7 @@ public struct RawTable: BaseTableProtocol, Encodable {
             // That could also throw an exception (which would crash the process), but that
             // was overlooked due to a missing @Throws annotation.
             // Now, we can't mark this as throws without breaking backwards compatibility.
-            // We should conver this to be throwing in a future major release.
+            // We should convert this to be throwing in a future major release.
             fatalError("Serializing a raw table failed: \(error)")
         }
     }

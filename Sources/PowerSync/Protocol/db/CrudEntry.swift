@@ -112,7 +112,10 @@ public struct CrudEntry: Sendable {
         }
 
         let decoder = JSONDecoder()
-        let entry = try decoder.decode(CrudJsonEntry.self, from: data.data(using: .utf8)!)
+        guard let jsonData = data.data(using: .utf8) else {
+            throw PowerSyncError.operationFailed(message: "Invalid UTF-8 in CRUD entry")
+        }
+        let entry = try decoder.decode(CrudJsonEntry.self, from: jsonData)
 
         return CrudEntry(
             id: entry.id,
@@ -128,7 +131,9 @@ public struct CrudEntry: Sendable {
     }
 
     private static func jsonValueToString(_ value: JsonValue?) throws -> String? {
-        try value.map { value in
+        // Older versions of the SDK were only able to export these values as strings, so we convert for
+        // backwards compatibility.
+        try value.flatMap { value in
             switch (value) {
             case .string(let value):
                 return value
@@ -139,7 +144,7 @@ public struct CrudEntry: Sendable {
             case .bool(let value):
                 return String(value)
             case .null:
-                return "null"
+                return nil
             case .array(_), .object(_):
                 throw PowerSyncError.operationFailed(message: "Invalid array/object in CRUD data, should be string")
             }

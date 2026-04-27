@@ -3,6 +3,7 @@
 ## 1.14.0 (unreleased)
 
 * Add `opDataTyped` and `previousValuesTyped` to `CrudEntry`, providing typed values instead of strings.
+* Make `CrudBatch`, `CrudEntry` and `CrudTransaction` a concrete struct. Note that these can no longer be created in user code.
 
 ## 1.13.1
 
