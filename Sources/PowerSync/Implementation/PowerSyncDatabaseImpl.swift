@@ -44,7 +44,10 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         let offlineSyncStatus = try await queries.readLock { connection in
             try connection.get(sql: "SELECT powersync_offline_sync_status()", parameters: []) { cursor in
                 let raw = try cursor.getString(index: 0)
-                return try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: raw.data(using: .utf8)!)
+                guard let data = raw.data(using: .utf8) else {
+                    throw PowerSyncError.operationFailed(message: "Could not encode offline sync status")
+                }
+                return try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: data)
             }
         }
 

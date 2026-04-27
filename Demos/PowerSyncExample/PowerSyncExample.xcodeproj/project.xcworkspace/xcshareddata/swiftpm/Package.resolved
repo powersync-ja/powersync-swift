@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
       "state" : {
-        "revision" : "9743740980cd488a11f50cffe62ed34a9739a135",
-        "version" : "0.4.10"
+        "revision" : "05c2af384558011f0915d757b6677f5dcbbc5c54",
+        "version" : "0.4.13"
       }
     },
     {
@@ -53,6 +53,15 @@
       "state" : {
         "revision" : "7faebca1ea4f9aaf0cda1cef7c43aecd2311ddf6",
         "version" : "1.3.0"
+      }
+    },
+    {
+      "identity" : "swift-async-algorithms",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-async-algorithms.git",
+      "state" : {
+        "revision" : "9d349bcc328ac3c31ce40e746b5882742a0d1272",
+        "version" : "1.1.3"
       }
     },
     {

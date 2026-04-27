@@ -1,5 +1,4 @@
 import Foundation
-import Synchronization
 
 final class StreamTracker: Sendable {
     // For each active stream key, how many StreamSubscription instances are active in that key.

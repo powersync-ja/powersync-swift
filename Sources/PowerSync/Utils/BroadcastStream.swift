@@ -1,8 +1,7 @@
-import Synchronization
-
+/// Dispatches events to a number of listeners as an ``AsyncStream``.
 final class BroadcastStream<T: Sendable>: Sendable {
     private let listeners: Mutex<Set<BroadcastStreamListener<T>>> = Mutex([])
-    
+
     private func register(continuation: AsyncStream<T>.Continuation) {
         let listener = BroadcastStreamListener(continuation: continuation)
         let _ = listeners.withLock { $0.insert(listener) }
@@ -13,7 +12,7 @@ final class BroadcastStream<T: Sendable>: Sendable {
             }
         }
     }
-    
+
     func dispatch(event: T) {
         let listeners = self.listeners.withLock { Array($0) }
         for listener in listeners {
@@ -44,7 +43,7 @@ final private class BroadcastStreamListener<T>: Sendable, Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(ObjectIdentifier(self))
     }
-    
+
     static func == (lhs: BroadcastStreamListener<T>, rhs: BroadcastStreamListener<T>) -> Bool {
         lhs === rhs
     }

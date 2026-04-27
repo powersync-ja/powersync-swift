@@ -1,6 +1,5 @@
 import AsyncAlgorithms
 import Foundation
-import Synchronization
 
 fileprivate let tag = "StreamingSyncClient"
 
@@ -26,7 +25,7 @@ final class StreamingSyncClient: Sendable {
     /// managing tokens and CRUD uploads.
     ///
     /// There should at most be one such task per database, but this internal method performs no concurrency
-    /// control for that.
+    /// control for that (that's the responsibility of a ``SyncCoordinator``).
     func run() -> Task<Void, any Error> {
         Task(name: "StreamingSyncClient.run") {
             let signals = SyncSignals()
@@ -38,7 +37,7 @@ final class StreamingSyncClient: Sendable {
     }
 
     private func uploadLoop(signals: SyncSignals) async throws {
-        // TODO: Replace with better watch mechanism
+        // TODO: Replace with better watch mechanism once we've dropped the Kotlin dependency and can use onChange.
         let watch = try db.watch(sql: "SELECT 1 FROM ps_crud LIMIT 1", parameters: [], mapper: { _ in () })
             .dropFirst() // Skip initial result, we just want to watch changes
             .map { _ in () }
@@ -158,7 +157,7 @@ The next upload iteration will be delayed.
         while (!Task.isCancelled) {
             do {
                 // This async let ensures each iteration is a task scoped to this block. This allows us to spawn
-                // aditional tasks in run() that would get cancelled when the main iteration is complete.
+                // additional tasks in run() that would get cancelled when the main iteration is complete.
                 async let iteration = ActiveSyncIteration(syncClient: self, signals: signals).run()
                 
                 result = try await iteration
@@ -242,7 +241,7 @@ private struct ActiveSyncIteration: Sendable {
         // checkpoint in that case.
         async let _ = watchCompletedCrudUploads()
 
-        let initialInstructions = try await powersyncControl(.start(StartSyncIteration(
+        let initialInstructions = try await powersyncControl(.start(start: StartSyncIteration(
             parameters: syncClient.options.params,
             schema: await syncClient.db.schema.inner,
             includeDefaults: syncClient.options.includeDefaultStreams,
@@ -306,7 +305,10 @@ private struct ActiveSyncIteration: Sendable {
 
     private func powersyncControl(_ args: PowerSyncControlArguments) async throws -> [Instruction] {
         let rawInstructions = try await syncClient.db.writeTransaction { tx in try args.execute(tx) }
-        return try StreamingSyncClient.jsonDecoder.decode([Instruction].self, from: rawInstructions.data(using: .utf8)!)
+        guard let data = rawInstructions.data(using: .utf8) else {
+            throw PowerSyncError.operationFailed(message: "Could not encode raw instructions")
+        }
+        return try StreamingSyncClient.jsonDecoder.decode([Instruction].self, from: data)
     }
 
     private func execute(instr: consuming Instruction) async throws {
@@ -327,18 +329,21 @@ private struct ActiveSyncIteration: Sendable {
                 $0.core = status
             }
         case .establishSyncStream(request: _):
-            fatalError("There can only be one establishSyncStream instruction per sync iteration")
+            throw PowerSyncError.operationFailed(message: "There can only be one establishSyncStream instruction per sync iteration")
         case .closeSyncStream(hideDisconnect: _):
-            fatalError("Must be handled in run() loop")
+            throw PowerSyncError.operationFailed(message: "CloseSyncStream must be handled in run() loop")
         case .fetchCredentials(didExpire: let didExpire):
             if didExpire {
                 await syncClient.invalidateCredentials()
             } else {
                 Task {
-                    let _ = try await syncClient.connector.fetchCredentials(allowCached: false)
-                    syncClient.db.logger.debug("Stopping because new credentials are available", tag: tag)
-                    // Token has been refreshed, start another iteration
-                    localEvents.dispatch(event: .didRefreshToken)
+                    do {
+                        let _ = try await syncClient.connector.fetchCredentials(allowCached: false)
+                        syncClient.db.logger.debug("Stopping because new credentials are available", tag: tag)
+                        localEvents.dispatch(event: .didRefreshToken)
+                    } catch {
+                        syncClient.db.logger.warning("Pre-fetching credentials that are about to expire has failed: \(error)", tag: tag)
+                    }
                 }
             }
         case .flushFileSystem:
@@ -397,6 +402,7 @@ fileprivate enum ControlInvocationsFromStreamIterator: AsyncIteratorProtocol {
                 self = .eof
                 return .responseStreamEnd
             case .some(.text(contents: let contents)):
+                self = .isReceiving(iterator)
                 return .textLine(line: contents)
             }
         case .eof:
@@ -413,6 +419,11 @@ private struct SyncIterationResult {
     }
 }
 
+/// Allows the concurrent upload and download tasks to communicate.
+/// 
+/// The download task might request a CRUD upload (when we run into a checkpoint that couldn't
+/// be applied due to local data), and the upload task needs to signal completions to the download
+/// task (so that we can retry applying a checkpoint).
 private struct SyncSignals {
     let signalCrudUpload = BroadcastStream<Void>()
     let signalCrudUploadComplete = BroadcastStream<Void>()
@@ -435,5 +446,5 @@ struct WriteCheckpointResponse: Codable {
 }
 
 private func sleepForSeconds(seconds: TimeInterval) async throws {
-    try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_00))
+    try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
 }

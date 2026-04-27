@@ -19,7 +19,7 @@ actor SyncCoordinator {
     
     func disconnect() async {
         guard let task = activeSync else {
-            return // Not connecteed
+            return // Not connected
         }
         
         await self.finishSyncTask(task: task)

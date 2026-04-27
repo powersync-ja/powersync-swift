@@ -190,7 +190,10 @@ public struct Table: TableProtocol, Encodable {
         try container.encode(name, forKey: .outer(.name))
         try container.encodeIfPresent(viewNameOverride, forKey: .outer(.viewName))
         try container.encode(columns, forKey: .outer(.columns))
-        try container.encode(indexes, forKey: .outer(.indexes))
+        let indexContainer = container.nestedUnkeyedContainer(forKey: .outer(.indexes))
+        for index in indexes {
+            try index.encode(table: self, to: indexContainer)
+        }
         try options.serializeTo(container)
     }
 }
