@@ -24,7 +24,6 @@ final class NativeConnectionPool: Sendable {
 
     private func dispatchWrites(lease: NativeConnectionLease) throws {
         try lease.withIterator(sql: "SELECT powersync_update_hooks('get')", parameters: []) { rows in
-            var rows = rows
             let affectedTables = try rows.next {
                 let decoder = JSONDecoder()
                 return try decoder.decode(Set<String>.self, from: try $0.getString(index: 0).data(using: .utf8)!)

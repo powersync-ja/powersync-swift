@@ -3,7 +3,7 @@ import Foundation
 
 final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     let logger: any LoggerProtocol
-    let syncCoordinator = SyncCoordinator()
+    let group: ActiveDatabaseGroup
     let syncStatus = SwiftSyncStatus()
     private let dbFilename: String?
     private let httpClient: HttpClient
@@ -13,6 +13,8 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     init(
         dbFilename: String? = nil,
+        identifier: String,
+        activeInstanceStore: DatabaseGroupCollection = .shared,
         logger: any LoggerProtocol,
         pool: any SQLiteConnectionPoolProtocol,
         httpClient: HttpClient,
@@ -23,14 +25,15 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         self.schema = AsyncMutex(schema)
         self.httpClient = httpClient
         self.queries = ConnectionPoolQueries(pool: pool)
+        self.group = activeInstanceStore.referenceGroup(identifier: identifier, logger: logger)
     }
-    
+
     var currentStatus: any SyncStatus {
         syncStatus
     }
 
     func resolveOfflineSyncStatusIfNotConnected() async throws {
-        try await syncCoordinator.guardNotConnected(inner: {
+        try await group.syncCoordinator.guardNotConnected(inner: {
             try await resolveOfflineSyncStatus()
         }, ifConnected: {})
     }
@@ -56,7 +59,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func updateSchema(schema: any SchemaProtocol) async throws {
         try await initializer.ensureInitialized(db: self)
-        try await syncCoordinator.guardNotConnected(
+        try await group.syncCoordinator.guardNotConnected(
             inner: {
                 let schema = Schema(other: schema)
                 await self.schema.withMutex { $0 = schema }
@@ -99,7 +102,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
     
     func disconnect() async throws {
-        await syncCoordinator.disconnect()
+        await group.syncCoordinator.disconnect()
     }
     
     func syncStream(name: String, params: JsonParam?) -> any SyncStream {
@@ -109,7 +112,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     func close() async throws {
         try await initialize()
         try await initializer.close {
-            await syncCoordinator.disconnect()
+            await group.syncCoordinator.disconnect()
             try await queries.pool.close()
         }
     }
@@ -124,12 +127,12 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
 
     func connect(connector: any PowerSyncBackendConnectorProtocol, options: ConnectOptions?) async throws {
-        await syncCoordinator.connect(db: self, connector: connector, options: options ?? ConnectOptions(), client: httpClient)
+        await group.syncCoordinator.connect(db: self, connector: connector, options: options ?? ConnectOptions(), client: httpClient)
     }
 
     func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws {
         try await initialize()
-        try await syncCoordinator.disconnectAndThen {
+        try await group.syncCoordinator.disconnectAndThen {
             var flags = 0
             if clearLocal {
                 flags |= 1

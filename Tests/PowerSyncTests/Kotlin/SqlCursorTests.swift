@@ -66,7 +66,8 @@ final class SqlCursorTests: XCTestCase {
         ])
 
         database = PowerSyncDatabaseImpl(
-            dbFilename: ":memory:",
+            identifier: ":memory:",
+            activeInstanceStore: DatabaseGroupCollection(),
             logger: DefaultLogger(),
             pool: AsyncConnectionPool(location: .inMemory),
             httpClient: PlatformHttpClient.shared,

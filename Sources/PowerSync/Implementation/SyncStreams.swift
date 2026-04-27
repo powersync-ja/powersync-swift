@@ -88,11 +88,11 @@ struct PendingSyncStream: SyncStream {
     }
     
     func subscribe(ttl: TimeInterval?, priority: BucketPriority?) async throws -> any SyncStreamSubscription {
-        return try await db.syncCoordinator.streams.subscribe(db: db, stream: self, ttl: ttl, priority: priority)
+        return try await db.group.syncCoordinator.streams.subscribe(db: db, stream: self, ttl: ttl, priority: priority)
     }
     
     func unsubscribeAll() async throws {
-        let tracker = db.syncCoordinator.streams
+        let tracker = db.group.syncCoordinator.streams
         let key = self.key
         tracker.removeStreamGroup(key: key)
         try await tracker.subscriptionsCommand(db: db, request: .unsubscribe(key))
@@ -125,7 +125,7 @@ final class SyncSubscriptionImplementation: SyncStreamSubscription {
     }
     
     deinit {
-        db.syncCoordinator.streams.decrementRefCount(key: key)
+        db.group.syncCoordinator.streams.decrementRefCount(key: key)
     }
 }
 

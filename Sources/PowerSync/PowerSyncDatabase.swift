@@ -16,14 +16,16 @@ public func PowerSyncDatabase(
     logger: (any LoggerProtocol) = DefaultLogger(),
     initialStatements: [String] = []
 ) -> PowerSyncDatabaseProtocol {
-    let location = if dbFilename == ":memory:" {
-        DatabaseLocation.inMemory
+    let (location, group) = if dbFilename == ":memory:" {
+        (DatabaseLocation.inMemory, DatabaseGroupCollection())
     } else {
-        DatabaseLocation.inDefaultDirectory(name: dbFilename)
+        (DatabaseLocation.inDefaultDirectory(name: dbFilename), .shared)
     }
     let pool = AsyncConnectionPool(location: location, initialStatements: initialStatements)
     return PowerSyncDatabaseImpl(
         dbFilename: dbFilename,
+        identifier: dbFilename,
+        activeInstanceStore: group,
         logger: logger,
         pool: pool,
         httpClient: PlatformHttpClient.shared,
@@ -53,6 +55,7 @@ public func OpenedPowerSyncDatabase(
     logger: (any LoggerProtocol) = DefaultLogger()
 ) -> PowerSyncDatabaseProtocol {
     return PowerSyncDatabaseImpl(
+        identifier: identifier,
         logger: logger,
         pool: pool,
         httpClient: PlatformHttpClient.shared,

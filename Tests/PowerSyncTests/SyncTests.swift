@@ -673,7 +673,8 @@ let defaultSchema = Schema(tables: [
 
 private func openDatabase(_ client: any HttpClient, schema: Schema = defaultSchema, logger: any LoggerProtocol = DefaultLogger()) -> PowerSyncDatabaseProtocol {
     return PowerSyncDatabaseImpl(
-        dbFilename: ":memory:",
+        identifier: ":memory:",
+        activeInstanceStore: DatabaseGroupCollection(),
         logger: logger,
         pool: AsyncConnectionPool(location: .inMemory),
         httpClient: client,

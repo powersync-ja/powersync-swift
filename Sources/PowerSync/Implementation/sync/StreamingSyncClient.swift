@@ -245,7 +245,7 @@ private struct ActiveSyncIteration: Sendable {
             parameters: syncClient.options.params,
             schema: await syncClient.db.schema.inner,
             includeDefaults: syncClient.options.includeDefaultStreams,
-            activeStreams: syncClient.db.syncCoordinator.streams.currentStreams,
+            activeStreams: syncClient.db.group.syncCoordinator.streams.currentStreams,
             appMetadata: syncClient.options.appMetadata,
         )))
 
@@ -357,7 +357,7 @@ private struct ActiveSyncIteration: Sendable {
     }
     
     private func watchSyncStreams() async throws {
-        let changes = syncClient.db.syncCoordinator.streams.streamsChanged.subscribe()
+        let changes = syncClient.db.group.syncCoordinator.streams.streamsChanged.subscribe()
         for await change in changes {
             self.localEvents.dispatch(event: .updateSubscriptions(streams: change))
         }
