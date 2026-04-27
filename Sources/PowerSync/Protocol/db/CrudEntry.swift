@@ -1,3 +1,5 @@
+import Foundation
+
 /// Represents the type of CRUD update operation that can be performed on a row.
 public enum UpdateType: String, Codable, Sendable {
     /// A row has been inserted or replaced
@@ -28,21 +30,21 @@ public enum UpdateType: String, Codable, Sendable {
 }
 
 /// Represents a CRUD (Create, Read, Update, Delete) entry in the system.
-public protocol CrudEntry: Sendable {
+public struct CrudEntry: Sendable {
     /// The unique identifier of the entry.
-    var id: String { get }
+    public let id: String
 
     /// The client ID associated with the entry.
-    var clientId: Int64 { get }
+    public let clientId: Int64
 
     /// The type of update operation performed on the entry.
-    var op: UpdateType { get }
+    public let op: UpdateType
 
     /// The name of the table where the entry resides.
-    var table: String { get }
+    public let table: String
 
     /// The transaction ID associated with the entry, if any.
-    var transactionId: Int64? { get }
+    public let transactionId: Int64?
 
     /// User-defined metadata that can be attached to writes.
     ///
@@ -51,13 +53,101 @@ public protocol CrudEntry: Sendable {
     ///
     /// Note that the `_metadata` column and this field are only available when ``Table/trackMetadata``
     /// is enabled.
-    var metadata: String? { get }
+    public let metadata: String?
 
     /// The operation data associated with the entry, represented as a dictionary of column names to their values.
-    var opData: [String: String?]? { get }
+    public let opDataTyped: JsonParam?
+
+    /// The operation data associated with the entry, represented as a dictionary of column names to their values.
+    ///
+    /// Consider using ``CrudEntry/opDataTyped`` instead, which provides values as typed JSON.
+    public var opData: [String: String?]? {
+        get {
+            opDataTyped?.mapValues { value in
+                do {
+                    return try CrudEntry.jsonValueToString(value)
+                } catch {
+                    return nil
+                }
+            }
+        }
+    }
 
     /// Previous values before this change.
     ///
     /// These values can be tracked for `UPDATE` statements when ``Table/trackPreviousValues`` is enabled.
-    var previousValues: [String: String?]? { get }
+    public let previousValuesTyped: JsonParam?
+
+    /// Previous values before this change.
+    ///
+    /// These values can be tracked for `UPDATE` statements when ``Table/trackPreviousValues`` is enabled.
+    ///
+    /// Consider using ``CrudEntry/previousValuesTyped`` instead, which provides values as typed JSON.
+    public var previousValues: [String: String?]? {
+        get {
+            previousValuesTyped?.mapValues { value in
+                do {
+                    return try CrudEntry.jsonValueToString(value)
+                } catch {
+                    return nil
+                }
+            }
+        }
+    }
+
+    private let nonExhaustive: Void // Prevent initialization outside of this package
+
+    internal static func fromCursor(cursor: borrowing SqlCursor) throws -> CrudEntry {
+        let id = try cursor.getInt64(index: 0)
+        let txId = cursor.getInt64Optional(index: 1)
+        let data = try cursor.getString(index: 2)
+
+        struct CrudJsonEntry: Decodable {
+            let id: String
+            let op: UpdateType
+            let data: JsonParam?
+            let type: String
+            let metadata: String?
+            let old: JsonParam?
+        }
+
+        let decoder = JSONDecoder()
+        guard let jsonData = data.data(using: .utf8) else {
+            throw PowerSyncError.operationFailed(message: "Invalid UTF-8 in CRUD entry")
+        }
+        let entry = try decoder.decode(CrudJsonEntry.self, from: jsonData)
+
+        return CrudEntry(
+            id: entry.id,
+            clientId: id,
+            op: entry.op,
+            table: entry.type,
+            transactionId: txId,
+            metadata: entry.metadata,
+            opDataTyped: entry.data,
+            previousValuesTyped: entry.old,
+            nonExhaustive: ()
+        )
+    }
+
+    private static func jsonValueToString(_ value: JsonValue?) throws -> String? {
+        // Older versions of the SDK were only able to export these values as strings, so we convert for
+        // backwards compatibility.
+        try value.flatMap { value in
+            switch (value) {
+            case .string(let value):
+                return value
+            case .int(let value):
+                return String(value)
+            case .double(let value):
+                return String(value)
+            case .bool(let value):
+                return String(value)
+            case .null:
+                return nil
+            case .array(_), .object(_):
+                throw PowerSyncError.operationFailed(message: "Invalid array/object in CRUD data, should be string")
+            }
+        }
+    }
 }
