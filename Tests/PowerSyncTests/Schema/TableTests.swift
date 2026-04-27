@@ -272,7 +272,8 @@ final class TableTests: XCTestCase {
       "columns" : [
         {
           "ascending" : true,
-          "name" : "name"
+          "name" : "name",
+          "type" : "text"
         }
       ],
       "name" : "test_index"

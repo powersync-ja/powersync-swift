@@ -440,5 +440,5 @@ struct WriteCheckpointResponse: Codable {
 }
 
 private func sleepForSeconds(seconds: TimeInterval) async throws {
-    try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_00))
+    try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
 }
