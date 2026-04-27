@@ -1,6 +1,5 @@
 import AsyncAlgorithms
 import Foundation
-import Synchronization
 
 fileprivate let tag = "StreamingSyncClient"
 
@@ -158,7 +157,7 @@ The next upload iteration will be delayed.
         while (!Task.isCancelled) {
             do {
                 // This async let ensures each iteration is a task scoped to this block. This allows us to spawn
-                // aditional tasks in run() that would get cancelled when the main iteration is complete.
+                // additional tasks in run() that would get cancelled when the main iteration is complete.
                 async let iteration = ActiveSyncIteration(syncClient: self, signals: signals).run()
                 
                 result = try await iteration
@@ -306,7 +305,10 @@ private struct ActiveSyncIteration: Sendable {
 
     private func powersyncControl(_ args: PowerSyncControlArguments) async throws -> [Instruction] {
         let rawInstructions = try await syncClient.db.writeTransaction { tx in try args.execute(tx) }
-        return try StreamingSyncClient.jsonDecoder.decode([Instruction].self, from: rawInstructions.data(using: .utf8)!)
+        guard let data = rawInstructions.data(using: .utf8) else {
+            throw PowerSyncError.operationFailed(message: "Could not encode raw instructions")
+        }
+        return try StreamingSyncClient.jsonDecoder.decode([Instruction].self, from: data)
     }
 
     private func execute(instr: consuming Instruction) async throws {
@@ -335,10 +337,13 @@ private struct ActiveSyncIteration: Sendable {
                 await syncClient.invalidateCredentials()
             } else {
                 Task {
-                    let _ = try await syncClient.connector.fetchCredentials(allowCached: false)
-                    syncClient.db.logger.debug("Stopping because new credentials are available", tag: tag)
-                    // Token has been refreshed, start another iteration
-                    localEvents.dispatch(event: .didRefreshToken)
+                    do {
+                        let _ = try await syncClient.connector.fetchCredentials(allowCached: false)
+                        syncClient.db.logger.debug("Stopping because new credentials are available", tag: tag)
+                        localEvents.dispatch(event: .didRefreshToken)
+                    } catch {
+                        syncClient.db.logger.warning("Pre-fetching credentials that are about to expire has failed: \(error)", tag: tag)
+                    }
                 }
             }
         case .flushFileSystem:
@@ -397,6 +402,7 @@ fileprivate enum ControlInvocationsFromStreamIterator: AsyncIteratorProtocol {
                 self = .eof
                 return .responseStreamEnd
             case .some(.text(contents: let contents)):
+                self = .isReceiving(iterator)
                 return .textLine(line: contents)
             }
         case .eof:

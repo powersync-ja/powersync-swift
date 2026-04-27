@@ -1,5 +1,3 @@
-import Synchronization
-
 /// Dispatches events to a number of listeners as an ``AsyncStream``.
 final class BroadcastStream<T: Sendable>: Sendable {
     private let listeners: Mutex<Set<BroadcastStreamListener<T>>> = Mutex([])

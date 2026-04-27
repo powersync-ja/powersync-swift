@@ -62,7 +62,10 @@ final class KotlinPowerSyncDatabaseImpl: PowerSyncDatabaseProtocol,
     private func resolveOfflineSyncStatus() async throws {
         let offlineSyncStatus = try await get("SELECT powersync_offline_sync_status()") { cursor in
             let raw = try cursor.getString(index: 0)
-            return try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: raw.data(using: .utf8)!)
+            guard let data = raw.data(using: .utf8) else {
+                throw PowerSyncError.operationFailed(message: "Could not encode offline sync status")
+            }
+            return try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: data)
         }
 
         syncStatus.mutateStatus { $0 = MutableSyncStatus(core: offlineSyncStatus) }

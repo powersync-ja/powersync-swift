@@ -1,5 +1,4 @@
 import Foundation
-import Synchronization
 
 /// The internal struct backing all sync status fields.
 /// 
@@ -84,7 +83,7 @@ fileprivate struct SyncStatusDataImpl: SyncStatusData {
     func statusForPriority(_ priority: BucketPriority) -> PriorityStatusEntry {
         for known in priorityStatusEntries {
             // Lower-priority buckets are synced after higher-priority buckets, and since priorityStatusEntries
-            // is sortedwe look for the first entry that doesn't have a higher priority.
+            // is sorted, we look for the first entry that doesn't have a higher priority.
             if known.priority <= priority {
                 return known
             }
@@ -95,7 +94,11 @@ fileprivate struct SyncStatusDataImpl: SyncStatusData {
     }
 
     func forStream(stream: any SyncStreamDescription) -> SyncStreamStatus? {
-        for found in syncStreams! {
+        guard let streams = syncStreams else {
+            return nil
+        }
+
+        for found in streams {
             if found.subscription.name == stream.name && found.subscription.parameters == stream.parameters {
                 return found
             }

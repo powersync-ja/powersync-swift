@@ -133,7 +133,7 @@ public struct ConnectOptions: Sendable {
         self.newClientImplementation = newClientImplementation
         self.clientConfiguration = clientConfiguration
         self.appMetadata = appMetadata
-        self.includeDefaultStreams = true
+        self.includeDefaultStreams = includeDefaultStreams
     }
 }
 

@@ -2,7 +2,6 @@ import AsyncAlgorithms
 import Foundation
 @testable import PowerSync
 import Testing
-import Synchronization
 
 final class MockHttpClient: HttpClient {
     private let _writeCheckpoint = PowerSync.Mutex(1000)
