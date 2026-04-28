@@ -64,7 +64,7 @@ public protocol SqlCursor {
     var columnNames: [String: Int] { get }
 }
 
-extension SqlCursor {
+public extension SqlCursor {
     private func withResolvedIndex<T>(name: String, read: (_ index: Int) throws(SqlCursorError) -> T) throws(SqlCursorError) -> T {
         if let index = self.columnNames[name] {
             do {
