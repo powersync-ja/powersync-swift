@@ -156,11 +156,11 @@ The next upload iteration will be delayed.
         
         while (!Task.isCancelled) {
             do {
-                // This async let ensures each iteration is a task scoped to this block. This allows us to spawn
-                // additional tasks in run() that would get cancelled when the main iteration is complete.
-                async let iteration = ActiveSyncIteration(syncClient: self, signals: signals).run()
-                
-                result = try await iteration
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    let iteration = ActiveSyncIteration(syncClient: self, signals: signals)
+                    var group: ThrowingTaskGroup<Void, any Error>? = group
+                    result = try await iteration.run(group: &group)
+                }
             } catch {
                 result = SyncIterationResult()
                 
@@ -234,7 +234,7 @@ private struct ActiveSyncIteration: Sendable {
         self.signals = signals
     }
     
-    func run() async throws -> SyncIterationResult {
+    func run(group: inout ThrowingTaskGroup<Void, any Error>?) async throws -> SyncIterationResult {
         // Notify the core extension for changed Sync Stream subscriptions, as we might have to reconnect.
         async let _ = watchSyncStreams()
         // Notify the core extension for completed crud uploads, as we might want to retry applying a
@@ -256,7 +256,7 @@ private struct ActiveSyncIteration: Sendable {
                 let serviceEvents = try await syncClient.fetchSyncLines(request: request)
                 controlArgs = AsyncAlgorithms.merge(serviceEvents, localEvents.subscribe())
             } else {
-                try await self.execute(instr: instruction)
+                try await self.execute(instr: instruction, group: &group)
             }
         }
 
@@ -273,7 +273,7 @@ private struct ActiveSyncIteration: Sendable {
                     return SyncIterationResult(hideDisconnect: hideDisconnect)
                 }
 
-                try await execute(instr: instr)
+                try await execute(instr: instr, group: &group)
             }
 
             if !hadSyncLine && arg.isSyncLine() {
@@ -296,7 +296,9 @@ private struct ActiveSyncIteration: Sendable {
                     return SyncIterationResult(hideDisconnect: hideDisconnect)
                 }
                 
-                try await execute(instr: instr)
+                // Don't pass the task group here, stop instructions shouldn't spawn further async work.
+                var group: ThrowingTaskGroup<Void, any Error>? = nil
+                try await execute(instr: instr, group: &group)
             }
 
             return SyncIterationResult()
@@ -311,7 +313,7 @@ private struct ActiveSyncIteration: Sendable {
         return try StreamingSyncClient.jsonDecoder.decode([Instruction].self, from: data)
     }
 
-    private func execute(instr: consuming Instruction) async throws {
+    private func execute(instr: consuming Instruction, group: inout ThrowingTaskGroup<Void, any Error>?) async throws {
         switch (instr) {
         case .logLine(severity: let severity, line: let line):
             let logger = syncClient.db.logger
@@ -336,7 +338,7 @@ private struct ActiveSyncIteration: Sendable {
             if didExpire {
                 await syncClient.invalidateCredentials()
             } else {
-                Task {
+                group?.addTask {
                     do {
                         let _ = try await syncClient.connector.fetchCredentials(allowCached: false)
                         syncClient.db.logger.debug("Stopping because new credentials are available", tag: tag)
