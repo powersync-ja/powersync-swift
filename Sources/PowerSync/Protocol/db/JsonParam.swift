@@ -2,7 +2,7 @@
 ///
 /// Supports all standard JSON types: string, number (integer and double),
 /// boolean, null, arrays, and nested objects.
-public enum JsonValue: Codable, Sendable, Equatable {
+public enum JsonValue: Codable, Sendable, Equatable, Hashable {
     /// A JSON string value.
     case string(String)
 

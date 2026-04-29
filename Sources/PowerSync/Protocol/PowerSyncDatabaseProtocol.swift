@@ -84,6 +84,10 @@ public struct ConnectOptions: Sendable {
     /// - SeeAlso: `SyncClientConfiguration` for available configuration options
     public var clientConfiguration: SyncClientConfiguration?
 
+    /// Whether streams that have been defined with `auto_subscribe: true` should be synced even
+    /// when they don't have an explicit subscription.
+    public var includeDefaultStreams: Bool
+
     /// Initializes a `ConnectOptions` instance with optional values.
     ///
     /// - Parameters:
@@ -96,7 +100,8 @@ public struct ConnectOptions: Sendable {
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
         clientConfiguration: SyncClientConfiguration? = nil,
-        appMetadata: [String: String] = [:]
+        appMetadata: [String: String] = [:],
+        includeDefaultStreams: Bool = true
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
@@ -104,6 +109,7 @@ public struct ConnectOptions: Sendable {
         newClientImplementation = true
         self.clientConfiguration = clientConfiguration
         self.appMetadata = appMetadata
+        self.includeDefaultStreams = includeDefaultStreams
     }
 
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
@@ -118,7 +124,8 @@ public struct ConnectOptions: Sendable {
         params: JsonParam = [:],
         newClientImplementation: Bool = true,
         clientConfiguration: SyncClientConfiguration? = nil,
-        appMetadata: [String: String] = [:]
+        appMetadata: [String: String] = [:],
+        includeDefaultStreams: Bool = true
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
@@ -126,6 +133,7 @@ public struct ConnectOptions: Sendable {
         self.newClientImplementation = newClientImplementation
         self.clientConfiguration = clientConfiguration
         self.appMetadata = appMetadata
+        self.includeDefaultStreams = includeDefaultStreams
     }
 }
 

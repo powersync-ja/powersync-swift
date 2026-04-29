@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents the priority of a bucket, used for sorting and managing operations based on priority levels.
-public struct BucketPriority: Comparable, Sendable {
+public struct BucketPriority: Comparable, Sendable, Codable {
     /// The priority code associated with the bucket. Higher values indicate lower priority.
     public let priorityCode: Int32
 
@@ -13,6 +13,17 @@ public struct BucketPriority: Comparable, Sendable {
         self.priorityCode = priorityCode
     }
 
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let code = try container.decode(Int32.self)
+        self.init(code)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(priorityCode)
+    }
+    
     /// Compares two `BucketPriority` instances to determine their order.
     /// - Parameters:
     ///   - lhs: The left-hand side `BucketPriority` instance.

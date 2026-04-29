@@ -39,10 +39,6 @@ public struct PowerSyncCredentials: Codable, Sendable {
         token = kotlin.token
     }
 
-    var kotlinCredentials: KotlinPowerSyncCredentials {
-        return KotlinPowerSyncCredentials(endpoint: endpoint, token: token, userId: nil)
-    }
-
     public func endpointUri(path: String) -> String {
         return "\(endpoint)/\(path)"
     }
