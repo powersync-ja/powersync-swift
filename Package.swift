@@ -39,17 +39,20 @@ if let kotlinSdkPath = localKotlinSdkOverride {
         ))
 }
 
-var corePackageName = "powersync-sqlite-core-swift"
+let coreTargetDependency: Target.Dependency
 if let corePath = localCoreExtension {
     conditionalDependencies.append(.package(path: corePath))
-    corePackageName = "powersync-sqlite-core"
+    coreTargetDependency = .product(name: "PowerSyncSQLiteCore", package: "PowerSyncSQLiteCore")
 } else {
     // Not using a local build, so download from releases
-    conditionalDependencies.append(
-        .package(
-            url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
-            exact: "0.4.13",
+    conditionalTargets.append(
+        .binaryTarget(
+            name: "powersync-sqlite-core",
+            url:
+            "https://github.com/powersync-ja/powersync-sqlite-core/releases/download/v0.4.14/powersync-sqlite-core.xcframework.zip",
+            checksum: "fd8d627a16ee95375cf26d8e4b4365d872c066b825869a77e198fff29727b351"
         ))
+    coreTargetDependency = .target(name: "powersync-sqlite-core")
 }
 
 let package = Package(
@@ -93,7 +96,7 @@ let package = Package(
             name: packageName,
             dependencies: [
                 kotlinTargetDependency,
-                .product(name: "PowerSyncSQLiteCore", package: corePackageName),
+                coreTargetDependency,
                 .product(name: "CSQLite", package: "CSQLite"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ]
