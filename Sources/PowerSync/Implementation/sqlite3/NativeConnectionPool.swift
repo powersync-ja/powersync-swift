@@ -68,7 +68,7 @@ final class NativeConnectionPool: Sendable {
         return result
     }
     
-    func withAllConnections<T>(onConnection: (NativeConnectionLease, [NativeConnectionLease]) async throws -> T) async throws -> T{
+    func withAllConnections<T>(onConnection: (NativeConnectionLease, [NativeConnectionLease]) async throws -> T) async throws -> T {
         let write = try await writer.acquire(count: 1)
         let writeLease = write.acquiredItems[0].asLease()
         defer { dispatchWrites(lease: writeLease) }
@@ -134,6 +134,8 @@ struct RawSqliteConnection: ~Copyable {
     }
 }
 
+// We mark this as Sendable because it's only used in a mutex from `ConnectionLeaseContext`.
+// We can't generally assume SQLite connections to be thread-safe.
 struct NativeConnectionLease: SQLiteConnectionLease, @unchecked Sendable {
     let pointer: OpaquePointer
 

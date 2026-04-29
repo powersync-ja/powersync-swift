@@ -125,7 +125,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
         }
     }
 
-    func write<T>(onConnection: @escaping @Sendable (any SQLiteConnectionLease) throws -> T) async throws -> T{
+    func write<T>(onConnection: @escaping @Sendable (any SQLiteConnectionLease) throws -> T) async throws -> T {
         let pool = try await obtainInner()
         return try await pool.write { connection in
             try await runBlocking { try onConnection(connection) }

@@ -5,6 +5,9 @@
 * Add `opDataTyped` and `previousValuesTyped` to `CrudEntry`, providing typed values instead of strings.
 * Make `CrudBatch`, `CrudEntry` and `CrudTransaction` a concrete struct. Note that these can no longer be created in user code.
 * Remove the internal `withSession` API.
+* Remove internal dependency on the PowerSync Kotlin SDK. Going forward, the Swift SDK is implemented in Swift!
+* Breaking (for internal `SQLiteConnectionPoolProtocol` implementers): Make callbacks generic.
+* Breaking (for internal `SQLiteConnectionLease` implementers): Add methods to run statements.
 
 ## 1.13.1
 

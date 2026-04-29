@@ -37,7 +37,10 @@ struct NativeSqliteStatement: ~Copyable {
     }
 
     var columnNames: [String : Int] {
-        return resolvedColumnNames!
+        guard let resolvedColumnNames else {
+            fatalError("columnNames is only available after step()")
+        }
+        return resolvedColumnNames
     }
     
     borrowing func bindValues(_ parameters: [PowerSyncDataType?]) throws(PowerSyncError) {
@@ -79,17 +82,21 @@ struct NativeSqliteStatement: ~Copyable {
         case .double(let value):
             rc = sqlite3_bind_double(self.stmt, index, value)
         case .data(let value):
-            // Data object can be made up of multiple memory regions, so copy once.
-            let buffer = malloc(value.count)!
-            value.copyBytes(to: buffer.assumingMemoryBound(to: UInt8.self), count: value.count)
+            if value.count == 0 {
+                rc = sqlite3_bind_zeroblob(self.stmt, index, 0)
+            } else {
+                // Data object can be made up of multiple memory regions, so copy once.
+                let buffer = malloc(value.count)!
+                value.copyBytes(to: buffer.assumingMemoryBound(to: UInt8.self), count: value.count)
 
-            rc = sqlite3_bind_blob(
-                self.stmt,
-                index,
-                buffer,
-                Int32(value.count),
-                free,
-            )
+                rc = sqlite3_bind_blob(
+                    self.stmt,
+                    index,
+                    buffer,
+                    Int32(value.count),
+                    free,
+                )
+            }
         }
 
         if rc != 0 {
