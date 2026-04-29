@@ -6,6 +6,7 @@ import DequeModule
 ///
 /// This class does not configure or open connections (that is the responsibility of ``AsyncConnectionPool``).
 final class NativeConnectionPool: Sendable {
+    // This could be an async mutex, but AsyncSemaphore has better cancellation support.
     private let writer: AsyncSemaphore<RawSqliteConnection>
     private let readers: AsyncSemaphore<RawSqliteConnection>?
     private let handleUpdates: @Sendable (_: Set<String>) -> ()

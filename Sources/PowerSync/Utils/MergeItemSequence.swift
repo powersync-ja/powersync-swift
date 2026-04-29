@@ -1,4 +1,9 @@
-/// An ``AsyncSequence`` merging all items emitted between ``AsyncIteratorProtocol/next``.
+/// An ``AsyncSequence`` merging all items emitted between calls to ``AsyncIteratorProtocol/next``.
+/// 
+/// This is useful for sequences where we just want to know that an event has occurred, without needing
+/// to know about the exact event. We use this internally to implement `watch()` queries with a throttle:
+/// If any amount of events have occurred between throttled calls to `next()`, we want to dispatch a single
+/// event.
 struct MergeItemSequence<Base: AsyncSequence & Sendable>: AsyncSequence where Base.Element == () {
     typealias AsyncIterator = IteratorImpl
     typealias Element = ()

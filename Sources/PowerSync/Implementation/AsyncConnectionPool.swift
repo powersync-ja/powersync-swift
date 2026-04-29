@@ -61,18 +61,19 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
     private let initialStatements: [String]
     private let logger: any LoggerProtocol
     private let tableUpdatesStream = BroadcastStream<Set<String>>()
-    private let inner: AsyncSemaphore<NativeConnectionPool?> = AsyncSemaphore(singleElement: nil)
+    private let opener = PoolOpener()
 
     init(location: DatabaseLocation, logger: any LoggerProtocol, initialStatements: [String] = []) {
         self.location = location
         self.logger = logger
         self.initialStatements = initialStatements
     }
-    
+
     var tableUpdates: AsyncStream<Set<String>> {
         tableUpdatesStream.subscribe()
     }
-    
+
+    /// Asyncifies a synchronous unit of work on by running it on a suitable background thread.
     private func runBlocking<T>(action: @escaping @Sendable () throws -> T, qos: DispatchQoS.QoSClass = .userInitiated) async throws -> T {
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: qos).async {
@@ -80,7 +81,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
             }
         }
     }
-    
+
     private func configureConnection(connection: borrowing RawSqliteConnection, isWriter: Bool) throws {
         let context = connection.asLease()
         for stmt in initialStatements {
@@ -111,40 +112,10 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
             let _ = try context.execute(sql: "select powersync_update_hooks('install')", parameters: [])
         }
     }
-    
+
+    /// Opens connections on a background thread to obtain the native connection pool.
     private func obtainInner() async throws -> NativeConnectionPool {
-        var lease = try await inner.acquire(count: 1)
-        if let pool = lease.acquiredItems[0] {
-            return pool
-        } else {
-            try registerPowerSyncCoreExtension()
-
-            @Sendable func handleUpdates(_ updates: Set<String>) {
-                self.tableUpdatesStream.dispatch(event: updates)
-            }
-            
-            let pool = try await runBlocking { [self] in
-                let writer = try location.openConnection(writer: true)
-                try configureConnection(connection: writer, isWriter: true)
-
-                if case .inMemory = location {
-                    return NativeConnectionPool(singleConnection: writer, logger: logger, handleUpdates: handleUpdates)
-                } else {
-                    let numReaders = 4
-                    var readers = RigidDeque<RawSqliteConnection>(capacity: numReaders)
-                    while !readers.isFull {
-                        let connection = try location.openConnection(writer: false)
-                        try configureConnection(connection: connection, isWriter: false)
-                        readers.append(connection)
-                    }
-
-                    return NativeConnectionPool(writer: writer, readers: readers, logger: logger, handleUpdates: handleUpdates)
-                }
-            }
-            
-            lease.acquiredItems[0] = pool
-            return pool
-        }
+        try await opener.obtainPool(pool: self)
     }
 
     func read<T>(onConnection: @escaping @Sendable (any SQLiteConnectionLease) throws -> T) async throws -> T {
@@ -160,7 +131,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
             try await runBlocking { try onConnection(connection) }
         }
     }
-    
+
     func withAllConnections<T>(onConnection: @escaping @Sendable (any SQLiteConnectionLease, [any SQLiteConnectionLease]) throws -> T) async throws -> T {
         let pool = try await obtainInner()
         return try await pool.withAllConnections { writer, readers in
@@ -169,10 +140,55 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
     }
 
     func close() async throws {
-        var lease = try await inner.acquire(count: 1)
-        if let pool = lease.acquiredItems[0] {
-            try await pool.close()
-            lease.acquiredItems[0] = nil
+        try await self.opener.close()
+    }
+
+    private actor PoolOpener {
+        private var pool: NativeConnectionPool? = nil
+        private var isClosed = false
+
+        func obtainPool(pool context: AsyncConnectionPool) async throws -> NativeConnectionPool {
+            if let pool {
+                return pool
+            }
+
+            try registerPowerSyncCoreExtension()
+            let handleUpdates: @Sendable (_: Set<String>) -> () = { [weak context] updates in
+                context?.tableUpdatesStream.dispatch(event: updates)
+            }
+
+            let pool = try await context.runBlocking {
+                let writer = try context.location.openConnection(writer: true)
+                try context.configureConnection(connection: writer, isWriter: true)
+
+                if case .inMemory = context.location {
+                    return NativeConnectionPool(singleConnection: writer, logger: context.logger, handleUpdates: handleUpdates)
+                } else {
+                    let numReaders = 4
+                    var readers = RigidDeque<RawSqliteConnection>(capacity: numReaders)
+                    while !readers.isFull {
+                        let connection = try context.location.openConnection(writer: false)
+                        try context.configureConnection(connection: connection, isWriter: false)
+                        readers.append(connection)
+                    }
+
+                    return NativeConnectionPool(writer: writer, readers: readers, logger: context.logger, handleUpdates: handleUpdates)
+                }
+            }
+
+            self.pool = pool
+            return pool
+        }
+
+        func close() async throws {
+            if isClosed {
+                return
+            }
+
+            isClosed = true
+            if let pool {
+                try await pool.close()
+            }
         }
     }
 }

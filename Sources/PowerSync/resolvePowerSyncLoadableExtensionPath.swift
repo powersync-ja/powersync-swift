@@ -5,7 +5,7 @@
 /// function invokes `sqlite3_auto_extension` to load the core extension automatically.
 ///
 /// - Returns: `nil`
-/// - Throws: An error if the extension could not be registered watchOS.
+/// - Throws: An error if the extension could not be registered.
 public func resolvePowerSyncLoadableExtensionPath() throws(PowerSyncError) -> String? {
     try registerPowerSyncCoreExtension()
     return nil

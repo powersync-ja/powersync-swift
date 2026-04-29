@@ -35,13 +35,12 @@ struct NativeSqliteStatement: ~Copyable {
     var columnCount: Int {
         return Int(sqlite3_column_count(self.stmt))
     }
-    
-    
+
     var columnNames: [String : Int] {
         return resolvedColumnNames!
     }
     
-    borrowing func bindValues(_ parameters: [PowerSyncDataType?]) throws (PowerSyncError) {
+    borrowing func bindValues(_ parameters: [PowerSyncDataType?]) throws(PowerSyncError) {
         for (i, parameter) in parameters.enumerated() {
             let index = Int32(i + 1)
 
@@ -53,7 +52,7 @@ struct NativeSqliteStatement: ~Copyable {
         }
     }
     
-    borrowing func bindValue(_ index: Int32, _ parameter: PowerSyncDataType?) throws (PowerSyncError) {
+    borrowing func bindValue(_ index: Int32, _ parameter: PowerSyncDataType?) throws(PowerSyncError) {
         let rc: Int32
         
         switch parameter {
@@ -98,7 +97,7 @@ struct NativeSqliteStatement: ~Copyable {
         }
     }
     
-    mutating func step() throws (PowerSyncError) -> Bool {
+    mutating func step() throws(PowerSyncError) -> Bool {
         let rc = sqlite3_step(self.stmt)
         if rc == SQLITE_DONE {
             return false
