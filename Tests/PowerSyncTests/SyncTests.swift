@@ -1,4 +1,5 @@
 import AsyncAlgorithms
+import Foundation
 @testable import PowerSync
 import Testing
 
@@ -226,7 +227,37 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { $0.connected }
         try #require(await connector.fetchCredentialsCalls == 2)
     }
-    
+
+    @Test func handlesThrowing401Response() async throws {
+        final actor BackendConnector: PowerSyncBackendConnectorProtocol {
+            var fetchCredentialsCalls = 0
+
+            func fetchCredentials() async throws -> PowerSyncCredentials? {
+                fetchCredentialsCalls += 1
+                return testCredentials
+            }
+
+            func uploadData(database: any PowerSyncDatabaseProtocol) async throws {}
+        }
+
+        let connector = BackendConnector()
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpClient { request in
+            if await connector.fetchCredentialsCalls == 1 {
+                // On a real 401 response, the platform client would throw because the body can't be interpreted as sync lines.
+                // This verifies the sync client can recognize that and reset credentials.
+                let response = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!
+                throw UnexpectedResponseError(response: response, message: "Expected error to retry fetching credentials")
+            } else {
+                return channel
+            }
+        })
+
+        try await db.connect(connector: connector, options: ConnectOptions(retryDelay: 0))
+        await waitForStatus(db.currentStatus) { $0.connected }
+        try #require(await connector.fetchCredentialsCalls == 2)
+    }
+
     @Test func tokenThrows() async throws {
         actor BackendConnector: PowerSyncBackendConnectorProtocol {
             var isFirstFetchCall = true

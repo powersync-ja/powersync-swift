@@ -9,10 +9,21 @@ import Foundation
 /// a general-purpose HTTP client. 
 protocol HttpClient: Sendable {
     /// Start streaming a `/sync/stream` response body, emitting individual lines.
+    ///
+    /// Throws an ``UnexpectedResponseError`` if the response can't be interpreted as sync lines.
     func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any SyncLineResponse)
 
     /// Read a full response body.
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data)
+}
+
+struct UnexpectedResponseError: Error, CustomDebugStringConvertible {
+    let response: HTTPURLResponse
+    let message: String
+    
+    var debugDescription: String {
+        message
+    }
 }
 
 protocol SyncLineResponse: Sendable, AsyncSequence where AsyncIterator: SyncLineResponseIterator {}
@@ -31,11 +42,15 @@ struct PlatformHttpClient: HttpClient {
     let session: URLSession
     
     func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any SyncLineResponse) {
-        let (bytes, response) = try await session.bytes(for: request)
+        let (bytes, originalResponse) = try await session.bytes(for: request)
+        let response = originalResponse as! HTTPURLResponse
         let jsonStreamMimeType = "application/x-ndjson"
-        
+
         if response.mimeType != jsonStreamMimeType {
-            throw PowerSyncError.operationFailed(message: "Invalid sync lines response, (expected \(jsonStreamMimeType), got \(response.mimeType, default: "")")
+            throw UnexpectedResponseError(
+                response: response,
+                message: "Invalid sync lines response, (expected \(jsonStreamMimeType), got \(response.mimeType, default: "")"
+            )
         }
 
         struct PlatformSyncLineResponse<Base>: SyncLineResponse where Base : AsyncSequence, Base.Element == UInt8, Base: Sendable {
@@ -57,7 +72,7 @@ struct PlatformHttpClient: HttpClient {
             }
         }
 
-        return (response as! HTTPURLResponse, PlatformSyncLineResponse(lines: bytes.lines))
+        return (response, PlatformSyncLineResponse(lines: bytes.lines))
     }
     
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data) {

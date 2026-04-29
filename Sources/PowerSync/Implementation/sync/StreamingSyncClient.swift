@@ -38,7 +38,8 @@ final class StreamingSyncClient: Sendable {
 
     private func uploadLoop(signals: SyncSignals) async throws {
         // TODO: Replace with better watch mechanism once we've dropped the Kotlin dependency and can use onChange.
-        let watch = try db.watch(sql: "SELECT 1 FROM ps_crud LIMIT 1", parameters: [], mapper: { _ in () })
+        let options = WatchOptions(sql: "SELECT 1 FROM ps_crud LIMIT 1", throttle: options.crudThrottle, mapper: { _ in ()})
+        let watch = try db.watch(options: options)
             .dropFirst() // Skip initial result, we just want to watch changes
             .map { _ in () }
         let allTriggers = AsyncAlgorithms.merge(watch, signals.signalCrudUpload.subscribe())
@@ -131,7 +132,13 @@ The next upload iteration will be delayed.
             try tx.execute(sql: "UPDATE ps_buckets SET target_op = CAST(? AS INTEGER) WHERE name = '$local'", parameters: [opId])
         }
     }
-    
+
+    private func handleCommonResponseErrors(response: HTTPURLResponse) async {
+        if response.statusCode == 401 {
+            await self.invalidateCredentials()
+        }
+    }
+
     private func getWriteCheckpoint() async throws -> String {
         let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
         let (_, request) = try await authenticatedRequest { endpoint in
@@ -139,10 +146,7 @@ The next upload iteration will be delayed.
             endpoint.queryItems = [.init(name: "client_id", value: clientId)]
         }
         let (response, data) = try await httpClient.readFully(request: request)
-        
-        if response.statusCode == 401 {
-            await self.invalidateCredentials()
-        }
+        await self.handleCommonResponseErrors(response: response)
         if response.statusCode != 200 {
             throw PowerSyncError.operationFailed(message: "Error getting write checkpoint: \(response.statusCode)")
         }
@@ -209,14 +213,23 @@ The next upload iteration will be delayed.
         httpRequest.setValue("application/x-ndjson", forHTTPHeaderField: "Accept")
         httpRequest.httpBody = try StreamingSyncClient.jsonEncoder.encode(request)
         
-        let (response, stream) = try await httpClient.receiveSyncLines(request: httpRequest)
-        if response.statusCode == 401 {
-            await invalidateCredentials()
+        let response: HTTPURLResponse
+        let stream: any SyncLineResponse
+        do {
+            (response, stream) = try await httpClient.receiveSyncLines(request: httpRequest)
+        } catch {
+            if let responseError = error as? UnexpectedResponseError {
+                await handleCommonResponseErrors(response: responseError.response)
+            }
+
+            throw error
         }
+
+        await handleCommonResponseErrors(response: response)
         if response.statusCode != 200 {
             throw PowerSyncError.operationFailed(message: "POST \(url) failed with status code \(response.statusCode)")
         }
-        
+
         return ControlInvocationsFromStream(sequence: stream)
     }
     
