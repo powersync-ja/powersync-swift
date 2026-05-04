@@ -1,6 +1,8 @@
 import Foundation
 
 /// A lease representing a temporarily borrowed SQLite connection from the pool.
+/// 
+/// This is an internal protocol and should not be implemented outside of the PowerSync SDK.
 public protocol SQLiteConnectionLease {
     /// Pointer to the underlying SQLite connection.
     /// This pointer should not be used outside of the closure which provided the lease.
@@ -9,6 +11,8 @@ public protocol SQLiteConnectionLease {
 
 /// An implementation of a connection pool providing asynchronous access to a single writer and multiple readers.
 /// This is the underlying pool implementation on which the higher-level PowerSync Swift SDK is built on.
+/// 
+/// This is an internal protocol and should not be implemented outside of the PowerSync SDK.
 public protocol SQLiteConnectionPoolProtocol: Sendable {
     var tableUpdates: AsyncStream<Set<String>> { get }
 
