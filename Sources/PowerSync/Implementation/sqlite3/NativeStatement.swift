@@ -125,4 +125,18 @@ struct NativeSqliteStatement: ~Copyable {
             try throwDatabaseError(db: self.db, sql: self.sql)
         }
     }
+    
+    mutating func stepWithCursor<T>(callback: (any SqlCursor) throws -> T) throws -> T? {
+        if try step() {
+            // Turn the static ~Copyable lifetime into a dynamic lifetime with explicit
+            // invalidation.
+            return try withUnsafePointer(to: self) { ptr in
+                let cursor = StatementCursor(ptr)
+                defer { cursor.invalidate() }
+                return try callback(cursor)
+            }
+        } else {
+            return nil
+        }
+    }
 }

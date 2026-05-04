@@ -102,9 +102,9 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
         if isWriter {
             // Older versions of the SDK used to set up an empty schema and raise the user version to 1.
             // Keep doing that for consistency.
-            let version = try context.withIterator(sql: "pragma user_version", parameters: []) { rows in
-                try rows.next { try $0.getInt(index: 0) }
-            }
+            var stmt = try context.iterate(sql: "pragma user_version", parameters: [])
+            let version = try stmt.stepWithCursor { try $0.getInt(index: 0) }
+            let _ = consume stmt
             if let version, version < 1 {
                 let _ = try context.execute(sql: "pragma user_version = 1", parameters: [])
             }

@@ -2,10 +2,12 @@
 
 ## 1.14.0 (unreleased)
 
+* Remove internal dependency on the PowerSync Kotlin SDK. Going forward, the Swift SDK is implemented in Swift!
+  __Important__: While these changes are tested, they are a full rewrite of the internal connection pool logic.
+  Please also test queries in your app after upgrading.
 * Add `opDataTyped` and `previousValuesTyped` to `CrudEntry`, providing typed values instead of strings.
 * Make `CrudBatch`, `CrudEntry` and `CrudTransaction` a concrete struct. Note that these can no longer be created in user code.
 * Remove the internal `withSession` API.
-* Remove internal dependency on the PowerSync Kotlin SDK. Going forward, the Swift SDK is implemented in Swift!
 * Breaking (for internal `SQLiteConnectionPoolProtocol` implementers): Make callbacks generic.
 * Breaking (for internal `SQLiteConnectionLease` implementers): Add methods to run statements.
 

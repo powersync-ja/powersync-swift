@@ -31,31 +31,31 @@ final class ConnectionLeaseContext: ConnectionContext {
 
     func getOptional<RowType>(sql: String, parameters: [(any Sendable)?]?, mapper: @escaping @Sendable (any SqlCursor) throws -> RowType) throws -> RowType? {
         try lease.withLock { lease in
-            try lease.withIterator(sql: sql, parameters: mapParameters(parameters)) { rows in
-                return try rows.next(callback: mapper)
-            }
+            var stmt = try lease.iterate(sql: sql, parameters: mapParameters(parameters))
+            return try stmt.stepWithCursor(callback: mapper)
         }
     }
     
     func getAll<RowType>(sql: String, parameters: [(any Sendable)?]?, mapper: @escaping @Sendable (any SqlCursor) throws -> RowType) throws -> [RowType] {
         try lease.withLock { lease in
-            try lease.withIterator(sql: sql, parameters: mapParameters(parameters)) { rows in
-                var result: [RowType] = []
-                while let row = try rows.next(callback: mapper) {
-                    result.append(row)
-                }
-                return result
+            var stmt = try lease.iterate(sql: sql, parameters: mapParameters(parameters))
+            var result: [RowType] = []
+
+            while let row = try stmt.stepWithCursor(callback: mapper) {
+                result.append(row)
             }
+            return result
         }
     }
     
     func get<RowType>(sql: String, parameters: [(any Sendable)?]?, mapper: @escaping @Sendable (any SqlCursor) throws -> RowType) throws -> RowType {
         try lease.withLock { lease in
-            try lease.withIterator(sql: sql, parameters: mapParameters(parameters)) { rows in
-                guard let cursor = try rows.next(callback: mapper) else {
-                    throw PowerSyncError.operationFailed(message: "Expected \(sql) to return a row, but got an empty result set.")
-                }
-                return cursor
+            var stmt = try lease.iterate(sql: sql, parameters: mapParameters(parameters))
+
+            if let row = try stmt.stepWithCursor(callback: mapper) {
+                return row
+            } else {
+                throw PowerSyncError.operationFailed(message: "Expected \(sql) to return a row, but got an empty result set.")
             }
         }
     }

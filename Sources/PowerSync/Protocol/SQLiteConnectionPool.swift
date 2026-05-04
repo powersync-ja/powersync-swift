@@ -5,15 +5,6 @@ public protocol SQLiteConnectionLease {
     /// Pointer to the underlying SQLite connection.
     /// This pointer should not be used outside of the closure which provided the lease.
     var pointer: OpaquePointer { borrowing get }
-
-    /// Executes an SQL statement and returns the amount of rows affected.
-    func execute(sql: String, parameters: [PowerSyncDataType?]) throws -> Int64
-
-    func withIterator<T>(sql: String, parameters: [PowerSyncDataType?], callback: (_: SQLiteStatementIteratorProtocol) throws -> T) throws -> T
-}
-
-public protocol SQLiteStatementIteratorProtocol {
-    func next<T>(callback: (_ cursor: SqlCursor) throws -> T) throws -> T?
 }
 
 /// An implementation of a connection pool providing asynchronous access to a single writer and multiple readers.

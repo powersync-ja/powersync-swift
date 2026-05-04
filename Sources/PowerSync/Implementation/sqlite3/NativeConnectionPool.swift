@@ -37,15 +37,14 @@ final class NativeConnectionPool: Sendable {
 
     private func dispatchWrites(lease: NativeConnectionLease) {
         do {
-            try lease.withIterator(sql: "SELECT powersync_update_hooks('get')", parameters: []) { rows in
-                let affectedTables = try rows.next {
-                    let decoder = JSONDecoder()
-                    return try decoder.decode(Set<String>.self, from: try $0.getString(index: 0).data(using: .utf8)!)
-                }
+            var stmt = try lease.iterate(sql: "SELECT powersync_update_hooks('get')", parameters: [])
+            let affectedTables = try stmt.stepWithCursor {
+                let decoder = JSONDecoder()
+                return try decoder.decode(Set<String>.self, from: try $0.getString(index: 0).data(using: .utf8)!)
+            }
 
-                if let affectedTables, !affectedTables.isEmpty {
-                    self.handleUpdates(affectedTables)
-                }
+            if let affectedTables, !affectedTables.isEmpty {
+                self.handleUpdates(affectedTables)
             }
         } catch {
             logger.warning("Could not read affected tables", tag: "NativeConnectionPool")
@@ -138,39 +137,4 @@ struct RawSqliteConnection: ~Copyable {
 // We can't generally assume SQLite connections to be thread-safe.
 struct NativeConnectionLease: SQLiteConnectionLease, @unchecked Sendable {
     let pointer: OpaquePointer
-
-    func execute(sql: String, parameters: [PowerSyncDataType?]) throws -> Int64 {
-        do {
-            var stmt = try NativeSqliteStatement(db: pointer, sql: sql)
-            try stmt.bindValues(parameters)
-            while try stmt.step() {
-                // Iterate through the statement.
-            }
-        }
-
-        return sqlite3_changes64(pointer)
-    }
-
-    func withIterator<T>(sql: String, parameters: [PowerSyncDataType?], callback: (SQLiteStatementIteratorProtocol) throws -> T) throws -> T {
-        var stmt = try NativeSqliteStatement(db: pointer, sql: sql)
-        try stmt.bindValues(parameters)
-        return try withUnsafeMutablePointer(to: &stmt) { ptr in
-            let iterator = NativeStatementIterator(stmt: ptr)
-            return try callback(iterator)
-        }
-    }
-}
-
-private struct NativeStatementIterator: SQLiteStatementIteratorProtocol {
-    var stmt: UnsafeMutablePointer<NativeSqliteStatement>
-    
-    func next<T>(callback: (any SqlCursor) throws -> T) throws -> T? {
-        if try stmt.pointee.step() {
-            let cursor = StatementCursor(stmt)
-            defer { cursor.invalidate() }
-            return try callback(cursor)
-        } else {
-            return nil
-        }
-    }
 }

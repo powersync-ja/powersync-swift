@@ -51,11 +51,24 @@ actor GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> T
     ) async throws -> T {
         // Don't start an explicit transaction, we do this internally
-        return try await pool.writeWithoutTransaction { database in
-            return try onConnection(
-                GRDBConnectionLease(database: database)
-            )
+        let (result, updates) = try await pool.writeWithoutTransaction { database in
+            try collectWrites(db: database.sqliteConnection!) {
+                try onConnection(GRDBConnectionLease(database: database))
+            }
         }
+
+        if !updates.isEmpty {
+            tableUpdatesContinuation?.yield(updates)
+
+            // Notify GRDB, this needs to be a write (transaction)
+            try await pool.write { database in
+                // Notify GRDB about these changes
+                for table in updates {
+                    try database.notifyChanges(in: Table(table))
+                }
+            }
+        }
+        return result
     }
 
     func withAllConnections<T: Sendable>(
