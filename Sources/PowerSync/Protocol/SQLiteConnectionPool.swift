@@ -1,3 +1,4 @@
+import CSQLite
 import Foundation
 
 /// A lease representing a temporarily borrowed SQLite connection from the pool.
@@ -7,6 +8,49 @@ public protocol SQLiteConnectionLease {
     /// Pointer to the underlying SQLite connection.
     /// This pointer should not be used outside of the closure which provided the lease.
     var pointer: OpaquePointer { borrowing get }
+
+    /// Executes a SQL statement, returning the amount of affected rows.
+    func execute(sql: String, parameters: [PowerSyncDataType?]) throws -> Int64
+
+    /// Prepares a statement from the SQL text and parameters, then invokes callback with a cursor.
+    func withIterator<T>(sql: String, parameters: [PowerSyncDataType?], callback: (SQLiteStatementIteratorProtocol) throws -> T) throws -> T
+}
+
+extension SQLiteConnectionLease {
+    /// Default implementation of ``execute(sql:parameters:)`` based on raw sqlite3 APIs.
+    public func execute(sql: String, parameters: [PowerSyncDataType?]) throws -> Int64 {
+        do {
+            var stmt = try NativeSqliteStatement(db: pointer, sql: sql)
+            try stmt.bindValues(parameters)
+            while try stmt.step() {
+                // Iterate through the statement.
+            }
+        }
+
+        return sqlite3_changes64(pointer)
+    }
+
+    /// Default implementation of ``withIterator(sql:parameters:callback:)`` based on raw sqlite3 APIs.
+    public func withIterator<T>(sql: String, parameters: [PowerSyncDataType?], callback: (SQLiteStatementIteratorProtocol) throws -> T) throws -> T {
+        var stmt = try NativeSqliteStatement(db: pointer, sql: sql)
+        try stmt.bindValues(parameters)
+        return try withUnsafeMutablePointer(to: &stmt) { ptr in
+            let iterator = NativeStatementIterator(stmt: ptr)
+            return try callback(iterator)
+        }
+    }
+}
+
+private struct NativeStatementIterator: SQLiteStatementIteratorProtocol {
+    var stmt: UnsafeMutablePointer<NativeSqliteStatement>
+    
+    func next<T>(callback: (any SqlCursor) throws -> T) throws -> T? {
+        return try stmt.pointee.stepWithCursor(callback: callback)
+    }
+}
+
+public protocol SQLiteStatementIteratorProtocol {
+    func next<T>(callback: (_ cursor: SqlCursor) throws -> T) throws -> T?
 }
 
 /// An implementation of a connection pool providing asynchronous access to a single writer and multiple readers.

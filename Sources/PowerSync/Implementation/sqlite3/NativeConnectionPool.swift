@@ -37,14 +37,15 @@ final class NativeConnectionPool: Sendable {
 
     private func dispatchWrites(lease: NativeConnectionLease) {
         do {
-            var stmt = try lease.iterate(sql: "SELECT powersync_update_hooks('get')", parameters: [])
-            let affectedTables = try stmt.stepWithCursor {
-                let decoder = JSONDecoder()
-                return try decoder.decode(Set<String>.self, from: try $0.getString(index: 0).data(using: .utf8)!)
-            }
+            try lease.withIterator(sql: "SELECT powersync_update_hooks('get')", parameters: []) { rows in
+                let affectedTables = try rows.next {
+                    let decoder = JSONDecoder()
+                    return try decoder.decode(Set<String>.self, from: try $0.getString(index: 0).data(using: .utf8)!)
+                }
 
-            if let affectedTables, !affectedTables.isEmpty {
-                self.handleUpdates(affectedTables)
+                if let affectedTables, !affectedTables.isEmpty {
+                    self.handleUpdates(affectedTables)
+                }
             }
         } catch {
             logger.warning("Could not read affected tables", tag: "NativeConnectionPool")
