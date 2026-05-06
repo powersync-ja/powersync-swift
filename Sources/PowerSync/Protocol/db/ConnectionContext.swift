@@ -27,7 +27,7 @@ public protocol ConnectionContext: Sendable {
 
      - Throws: PowerSyncError if the query fails
      */
-    func getOptional<RowType: Sendable>(
+    func getOptional<RowType>(
         sql: String,
         parameters: [Sendable?]?,
         mapper: @Sendable @escaping (SqlCursor) throws -> RowType
@@ -45,7 +45,7 @@ public protocol ConnectionContext: Sendable {
 
      - Throws: PowerSyncError if the query fails
      */
-    func getAll<RowType: Sendable>(
+    func getAll<RowType>(
         sql: String,
         parameters: [Sendable?]?,
         mapper: @Sendable @escaping (SqlCursor) throws -> RowType
@@ -63,7 +63,7 @@ public protocol ConnectionContext: Sendable {
 
      - Throws: PowerSyncError if the query fails or no result is found
      */
-    func get<RowType: Sendable>(
+    func get<RowType>(
         sql: String,
         parameters: [Sendable?]?,
         mapper: @Sendable @escaping (SqlCursor) throws -> RowType

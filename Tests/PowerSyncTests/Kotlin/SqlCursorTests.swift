@@ -65,10 +65,13 @@ final class SqlCursorTests: XCTestCase {
             ])
         ])
 
-        database = openKotlinDBDefault(
+        database = PowerSyncDatabaseImpl(
+            identifier: ":memory:",
+            activeInstanceStore: DatabaseGroupCollection(),
+            logger: DefaultLogger(),
+            pool: AsyncConnectionPool(location: .inMemory, logger: DefaultLogger()),
+            httpClient: PlatformHttpClient.shared,
             schema: schema,
-            dbFilename: ":memory:",
-            logger: DatabaseLogger(DefaultLogger())
         )
         try await database.disconnectAndClear()
     }

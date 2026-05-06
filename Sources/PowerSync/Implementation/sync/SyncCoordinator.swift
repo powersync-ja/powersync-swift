@@ -3,7 +3,7 @@ actor SyncCoordinator {
     nonisolated let streams = StreamTracker()
     private var activeSync: Task<Void, any Error>?
     
-    func connect(db: KotlinPowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: HttpClient) async {
+    func connect(db: PowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: HttpClient) async {
         if let task = activeSync {
             await self.finishSyncTask(task: task)
         }
@@ -23,6 +23,12 @@ actor SyncCoordinator {
         }
         
         await self.finishSyncTask(task: task)
+    }
+    
+    /// Runs ``Self/disconnect`` and `action` in a single actor message lock.
+    func disconnectAndThen<T>(action: () async throws -> T) async rethrows -> T {
+        await disconnect()
+        return try await action()
     }
     
     /// Executes an inner function, but only if no connection is active or scheduled.

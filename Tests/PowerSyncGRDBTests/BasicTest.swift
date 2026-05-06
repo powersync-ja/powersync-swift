@@ -90,7 +90,7 @@ final class GRDBTests: XCTestCase {
             pool: pool,
             schema: schema,
             identifier: dbIdentifier,
-            logger: DatabaseLogger(logger)
+            logger: logger
         )
 
         try await database.disconnectAndClear()
@@ -352,6 +352,25 @@ final class GRDBTests: XCTestCase {
         watchTask.cancel()
     }
 
+    func testGRDBUpdatesFromIndirectPowerSyncFunction() async throws {
+        try await database.execute(
+            sql: "INSERT INTO users(id, name) VALUES(uuid(), ?)",
+            parameters: ["a user"]
+        )
+
+        var events = ValueObservation.tracking {
+            try User.order(User.Columns.name.asc).fetchAll($0)
+        }.values(in: pool).makeAsyncIterator()
+        let first = try await events.next()
+        XCTAssertEqual(first?.count, 1)
+
+        // We want to assert that internal statements from the core extension still
+        // update GRDB value observations.
+        try await database.disconnectAndClear()
+        let second = try await events.next()
+        XCTAssertEqual(second?.count, 0)
+    }
+
     func testShouldThrowErrorsFromPowerSync() async throws {
         do {
             try await database.execute(
@@ -427,7 +446,7 @@ final class GRDBTests: XCTestCase {
 
         let warningIndex = logs.getLogs().firstIndex(
             where: { value in
-                value.contains("debug: PowerSyncVersion")
+                value.contains("debug: Opened connection. SQLite version")
             }
         )
 

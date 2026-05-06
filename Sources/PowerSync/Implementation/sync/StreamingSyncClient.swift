@@ -4,13 +4,13 @@ import Foundation
 fileprivate let tag = "StreamingSyncClient"
 
 final class StreamingSyncClient: Sendable {
-    let db: KotlinPowerSyncDatabaseImpl
+    let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
     let connector: CachingCredentialsConnector
     let httpClient: any HttpClient
     
     init(
-        db: KotlinPowerSyncDatabaseImpl,
+        db: PowerSyncDatabaseImpl,
         connector: PowerSyncBackendConnectorProtocol,
         httpClient: any HttpClient,
         options: ConnectOptions,
@@ -104,7 +104,7 @@ The next upload iteration will be delayed.
     private func uploadLocalTarget() async throws {
         guard let _ = try await db.getOptional(
             sql: "SELECT 1 FROM ps_buckets WHERE name = '$local' AND target_op = ?",
-            parameters: [KotlinPowerSyncDatabaseImpl.maxOpId],
+            parameters: [PowerSyncDatabaseImpl.maxOpId],
             mapper: { cursor in () }
         ) else {
             return // Nothing to update
@@ -258,7 +258,7 @@ private struct ActiveSyncIteration: Sendable {
             parameters: syncClient.options.params,
             schema: await syncClient.db.schema.inner,
             includeDefaults: syncClient.options.includeDefaultStreams,
-            activeStreams: syncClient.db.syncCoordinator.streams.currentStreams,
+            activeStreams: syncClient.db.group.syncCoordinator.streams.currentStreams,
             appMetadata: syncClient.options.appMetadata,
         )))
 
@@ -372,7 +372,7 @@ private struct ActiveSyncIteration: Sendable {
     }
     
     private func watchSyncStreams() async throws {
-        let changes = syncClient.db.syncCoordinator.streams.streamsChanged.subscribe()
+        let changes = syncClient.db.group.syncCoordinator.streams.streamsChanged.subscribe()
         for await change in changes {
             self.localEvents.dispatch(event: .updateSubscriptions(streams: change))
         }
@@ -458,8 +458,4 @@ struct WriteCheckpointData: Codable {
 
 struct WriteCheckpointResponse: Codable {
     let data: WriteCheckpointData
-}
-
-private func sleepForSeconds(seconds: TimeInterval) async throws {
-    try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
 }

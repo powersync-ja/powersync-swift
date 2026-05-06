@@ -1,0 +1,4 @@
+module PowerSyncCoreShim {
+    header "include/powersync_core.h"
+    export *
+}

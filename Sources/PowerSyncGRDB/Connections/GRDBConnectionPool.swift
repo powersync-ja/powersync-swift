@@ -37,60 +37,60 @@ actor GRDBConnectionPool: SQLiteConnectionPoolProtocol {
         tableUpdatesContinuation = tempContinuation
     }
 
-    func read(
-        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> Void
-    ) async throws {
-        try await pool.read { database in
+    func read<T: Sendable>(
+        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> T
+    ) async throws -> T {
+        return try await pool.read { database in
             try onConnection(
                 GRDBConnectionLease(database: database)
             )
         }
     }
 
-    func write(
-        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> Void
-    ) async throws {
-        // Don't start an explicit transaction, we do this internally
-        let result = try await pool.writeWithoutTransaction { database in
-            guard let pointer = database.sqliteConnection else {
-                throw PowerSyncGRDBError.connectionUnavailable
-            }
-
-            let sessionResult = try withSession(
-                db: pointer,
-            ) {
-                try onConnection(
-                    GRDBConnectionLease(database: database)
-                )
-            }
-
-            return sessionResult
-        }
-        // Notify PowerSync of these changes
-        tableUpdatesContinuation?.yield(result.affectedTables)
-        // Notify GRDB, this needs to be a write (transaction)
-        try await pool.write { database in
-            // Notify GRDB about these changes
-            for table in result.affectedTables {
-                try database.notifyChanges(in: Table(table))
+    func write<T: Sendable>(
+        onConnection: @Sendable @escaping (SQLiteConnectionLease) throws -> T
+    ) async throws -> T {
+        // Don't start an explicit transaction, we do this internally.
+        let (result, updates) = try await pool.writeWithoutTransaction { database in
+            // This installs a temporary update hook, which breaks if GRDB had its own. Currently, we rely on
+            // GRDB only installing update hooks for statements that need it (see https://github.com/groue/GRDB.swift/blob/36e30a6f1ef10e4194f6af0cff90888526f0c115/GRDB/Core/TransactionObserver.swift#L266-L275),
+            // note that `statementObservations` is set in `statementWillExecute` and cleared after a statement
+            // has completed or failed.
+            // So since we have exclusive access to the write connection here, no GRDB-active statement can run and we
+            // can safely install our own hooks.
+            // In the future, we would like to use high-level GRDB APIs for this instead. However, we're blocked
+            // by https://github.com/groue/GRDB.swift/issues/1863 on that.
+            try collectWrites(db: database.sqliteConnection!) {
+                try onConnection(GRDBConnectionLease(database: database))
             }
         }
 
-        if case let .failure(error) = result.blockResult {
-            throw error
+        if !updates.isEmpty {
+            tableUpdatesContinuation?.yield(updates)
+
+            // Notify GRDB, this needs to be a write (transaction)
+            try await pool.write { database in
+                // Notify GRDB about these changes
+                for table in updates {
+                    try database.notifyChanges(in: Table(table))
+                }
+            }
         }
+        return result
     }
 
-    func withAllConnections(
-        onConnection: @Sendable @escaping (SQLiteConnectionLease, [SQLiteConnectionLease]) throws -> Void
-    ) async throws {
+    func withAllConnections<T: Sendable>(
+        onConnection: @Sendable @escaping (SQLiteConnectionLease, [SQLiteConnectionLease]) throws -> T
+    ) async throws -> T {
         // FIXME, we currently don't support updating the schema
-        try await pool.writeWithoutTransaction { database in
+        let result = try await pool.writeWithoutTransaction { database in
             let lease = try GRDBConnectionLease(database: database)
-            try onConnection(lease, [])
+            let result = try onConnection(lease, [])
             database.clearSchemaCache()
+            return result
         }
         pool.invalidateReadOnlyConnections()
+        return result
     }
 
     func close() async throws {

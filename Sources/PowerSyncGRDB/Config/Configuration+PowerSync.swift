@@ -26,33 +26,10 @@ public extension Configuration {
     mutating func configurePowerSync(
         schema: Schema
     ) throws {
-        // Handles the case on WatchOS where the extension is statically loaded.
-        // For WatchOS: We need to statically register the extension before SQLite connections are established.
-        // This should only throw on non-WatchOS platforms if the extension path cannot be resolved.
+        // This calls sqlite3_auto_extension and enables the PowerSync core extension for all
+        // new connections.
         let extensionPath = try resolvePowerSyncLoadableExtensionPath()
-
-        // Register the PowerSync core extension
-        prepareDatabase { database in
-            if let extensionPath = extensionPath {
-                /// The extension is loaded as an automatic extension if resolvePowerSyncLoadableExtensionPath returns nil
-                /// We should dynamically load the extension if we received an extensionPath
-                let extensionLoadResult = sqlite3_enable_load_extension(database.sqliteConnection, 1)
-                if extensionLoadResult != SQLITE_OK {
-                    throw PowerSyncGRDBError.extensionLoadFailed("Could not enable extension loading")
-                }
-                var errorMsg: UnsafeMutablePointer<Int8>?
-                let loadResult = sqlite3_load_extension(database.sqliteConnection, extensionPath, "sqlite3_powersync_init", &errorMsg)
-                if loadResult != SQLITE_OK {
-                    if let errorMsg = errorMsg {
-                        let message = String(cString: errorMsg)
-                        sqlite3_free(errorMsg)
-                        throw PowerSyncGRDBError.extensionLoadFailed(message)
-                    } else {
-                        throw PowerSyncGRDBError.unknownExtensionLoadError
-                    }
-                }
-            }
-        }
+        assert(extensionPath == nil)
 
         // Supply the PowerSync views as a SchemaSource
         let powerSyncSchemaSource = PowerSyncSchemaSource(

@@ -22,42 +22,6 @@ public struct WatchOptions<RowType>: Sendable {
 }
 
 public protocol Queries {
-    /// Execute a write query (INSERT, UPDATE, DELETE)
-    /// Using `RETURNING *` will result in an error.
-    @discardableResult
-    func execute(sql: String, parameters: [Sendable?]?) async throws -> Int64
-
-    /// Execute a read-only (SELECT) query and return a single result.
-    /// If there is no result, throws an IllegalArgumentException.
-    /// See `getOptional` for queries where the result might be empty.
-    func get<RowType>(
-        sql: String,
-        parameters: [Sendable?]?,
-        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
-    ) async throws -> RowType
-
-    /// Execute a read-only (SELECT) query and return the results.
-    func getAll<RowType>(
-        sql: String,
-        parameters: [Sendable?]?,
-        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
-    ) async throws -> [RowType]
-
-    /// Execute a read-only (SELECT) query and return a single optional result.
-    func getOptional<RowType>(
-        sql: String,
-        parameters: [Sendable?]?,
-        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
-    ) async throws -> RowType?
-
-    /// Execute a read-only (SELECT) query every time the source tables are modified
-    /// and return the results as an array in a Publisher.
-    func watch<RowType>(
-        sql: String,
-        parameters: [Sendable?]?,
-        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
-    ) throws -> AsyncThrowingStream<[RowType], Error>
-
     func watch<RowType>(
         options: WatchOptions<RowType>
     ) throws -> AsyncThrowingStream<[RowType], Error>
@@ -76,19 +40,59 @@ public protocol Queries {
     func readLock<R>(
         callback: @Sendable @escaping (any ConnectionContext) throws -> R
     ) async throws -> R
-
-    /// Execute a write transaction with the given callback
-    func writeTransaction<R>(
-        callback: @Sendable @escaping (any Transaction) throws -> R
-    ) async throws -> R
-
-    /// Execute a read transaction with the given callback
-    func readTransaction<R>(
-        callback: @Sendable @escaping (any Transaction) throws -> R
-    ) async throws -> R
 }
 
 public extension Queries {
+    /// Execute a write transaction with the given callback
+    func writeTransaction<R>(
+        callback: @Sendable @escaping (any Transaction) throws -> R
+    ) async throws -> R {
+        try await writeLock { ctx in try TransactionImpl.run(conn: ctx, callback: callback) }
+    }
+
+    /// Execute a read transaction with the given callback
+    func readTransaction<R: Sendable>(
+        callback: @Sendable @escaping (any Transaction) throws -> R
+    ) async throws -> R {
+        try await readLock { ctx in try TransactionImpl.run(conn: ctx, callback: callback) }
+    }
+    
+    /// Execute a write query (INSERT, UPDATE, DELETE)
+    /// Using `RETURNING *` will result in an error.
+    @discardableResult
+    func execute(sql: String, parameters: [Sendable?]?) async throws -> Int64 {
+        return try await self.writeLock { ctx in try ctx.execute(sql: sql, parameters: parameters) }
+    }
+
+    /// Execute a read-only (SELECT) query and return a single result.
+    /// If there is no result, throws an IllegalArgumentException.
+    /// See `getOptional` for queries where the result might be empty.
+    func get<RowType>(
+        sql: String,
+        parameters: [Sendable?]?,
+        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
+    ) async throws -> RowType {
+        return try await self.readLock { ctx in try ctx.get(sql: sql, parameters: parameters, mapper: mapper) }
+    }
+
+    /// Execute a read-only (SELECT) query and return the results.
+    func getAll<RowType>(
+        sql: String,
+        parameters: [Sendable?]?,
+        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
+    ) async throws -> [RowType] {
+        return try await self.readLock { ctx in try ctx.getAll(sql: sql, parameters: parameters, mapper: mapper) }
+    }
+
+    /// Execute a read-only (SELECT) query and return a single optional result.
+    func getOptional<RowType>(
+        sql: String,
+        parameters: [Sendable?]?,
+        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
+    ) async throws -> RowType? {
+        return try await self.readLock { ctx in try ctx.getOptional(sql: sql, parameters: parameters, mapper: mapper) }
+    }
+    
     @discardableResult
     func execute(_ sql: String) async throws -> Int64 {
         return try await execute(sql: sql, parameters: [])
@@ -113,6 +117,16 @@ public extension Queries {
         mapper: @Sendable @escaping (SqlCursor) throws -> RowType
     ) async throws -> RowType? {
         return try await getOptional(sql: sql, parameters: [], mapper: mapper)
+    }
+
+    /// Execute a read-only (SELECT) query every time the source tables are modified
+    /// and return the results as an array in a Publisher.
+    func watch<RowType>(
+        sql: String,
+        parameters: [Sendable?]?,
+        mapper: @Sendable @escaping (SqlCursor) throws -> RowType
+    ) throws -> AsyncThrowingStream<[RowType], Error> {
+        return try watch(options: WatchOptions(sql: sql, parameters: parameters, mapper: mapper))
     }
 
     func watch<RowType>(

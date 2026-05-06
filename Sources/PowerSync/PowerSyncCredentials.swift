@@ -34,11 +34,6 @@ public struct PowerSyncCredentials: Codable, Sendable {
         self.token = token
     }
 
-    init(kotlin: KotlinPowerSyncCredentials) {
-        endpoint = kotlin.endpoint
-        token = kotlin.token
-    }
-
     public func endpointUri(path: String) -> String {
         return "\(endpoint)/\(path)"
     }

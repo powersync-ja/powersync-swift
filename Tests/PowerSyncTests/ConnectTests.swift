@@ -18,10 +18,10 @@ final class ConnectTests: XCTestCase {
             ),
         ])
 
-        database = openKotlinDBDefault(
+        database = PowerSyncDatabase(
             schema: schema,
             dbFilename: ":memory:",
-            logger: DatabaseLogger(DefaultLogger())
+            logger: DefaultLogger()
         )
         try await database.disconnectAndClear()
     }

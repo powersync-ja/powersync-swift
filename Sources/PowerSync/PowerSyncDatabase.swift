@@ -16,11 +16,20 @@ public func PowerSyncDatabase(
     logger: (any LoggerProtocol) = DefaultLogger(),
     initialStatements: [String] = []
 ) -> PowerSyncDatabaseProtocol {
-    return openKotlinDBDefault(
-        schema: schema,
+    let (location, group) = if dbFilename == ":memory:" {
+        (DatabaseLocation.inMemory, DatabaseGroupCollection())
+    } else {
+        (DatabaseLocation.inDefaultDirectory(name: dbFilename), .shared)
+    }
+    let pool = AsyncConnectionPool(location: location, logger: logger, initialStatements: initialStatements)
+    return PowerSyncDatabaseImpl(
         dbFilename: dbFilename,
-        logger: DatabaseLogger(logger),
-        initialStatements: initialStatements
+        identifier: dbFilename,
+        activeInstanceStore: group,
+        logger: logger,
+        pool: pool,
+        httpClient: PlatformHttpClient.shared,
+        schema: schema
     )
 }
 
@@ -45,10 +54,11 @@ public func OpenedPowerSyncDatabase(
     identifier: String,
     logger: (any LoggerProtocol) = DefaultLogger()
 ) -> PowerSyncDatabaseProtocol {
-    return openKotlinDBWithPool(
-        schema: schema,
-        pool: pool,
+    return PowerSyncDatabaseImpl(
         identifier: identifier,
-        logger: DatabaseLogger(logger)
+        logger: logger,
+        pool: pool,
+        httpClient: PlatformHttpClient.shared,
+        schema: schema
     )
 }

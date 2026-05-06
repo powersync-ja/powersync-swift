@@ -35,6 +35,6 @@ internal func completeCrudItems(_ db: any PowerSyncDatabaseProtocol, _ lastItemI
                 return
             }
         }
-        try tx.execute(sql: "UPDATE ps_buckets SET target_op = 9223372036854775807 WHERE name = '$local'", parameters: nil)
+        try tx.execute(sql: "UPDATE ps_buckets SET target_op = ? WHERE name = '$local'", parameters: [PowerSyncDatabaseImpl.maxOpId])
     }
 }

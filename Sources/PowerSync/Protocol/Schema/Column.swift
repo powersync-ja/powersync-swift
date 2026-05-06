@@ -1,5 +1,4 @@
 import Foundation
-import PowerSyncKotlin
 
 public protocol ColumnProtocol: Equatable, Sendable {
     /// Name of the column.
