@@ -68,8 +68,8 @@ public struct ConnectOptions: Sendable {
 
     /// Uses a new sync client implemented in Rust instead of the one implemented in Kotlin.
     ///
-    /// This option is enabled by default and recommended for all apps. The old Kotlin-based implementation
-    /// will be removed in a future version of the SDK.
+    /// This option is enabled by default and exists for backwards compatibility. Support for the legacy 
+    /// Kotlin-based implementation has been removed.
     public var newClientImplementation: Bool
 
     /// Configuration for the sync client used for PowerSync requests.
@@ -116,7 +116,7 @@ public struct ConnectOptions: Sendable {
     @available(
         *,
         deprecated,
-        message: "Specifying the newClientImplementation flag is no longer needed. It is now enabled by default. The use of the old client is deprecated and will be removed in a future version."
+        message: "Specifying the newClientImplementation flag is no longer needed. It is now enabled by default. Support for the legacy Kotlin-based client was removed."
     )
     public init(
         crudThrottle: TimeInterval = 1,
