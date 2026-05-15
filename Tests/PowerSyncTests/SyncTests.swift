@@ -572,7 +572,48 @@ class InMemorySyncIntegrationTests {
         try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
         try await a.waitForFirstSync()
     }
-    
+
+    @Test func canSubscribeToStreamsWithObjectAndArrays() async throws {
+        // Regression test for https://github.com/powersync-ja/powersync-kotlin/issues/349, which also affected the Swift SDK.
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpClient { request in
+            let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
+            if case let .object(streams) = body["streams"] {
+                try #require(streams["subscriptions"] == .array([
+                    .object([
+                        "stream": .string("stream"),
+                        "parameters": .object([
+                            "a": .object([
+                                "foo": .string("bar")
+                            ]),
+                            "b": .array([.string("foo"), .string("bar")])
+                        ]),
+                        "override_priority": .null
+                    ])
+                ]))
+            } else {
+                Issue.record("Should have streams key in body")
+            }
+            
+            return channel
+        })
+
+        let params: JsonParam = [
+            "a": .object([
+                "foo": .string("bar")
+            ]),
+            "b": .array([.string("foo"), .string("bar")])
+        ]
+        let stream = try await db.syncStream(name: "stream", params: params).subscribe()
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+
+        await waitForStatus(db.currentStatus) { $0.connected }
+        let streams = try #require(db.currentStatus.syncStreams)
+        try #require(streams.count == 1)
+        try #require(streams[0].subscription.parameters == params)
+        try await stream.unsubscribe()
+    }
+
     @Test func reportsDefaultStreams() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let db = openDatabase(MockHttpClient { request in channel })
