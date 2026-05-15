@@ -12,24 +12,32 @@ on:
         required: true
         type: string
 
+permissions: {}
+
 jobs:
   build:
     uses: ./.github/workflows/build_and_test.yaml
+
   release:
+    permissions:
+      contents: write # To create the release
     needs: build
     runs-on: macos-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Validate version format and set prerelease flag
         id: version_check
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [[ ${{ github.event.inputs.version }} =~ ^[0-9]+\.[0-9]+\.[0-9]+(-Beta\.[0-9]+)?$ ]]; then
-            if [[ ${{ github.event.inputs.version }} =~ -Beta\.[0-9]+$ ]]; then
+          if [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-Beta\.[0-9]+)?$ ]]; then
+            if [[ $VERSION =~ -Beta\.[0-9]+$ ]]; then
               echo "is_prerelease=true" >> $GITHUB_OUTPUT
               echo "Version is valid Beta format"
             else
@@ -43,17 +51,19 @@ jobs:
             exit 1
           fi
 
-      - name: Create Git tag
-        run: |
-          git tag ${{ github.event.inputs.version }}
-          git push origin ${{ github.event.inputs.version }}
-
       - name: Create GitHub Release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: ${{ github.event.inputs.version }}
-          name: PowerSync ${{ github.event.inputs.version }}
-          body: ${{ github.event.inputs.release_notes }}
-          draft: false
-          prerelease: ${{ steps.version_check.outputs.is_prerelease }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ !steps.version_check.outputs.is_prerelease }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.version }}
+          NOTES: ${{ github.event.inputs.release_notes }}
+        run: |
+          gh release create $TAG --notes "$NOTES"
+      - name: Create GitHub Pre-Release
+        if: ${{ steps.version_check.outputs.is_prerelease }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.version }}
+          NOTES: ${{ github.event.inputs.release_notes }}
+        run: |
+          gh release create $TAG --notes "$NOTES" --prerelease
