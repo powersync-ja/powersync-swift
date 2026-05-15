@@ -4,7 +4,6 @@ rules:
     config:
       policies:
         "actions/*": ref-pin
-        "Homebrew/actions/*": ref-pin
   anonymous-definition:
     disable: true
   concurrency-limits:

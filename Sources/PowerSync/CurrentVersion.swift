@@ -1,3 +1,3 @@
 // The current version of the PowerSync Swift SDK. This should be updated to the latest version in `CHANGELOG.md` when a new version is released.
-let libraryVersion = "1.13.1"
+let libraryVersion = "1.14.0-Beta.0"
 
