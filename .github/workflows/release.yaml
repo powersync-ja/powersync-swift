@@ -58,7 +58,7 @@ jobs:
           TAG: ${{ github.event.inputs.version }}
           NOTES: ${{ github.event.inputs.release_notes }}
         run: |
-          gh release create $TAG --notes $NOTES
+          gh release create $TAG --notes "$NOTES"
       - name: Create GitHub Pre-Release
         if: ${{ steps.version_check.outputs.is_prerelease }}
         env:
@@ -66,4 +66,4 @@ jobs:
           TAG: ${{ github.event.inputs.version }}
           NOTES: ${{ github.event.inputs.release_notes }}
         run: |
-          gh release create $TAG --notes $NOTES -p
+          gh release create $TAG --notes "$NOTES" --prerelease
