@@ -1,17 +1,33 @@
 import AsyncAlgorithms
 
 func watchImpl<RowType: Sendable>(db: PowerSyncDatabaseImpl, options: WatchOptions<RowType>) -> AsyncThrowingStream<[RowType], any Error> {
+    // Note: Hold a weak reference to the database, active watch streams shouldn't prevent a database from being closed.
     AsyncThrowingStream { continuation in
         // Create an outer task to monitor cancellation
-        let task = Task {
-            do {
-                let watchedTables = try await getQuerySourceTables(
-                    db: db,
-                    sql: options.sql,
-                    parameters: options.parameters
-                )
+        let task = Task { [weak db] in
+            var didFinish = false
+            defer {
+                if !didFinish {
+                    continuation.finish()
+                }
+            }
 
-                let updateNotifications = db.pool.tableUpdates.filter { changedTables in
+            do {
+                let watchedTables: Set<String>
+                let pool: any SQLiteConnectionPoolProtocol
+
+                if let db {
+                    watchedTables = try await getQuerySourceTables(
+                        db: db,
+                        sql: options.sql,
+                        parameters: options.parameters
+                    )
+                    pool = db.pool
+                } else {
+                    return
+                }
+
+                let updateNotifications = pool.tableUpdates.filter { changedTables in
                     changedTables.contains(where: watchedTables.contains)
                 }.map { _ in () }
                 // Allows emitting the first result even if there aren't changes
@@ -21,6 +37,7 @@ func watchImpl<RowType: Sendable>(db: PowerSyncDatabaseImpl, options: WatchOptio
                 for try await _ in merged {
                     // Check if the outer task is cancelled
                     try Task.checkCancellation()
+                    guard let db else { return }
 
                     try continuation.yield(await db.getAll(
                         sql: options.sql,
@@ -29,12 +46,9 @@ func watchImpl<RowType: Sendable>(db: PowerSyncDatabaseImpl, options: WatchOptio
                     ))
                     try await sleepForSeconds(seconds: options.throttle)
                 }
-
-                continuation.finish()
             } catch {
-                if error is CancellationError {
-                    continuation.finish()
-                } else {
+                if !(error is CancellationError) {
+                    didFinish = true
                     continuation.finish(throwing: error)
                 }
             }
@@ -47,8 +61,19 @@ func watchImpl<RowType: Sendable>(db: PowerSyncDatabaseImpl, options: WatchOptio
     }
 }
 
+private func prepareWatch(
+    db: borrowing PowerSyncDatabaseImpl,
+    sql: String,
+    parameters: [Sendable?]
+) async throws -> (Set<String>, any SQLiteConnectionPoolProtocol) {
+    (
+        try await getQuerySourceTables(db: db, sql: sql, parameters: parameters),
+        db.pool,
+    )
+}
+
 private func getQuerySourceTables(
-    db: PowerSyncDatabaseImpl,
+    db: borrowing PowerSyncDatabaseImpl,
     sql: String,
     parameters: [Sendable?]
 ) async throws -> Set<String> {
