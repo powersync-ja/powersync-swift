@@ -8,7 +8,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     private let dbFilename: String?
     private let httpClient: HttpClient
     private let initializer = DatabaseInitializationAction()
-    fileprivate let queries: ConnectionPoolQueries
+    let pool: any SQLiteConnectionPoolProtocol
     let schema: AsyncMutex<Schema>
 
     init(
@@ -24,7 +24,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         self.logger = logger
         self.schema = AsyncMutex(schema)
         self.httpClient = httpClient
-        self.queries = ConnectionPoolQueries(pool: pool)
+        self.pool = pool
         self.group = activeInstanceStore.referenceGroup(identifier: identifier, logger: logger)
     }
 
@@ -44,7 +44,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     
     fileprivate func resolveOfflineSyncStatus() async throws {
         // We can't use get() here because it runs as part of the initialization step.
-        let offlineSyncStatus = try await queries.readLock { connection in
+        let offlineSyncStatus = try await readLockInner { connection in
             try connection.get(sql: "SELECT powersync_offline_sync_status()", parameters: []) { cursor in
                 let raw = try cursor.getString(index: 0)
                 guard let data = raw.data(using: .utf8) else {
@@ -70,16 +70,17 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
     
     fileprivate func applySchema(schema: Schema) async throws {
-        try await queries.withAll { writer, readers in
+        try await pool.withAllConnections { writer, readers in
             let encoded = try StreamingSyncClient.jsonEncoder.encode(schema)
             guard let asString = String(data: encoded, encoding: .utf8) else {
                 throw PowerSyncError.operationFailed(message: "Could not serialize schema")
             }
-            try writer.execute(sql: "SELECT powersync_replace_schema(?)", parameters: [asString])
+
+            let _ = try writer.execute(sql: "SELECT powersync_replace_schema(?)", parameters: [.string(asString)])
 
             for reader in readers {
                 // Update the schema on all read connections
-                try reader.execute(sql: "pragma table_info('sqlite_master')", parameters: [])
+                let _ = try reader.execute(sql: "pragma table_info('sqlite_master')", parameters: [])
             }
         }
     }
@@ -113,7 +114,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         try await initialize()
         try await initializer.close {
             await group.syncCoordinator.disconnect()
-            try await queries.pool.close()
+            try await pool.close()
         }
     }
     
@@ -127,6 +128,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
 
     func connect(connector: any PowerSyncBackendConnectorProtocol, options: ConnectOptions?) async throws {
+        try await initialize()
         await group.syncCoordinator.connect(db: self, connector: connector, options: options ?? ConnectOptions(), client: httpClient)
     }
 
@@ -143,23 +145,35 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             
             do {
                 let flags = flags
-                let _ = try await queries.writeLock { ctx in try ctx.execute(sql: "SELECT powersync_clear(?)", parameters: [flags]) }
+                let _ = try await writeLockInner { ctx in try ctx.execute(sql: "SELECT powersync_clear(?)", parameters: [flags]) }
             }
         }
     }
 
     func writeLock<R: Sendable>(callback: @escaping @Sendable (any ConnectionContext) throws -> R) async throws -> R {
         try await initialize()
-        return try await queries.writeLock(callback: callback)
+        return try await writeLockInner(callback: callback)
+    }
+
+    fileprivate func writeLockInner<R: Sendable>(callback: @escaping @Sendable (any ConnectionContext) throws -> R) async throws -> R {
+        return try await self.pool.write { connection in
+            try callback(ConnectionLeaseContext(lease: connection))
+        }
     }
 
     func readLock<R: Sendable>(callback: @escaping @Sendable (any ConnectionContext) throws -> R) async throws -> R {
         try await initialize()
-        return try await queries.readLock(callback: callback)
+        return try await readLockInner(callback: callback)
+    }
+
+    fileprivate func readLockInner<R: Sendable>(callback: @escaping @Sendable (any ConnectionContext) throws -> R) async throws -> R {
+        return try await pool.read { connection in
+            try callback(ConnectionLeaseContext(lease: connection))
+        }
     }
 
     func watch<RowType: Sendable>(options: WatchOptions<RowType>) throws -> AsyncThrowingStream<[RowType], any Error> {
-        return try queries.watch(options: options)
+        return watchImpl(db: self, options: options)
     }
 
     static let maxOpId = Int64.max
@@ -178,7 +192,7 @@ private actor DatabaseInitializationAction {
             return
         }
 
-        powerSyncVersion = try await db.queries.writeLock { conn in
+        powerSyncVersion = try await db.writeLockInner { conn in
             let sqliteVersion = try conn.get(sql: "SELECT sqlite_version()", parameters: []) { try $0.getString(index: 0) }
             let powerSyncVersion = try conn.get(sql: "SELECT powersync_rs_version()", parameters: []) { try $0.getString(index: 0) }
 

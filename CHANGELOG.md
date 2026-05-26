@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.14.0-Beta.0
+## 1.14.0
 
 * Remove internal dependency on the PowerSync Kotlin SDK. Going forward, the Swift SDK is implemented in Swift!
   __Important__: While these changes are tested, they are a full rewrite of the internal connection pool logic.
