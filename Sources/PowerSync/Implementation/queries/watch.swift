@@ -61,17 +61,6 @@ func watchImpl<RowType: Sendable>(db: PowerSyncDatabaseImpl, options: WatchOptio
     }
 }
 
-private func prepareWatch(
-    db: borrowing PowerSyncDatabaseImpl,
-    sql: String,
-    parameters: [Sendable?]
-) async throws -> (Set<String>, any SQLiteConnectionPoolProtocol) {
-    (
-        try await getQuerySourceTables(db: db, sql: sql, parameters: parameters),
-        db.pool,
-    )
-}
-
 private func getQuerySourceTables(
     db: borrowing PowerSyncDatabaseImpl,
     sql: String,
