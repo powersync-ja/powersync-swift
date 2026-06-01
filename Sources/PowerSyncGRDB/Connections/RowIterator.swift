@@ -47,43 +47,43 @@ struct RowSqlCursor: PowerSync.SqlCursor {
     }
     
     public func getBooleanOptional(index: Int) -> Bool? {
-        return row.self[index]
+        return row[index]
     }
     
     public func getDouble(index: Int) throws(PowerSync.SqlCursorError) -> Double {
         try checkNotNull(index: index)
-        return row.self[index]
+        return row[index]
     }
     
     public func getDoubleOptional(index: Int) -> Double? {
-        return row.self[index]
+        return row[index]
     }
     
     public func getInt(index: Int) throws(PowerSync.SqlCursorError) -> Int {
         try checkNotNull(index: index)
-        return row.self[index]
+        return row[index]
     }
 
     public func getIntOptional(index: Int) -> Int? {
-        return row.self[index]
+        return row[index]
     }
     
     public func getInt64(index: Int) throws(PowerSync.SqlCursorError) -> Int64 {
         try self.checkNotNull(index: index)
-        return row.self[index]
+        return row[index]
     }
     
     public func getInt64Optional(index: Int) -> Int64? {
-        return row.self[index]
+        return row[index]
     }
     
     public func getString(index: Int) throws(PowerSync.SqlCursorError) -> String {
         try self.checkNotNull(index: index)
-        return row.self[index]
+        return row[index]
     }
     
     public func getStringOptional(index: Int) -> String? {
-        return row.self[index]
+        return row[index]
     }
     
     public var columnCount: Int {
