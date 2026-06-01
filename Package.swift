@@ -60,7 +60,7 @@ let package = Package(
         )
     ],
     dependencies: conditionalDependencies + [
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.9.0"),
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.0"),
         .package(url: "https://github.com/powersync-ja/CSQLite.git", exact: "3.51.2"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.0"),
         .package(url: "https://github.com/apple/swift-collections.git", from: "1.4.0")

@@ -52,17 +52,12 @@ actor GRDBConnectionPool: SQLiteConnectionPoolProtocol {
     ) async throws -> T {
         // Don't start an explicit transaction, we do this internally.
         let (result, updates) = try await pool.writeWithoutTransaction { database in
-            // This installs a temporary update hook, which breaks if GRDB had its own. Currently, we rely on
-            // GRDB only installing update hooks for statements that need it (see https://github.com/groue/GRDB.swift/blob/36e30a6f1ef10e4194f6af0cff90888526f0c115/GRDB/Core/TransactionObserver.swift#L266-L275),
-            // note that `statementObservations` is set in `statementWillExecute` and cleared after a statement
-            // has completed or failed.
-            // So since we have exclusive access to the write connection here, no GRDB-active statement can run and we
-            // can safely install our own hooks.
-            // In the future, we would like to use high-level GRDB APIs for this instead. However, we're blocked
-            // by https://github.com/groue/GRDB.swift/issues/1863 on that.
-            try collectWrites(db: database.sqliteConnection!) {
-                try onConnection(GRDBConnectionLease(database: database))
-            }
+            let observer = AllWritesObserver()
+            database.add(transactionObserver: observer)
+            defer { database.remove(transactionObserver: observer) }
+            
+            let result = try onConnection(GRDBConnectionLease(database: database))
+            return (result, observer.committedTables)
         }
 
         if !updates.isEmpty {
