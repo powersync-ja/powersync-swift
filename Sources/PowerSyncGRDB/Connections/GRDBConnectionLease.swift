@@ -17,4 +17,38 @@ final class GRDBConnectionLease: SQLiteConnectionLease {
         self.pointer = connection
         self.database = database
     }
+
+    func execute(sql: String, parameters: [PowerSyncDataType?]) throws -> Int64 {
+        try database.execute(sql: sql, arguments: StatementArguments(parameters))
+        return Int64(database.changesCount)
+    }
+
+    func withIterator<T>(sql: String, parameters: [PowerSyncDataType?], callback: (any SQLiteStatementIteratorProtocol) throws -> T) throws -> T {
+        let statement = try database.makeStatement(sql: sql)
+        let rows = try Row.fetchCursor(statement, arguments: StatementArguments(parameters))
+        return try callback(RowIterator(rows: rows))
+    }
+}
+
+extension PowerSync.PowerSyncDataType: DatabaseValueConvertible {
+    public var databaseValue: GRDB.DatabaseValue {
+        switch self {
+        case .bool(let value):
+            return value.databaseValue
+        case .string(let value):
+            return value.databaseValue
+        case .int64(let value):
+            return value.databaseValue
+        case .int32(let value):
+            return value.databaseValue
+        case .double(let value):
+            return value.databaseValue
+        case .data(let value):
+            return value.databaseValue
+        }
+    }
+
+    public static func fromDatabaseValue(_ dbValue: GRDB.DatabaseValue) -> PowerSync.PowerSyncDataType? {
+        nil
+    }
 }
