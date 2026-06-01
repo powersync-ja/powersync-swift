@@ -49,6 +49,7 @@ extension PowerSync.PowerSyncDataType: DatabaseValueConvertible {
     }
 
     public static func fromDatabaseValue(_ dbValue: GRDB.DatabaseValue) -> PowerSync.PowerSyncDataType? {
+        // Unused, we only need databaseValue to pass PowerSyncDataType as StatementParameters
         nil
     }
 }

@@ -452,6 +452,34 @@ final class GRDBTests: XCTestCase {
 
         XCTAssert(warningIndex! >= 0)
     }
+
+    func testBindValues() async throws {
+        try await database.readLock { lease in
+            try lease.get(
+                sql: "SELECT ?, ?, ?, ?, ?, ?, typeof(?), typeof(?)",
+                parameters: [
+                    nil,
+                    false,
+                    Int32(32),
+                    Int64(64),
+                    3.14,
+                    "hello",
+                    Data(),
+                    Data([1, 2, 3])
+                ],
+                mapper: { cursor in
+                    XCTAssertEqual(cursor.getStringOptional(index: 0), nil)
+                    XCTAssertEqual(try cursor.getBoolean(index: 1), false)
+                    XCTAssertEqual(try cursor.getInt(index: 2), 32)
+                    XCTAssertEqual(try cursor.getInt(index: 3), 64)
+                    XCTAssertEqual(try cursor.getDouble(index: 4), 3.14)
+                    XCTAssertEqual(try cursor.getString(index: 5), "hello")
+                    XCTAssertEqual(try cursor.getString(index: 6), "blob")
+                    XCTAssertEqual(try cursor.getString(index: 7), "blob")
+                }
+            )
+        }
+    }
 }
 
 final class TestLogWriterAdapter: LogWriterProtocol,
