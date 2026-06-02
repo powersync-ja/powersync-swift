@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.1
+
+* [Internal] The GRDB integration uses high-level GRDB APIs to run statements.
+  Previously, it would use the raw connection pointer only.
+
 ## 1.14.0
 
 * Remove internal dependency on the PowerSync Kotlin SDK. Going forward, the Swift SDK is implemented in Swift!
