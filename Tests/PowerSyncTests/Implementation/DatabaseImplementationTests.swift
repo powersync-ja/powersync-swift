@@ -11,7 +11,7 @@ struct DatabaseImplementationTests {
             logger: DefaultLogger()
         )
 
-        let error = try await db.readTransaction { tx in
+        let description = try await db.readTransaction { tx in
             try tx.get(sql: "SELECT 1", parameters: [], mapper: { cursor in  })
             
             // Writing to the database in a read-only connection must fail.
@@ -21,6 +21,6 @@ struct DatabaseImplementationTests {
             return try #require(error?.errorDescription)
         }
         try await db.close(deleteDatabase: true)
-        #expect(error.contains("attempt to write a readonly database") == true)
+        #expect(description.contains("attempt to write a readonly database"))
     }
 }
