@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.2
+
+* Fix `readTransaction` throwing. This issue was introduced in version 1.14.0.
+
 ## 1.14.1
 
 * [Internal] The GRDB integration uses high-level GRDB APIs to run statements.
