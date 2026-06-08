@@ -90,9 +90,6 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
 
         if isWriter {
             let _ = try context.execute(sql: "pragma journal_mode = WAL", parameters: [])
-        } else {
-            // This is mainly an additional safety element, we also open read connections SQLITE_READONLY.
-            let _ = try context.execute(sql: "pragma query_only = TRUE", parameters: [])
         }
 
         let _ = try context.execute(sql: "pragma journal_size_limit = \(6 * 1024 * 1024)", parameters: [])
