@@ -290,7 +290,7 @@ public func waitForMatch<T: Sendable, E: Error>(
 func waitFor(
     timeout: TimeInterval = 0.5,
     interval: TimeInterval = 0.1,
-    predicate: () async throws -> Void
+    predicate: @Sendable () async throws -> Void
 ) async throws {
     let intervalNanoseconds = UInt64(interval * 1_000_000_000)
 
