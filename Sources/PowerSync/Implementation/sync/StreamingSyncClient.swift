@@ -37,18 +37,16 @@ final class StreamingSyncClient: Sendable {
     }
 
     private func uploadLoop(signals: SyncSignals) async throws {
-        // TODO: Replace with better watch mechanism once we've dropped the Kotlin dependency and can use onChange.
-        let options = WatchOptions(sql: "SELECT 1 FROM ps_crud LIMIT 1", throttle: options.crudThrottle, mapper: { _ in ()})
-        let watch = try db.watch(options: options)
-            .dropFirst() // Skip initial result, we just want to watch changes
-            .map { _ in () }
-        let allTriggers = AsyncAlgorithms.merge(watch, signals.signalCrudUpload.subscribe())
+        let updates = db.pool.tableUpdates.filter { updates in updates.contains("ps_crud") }.map { _ in () }
+        let allTriggers = MergeItemSequence(inner: AsyncAlgorithms.merge(updates, signals.signalCrudUpload.subscribe()))
         
         for try await _ in allTriggers {
+            async let crudThrottleDelay = sleepForSeconds(seconds: self.options.crudThrottle)
             try await uploadAllCrud()
             
             db.logger.debug("crud upload: notify completion", tag: tag)
             signals.notifyCrudUploadComplete()
+            try await crudThrottleDelay
         }
     }
     
@@ -84,7 +82,7 @@ The next upload iteration will be delayed.
                 if error is CancellationError {
                     return
                 }
-                
+                lastUploadItem = nil
                 db.syncStatus.mutateStatus {
                     $0.uploading = false
                     $0.internalUploadError = error
