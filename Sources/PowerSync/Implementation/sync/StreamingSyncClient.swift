@@ -38,16 +38,18 @@ final class StreamingSyncClient: Sendable {
 
     private func uploadLoop(signals: SyncSignals) async throws {
         let updates = db.pool.tableUpdates.filter { updates in updates.contains("ps_crud") }.map { _ in () }
-        let allTriggers = MergeItemSequence(inner: AsyncAlgorithms.merge(updates, signals.signalCrudUpload.subscribe()))
+        let allTriggers = MergeItemSequence(inner: AsyncAlgorithms.merge(updates, signals.signalCrudUpload.subscribe())).makeAsyncIterator()
         
-        for try await _ in allTriggers {
+        // Use a do-while loop to ensure we start an upload iteration even if we can't connect to the service.
+        repeat {
             async let crudThrottleDelay = sleepForSeconds(seconds: self.options.crudThrottle)
             try await uploadAllCrud()
             
-            db.logger.debug("crud upload: notify completion", tag: tag)
+            db.logger.debug("crud upload: notify completion \(self.options.crudThrottle)", tag: tag)
             signals.notifyCrudUploadComplete()
             try await crudThrottleDelay
-        }
+            db.logger.debug("crud upload: delay done \(self.options.crudThrottle)", tag: tag)
+        } while try await allTriggers.next() != nil
     }
     
     private func uploadAllCrud() async throws {

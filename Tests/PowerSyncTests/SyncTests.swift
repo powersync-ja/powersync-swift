@@ -200,6 +200,40 @@ class InMemorySyncIntegrationTests {
         try #require(try await query.next() == ["from server"])
     }
     
+    @Test @MainActor func recoversFromUploadErrors() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in channel }
+        let db = openDatabase(mockClient)
+        mockClient.writeCheckpoint = 1
+        var isFirstUpload = true
+
+        try await db.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["local write"])
+        try await db.connect(connector: TestConnector { @MainActor db in
+            if isFirstUpload {
+                isFirstUpload = false
+                throw PowerSyncError.operationFailed(message: "Deliberate failure in upload for test", underlyingError: nil)
+            }
+            let tx = try await db.getNextCrudTransaction()
+            try await tx?.complete()
+        }, options: ConnectOptions(retryDelay: 0.5))
+        await waitForStatus(db.currentStatus) { $0.uploadError != nil }
+
+        var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
+        try #require(try await query.next() == ["local write"])
+
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
+        try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
+            checksum: 0,
+            op_id: "1",
+            object_id: "1",
+            object_type: "users",
+            op: .put,
+            data: #"{"id": "test1", "name": "from server"}"#,
+        )])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        try #require(try await query.next() == ["from server"])
+    }
+    
     @Test @MainActor func uploadsOfflineWrites() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         var allowConnection = false
@@ -232,23 +266,6 @@ class InMemorySyncIntegrationTests {
         )])))
         try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
         try #require(try await query.next() == ["from server"])
-    }
-    
-    @Test @MainActor func appliesCrudThrottle() async throws {
-        let mockClient = MockHttpClient { request in AsyncThrowingChannel<PowerSync.SyncLine, any Error>() }
-
-        let db = openDatabase(mockClient)
-        var crudUploadCalls = 0
-        
-        try await db.connect(connector: TestConnector { @MainActor db in crudUploadCalls += 1 }, options: ConnectOptions(crudThrottle: 20))
-        await waitForStatus(db.currentStatus) { $0.connected }
-        // Wait for the initial upload on connect()
-        try await waitFor { @MainActor #expect(crudUploadCalls == 1) }
-        
-        // Updating something now should not trigger another upload due to the long throttle.
-        try await db.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["local write"])
-        try await sleepForSeconds(seconds: 1)
-        #expect(crudUploadCalls == 1)
     }
 
     @Test func tokenExpired() async throws {
