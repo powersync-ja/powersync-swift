@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.3
+
+- Fix CRUD uploads entering a `Delaying due to previously encountered CRUD item` loop.
+
 ## 1.14.2
 
 * Fix `readTransaction` throwing. This issue was introduced in version 1.14.0.

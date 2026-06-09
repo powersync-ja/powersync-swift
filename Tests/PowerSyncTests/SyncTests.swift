@@ -175,7 +175,7 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { $0.connected }
     }
 
-    @Test func uploadsOfflineWrites() async throws {
+    @Test func uploadsWritesMadeBeforeConnecting() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let mockClient = MockHttpClient { request in channel }
         let db = openDatabase(mockClient)
@@ -187,6 +187,40 @@ class InMemorySyncIntegrationTests {
         var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
         try #require(try await query.next() == ["local write"])
 
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
+        try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
+            checksum: 0,
+            op_id: "1",
+            object_id: "1",
+            object_type: "users",
+            op: .put,
+            data: #"{"id": "test1", "name": "from server"}"#,
+        )])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        try #require(try await query.next() == ["from server"])
+    }
+    
+    @Test @MainActor func uploadsOfflineWrites() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        var allowConnection = false
+        let mockClient = MockHttpClient { @MainActor request in
+            if allowConnection {
+                return channel
+            }
+            throw PowerSyncError.operationFailed(message: "Fake IO error for test", underlyingError: nil)
+        }
+        let db = openDatabase(mockClient)
+        mockClient.writeCheckpoint = 1
+
+        // Connect but simulate an IO error from an offline device.
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(retryDelay: 0.1))
+        await waitForStatus(db.currentStatus) { $0.downloadError != nil }
+
+        try await db.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["local write"])
+        var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
+        try #require(try await query.next() == ["local write"])
+        
+        allowConnection = true
         try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
@@ -796,7 +830,7 @@ func expectUserCount(_ db: PowerSyncDatabaseProtocol, _ amount: Int32) async thr
     try #require(users.count == amount)
 }
 
-func waitForStatus(_ status: SyncStatus, predicate: (borrowing SyncStatusData) -> Bool) async {
+func waitForStatus(_ status: SyncStatus, predicate: @Sendable (borrowing SyncStatusData) -> Bool) async {
     if predicate(status) {
         return
     }
