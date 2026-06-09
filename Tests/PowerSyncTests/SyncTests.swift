@@ -233,6 +233,23 @@ class InMemorySyncIntegrationTests {
         try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
         try #require(try await query.next() == ["from server"])
     }
+    
+    @Test @MainActor func appliesCrudThrottle() async throws {
+        let mockClient = MockHttpClient { request in AsyncThrowingChannel<PowerSync.SyncLine, any Error>() }
+
+        let db = openDatabase(mockClient)
+        var crudUploadCalls = 0
+        
+        try await db.connect(connector: TestConnector { @MainActor db in crudUploadCalls += 1 }, options: ConnectOptions(crudThrottle: 20))
+        await waitForStatus(db.currentStatus) { $0.connected }
+        // Wait for the initial upload on connect()
+        try await waitFor { @MainActor #expect(crudUploadCalls == 1) }
+        
+        // Updating something now should not trigger another upload due to the long throttle.
+        try await db.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["local write"])
+        try await sleepForSeconds(seconds: 1)
+        #expect(crudUploadCalls == 1)
+    }
 
     @Test func tokenExpired() async throws {
         final actor BackendConnector: PowerSyncBackendConnectorProtocol {
