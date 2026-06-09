@@ -45,10 +45,9 @@ final class StreamingSyncClient: Sendable {
             async let crudThrottleDelay = sleepForSeconds(seconds: self.options.crudThrottle)
             try await uploadAllCrud()
             
-            db.logger.debug("crud upload: notify completion \(self.options.crudThrottle)", tag: tag)
+            db.logger.debug("crud upload: notify completion", tag: tag)
             signals.notifyCrudUploadComplete()
             try await crudThrottleDelay
-            db.logger.debug("crud upload: delay done \(self.options.crudThrottle)", tag: tag)
         } while try await allTriggers.next() != nil
     }
     
