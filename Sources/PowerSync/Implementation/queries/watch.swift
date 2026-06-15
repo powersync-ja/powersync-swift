@@ -29,6 +29,8 @@ func watchImpl<RowType: Sendable>(db: PowerSyncDatabaseImpl, options: WatchOptio
 
                 let updateNotifications = pool.tableUpdates.filter { changedTables in
                     changedTables.contains(where: watchedTables.contains)
+                        // Another process changed unknown tables: conservatively re-query.
+                        || changedTables.contains(EXTERNAL_CHANGES_MARKER)
                 }.map { _ in () }
                 // Allows emitting the first result even if there aren't changes
                 let withInitial = AsyncAlgorithms.merge([()].async, updateNotifications)

@@ -236,9 +236,9 @@ class InMemorySyncIntegrationTests {
     
     @Test @MainActor func uploadsOfflineWrites() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        var allowConnection = false
-        let mockClient = MockHttpClient { @MainActor request in
-            if allowConnection {
+        let allowConnection = Mutex(false)
+        let mockClient = MockHttpClient { _ in
+            if allowConnection.withLock({ $0 }) {
                 return channel
             }
             throw PowerSyncError.operationFailed(message: "Fake IO error for test", underlyingError: nil)
@@ -254,7 +254,7 @@ class InMemorySyncIntegrationTests {
         var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
         try #require(try await query.next() == ["local write"])
         
-        allowConnection = true
+        allowConnection.withLock { $0 = true }
         try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,

@@ -5,7 +5,20 @@ import Foundation
 enum DatabaseLocation {
     case inMemory
     case inDefaultDirectory(name: String)
-    
+    case atPath(String)
+
+    /// The on-disk path other processes can share, or `nil` for in-memory databases.
+    var sharedPath: String? {
+        switch self {
+        case .inMemory:
+            return nil
+        case let .inDefaultDirectory(name):
+            return (try? DatabaseLocation.appleDefaultDatabaseDirectory().path).map { "\($0)/\(name)" }
+        case let .atPath(path):
+            return path
+        }
+    }
+
     func openConnection(writer: Bool) throws -> RawSqliteConnection {
         var db: OpaquePointer?
         let rc: Int32
@@ -24,6 +37,21 @@ enum DatabaseLocation {
             }
 
             path = "\(databaseDirectory)/\(name)"
+            let flags = if writer {
+                SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
+            } else {
+                SQLITE_OPEN_READONLY
+            }
+            rc = sqlite3_open_v2(path, &db, flags, nil)
+        case .atPath(let absolutePath):
+            let fileManager = FileManager.default
+            let directory = (absolutePath as NSString).deletingLastPathComponent
+
+            if !fileManager.fileExists(atPath: directory) {
+                try fileManager.createDirectory(atPath: directory, withIntermediateDirectories: true)
+            }
+
+            path = absolutePath
             let flags = if writer {
                 SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
             } else {
@@ -62,11 +90,16 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
     private let logger: any LoggerProtocol
     private let tableUpdatesStream = BroadcastStream<Set<String>>()
     private let opener = PoolOpener()
+    /// Cross-process change signaling; `nil` for in-memory databases (nothing to share).
+    private let changeSignal: CrossProcessChangeSignal?
 
     init(location: DatabaseLocation, logger: any LoggerProtocol, initialStatements: [String] = []) {
         self.location = location
         self.logger = logger
         self.initialStatements = initialStatements
+        self.changeSignal = location.sharedPath.map {
+            CrossProcessChangeSignal(databasePath: $0, logger: logger)
+        }
     }
 
     var tableUpdates: AsyncStream<Set<String>> {
@@ -88,12 +121,15 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
             let _ = try context.execute(sql: stmt, parameters: [])
         }
 
+        // The busy handler is installed first so later statements wait instead of failing,
+        // but note it does NOT apply to the WAL transition below.
+        let _ = try context.execute(sql: "pragma busy_timeout = 30000", parameters: [])
+
         if isWriter {
             let _ = try context.execute(sql: "pragma journal_mode = WAL", parameters: [])
         }
 
         let _ = try context.execute(sql: "pragma journal_size_limit = \(6 * 1024 * 1024)", parameters: [])
-        let _ = try context.execute(sql: "pragma busy_timeout = 30000", parameters: [])
         let _ = try context.execute(sql: "pragma cache_size = -\(50 * 1024)", parameters: [])
 
         if isWriter {
@@ -107,6 +143,42 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
             }
 
             let _ = try context.execute(sql: "select powersync_update_hooks('install')", parameters: [])
+        }
+    }
+
+    /// Whether an error from opening/configuring a connection is transient contention
+    /// (another process holds the file, e.g. mid WAL-recovery) and worth retrying.
+    /// `pragma journal_mode = WAL` reports SQLITE_BUSY/SQLITE_BUSY_RECOVERY without
+    /// consulting the busy handler, so `busy_timeout` cannot cover the open path.
+    private static func isTransientOpenError(_ error: any Error) -> Bool {
+        guard case let PowerSyncError.sqliteError(extendedResultCode, _, _, _, _) = error else {
+            return false
+        }
+        let primary = extendedResultCode & 0xFF
+        return primary == SQLITE_BUSY || primary == SQLITE_LOCKED
+    }
+
+    /// Opens and configures a connection, retrying with backoff while another process
+    /// holds the database (apps and their widgets/extensions open concurrently).
+    fileprivate func openConfiguredConnection(writer: Bool) throws -> RawSqliteConnection {
+        // ~5s total budget: 10ms doubling to a 250ms cap. Concurrent opens (app + widget)
+        // resolve in tens of milliseconds; a database still busy after seconds is stuck.
+        var delayMicroseconds: UInt32 = 10_000
+        let deadline = DispatchTime.now() + .seconds(5)
+        while true {
+            do {
+                let connection = try location.openConnection(writer: writer)
+                try configureConnection(connection: connection, isWriter: writer)
+                return connection
+            } catch where Self.isTransientOpenError(error) && DispatchTime.now() < deadline {
+                // The failed connection is dropped (closed by deinit); reopen fresh.
+                logger.debug(
+                    "database busy while opening (another process holds it); retrying in \(delayMicroseconds / 1000)ms",
+                    tag: "AsyncConnectionPool"
+                )
+                usleep(delayMicroseconds)
+                delayMicroseconds = min(delayMicroseconds * 2, 250_000)
+            }
         }
     }
 
@@ -137,6 +209,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
     }
 
     func close() async throws {
+        changeSignal?.stop()
         try await self.opener.close()
     }
 
@@ -152,11 +225,17 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
             try registerPowerSyncCoreExtension()
             let handleUpdates: @Sendable (_: Set<String>) -> () = { [weak context] updates in
                 context?.tableUpdatesStream.dispatch(event: updates)
+                // Tell other processes sharing this file that tables changed.
+                context?.changeSignal?.post()
+            }
+            context.changeSignal?.start { [weak context] in
+                // Another process (or this one; harmless, throttled downstream) changed
+                // the database outside this pool's update hooks.
+                context?.tableUpdatesStream.dispatch(event: [EXTERNAL_CHANGES_MARKER])
             }
 
             let pool = try await context.runBlocking {
-                let writer = try context.location.openConnection(writer: true)
-                try context.configureConnection(connection: writer, isWriter: true)
+                let writer = try context.openConfiguredConnection(writer: true)
 
                 if case .inMemory = context.location {
                     return NativeConnectionPool(singleConnection: writer, logger: context.logger, handleUpdates: handleUpdates)
@@ -164,9 +243,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
                     let numReaders = 4
                     var readers = RigidDeque<RawSqliteConnection>(capacity: numReaders)
                     while !readers.isFull {
-                        let connection = try context.location.openConnection(writer: false)
-                        try context.configureConnection(connection: connection, isWriter: false)
-                        readers.append(connection)
+                        readers.append(try context.openConfiguredConnection(writer: false))
                     }
 
                     return NativeConnectionPool(writer: writer, readers: readers, logger: context.logger, handleUpdates: handleUpdates)

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+* `PowerSyncDatabase(dbFilename:)` now accepts an absolute path (starting with `/`), used
+  as-is so the database can live in an App Group container shared with app extensions.
+  Plain filenames keep the existing behavior, and `close(deleteDatabase: true)` deletes the
+  files at the absolute location.
+* Opening the connection pool retries while another process holds the database. The
+  `pragma journal_mode = WAL` transition reports `SQLITE_BUSY`/`SQLITE_BUSY_RECOVERY`
+  without consulting the busy handler, so concurrent cold opens (an app launching while its
+  extension opens the same file) used to fail; the pool now retries with backoff.
+* Added an opt-in cross-process change signal: each pool posts a Darwin notification after
+  every committed write and, on receipt, re-emits `tableUpdates` with
+  `EXTERNAL_CHANGES_MARKER` so `watch` queries and the upload client wake for writes made by
+  other processes sharing the database file. In-memory databases skip the signal.
+
 ## 1.14.3
 
 - Fix CRUD uploads entering a `Delaying due to previously encountered CRUD item` loop.

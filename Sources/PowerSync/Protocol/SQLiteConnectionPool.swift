@@ -57,6 +57,11 @@ public protocol SQLiteStatementIteratorProtocol {
 /// This is the underlying pool implementation on which the higher-level PowerSync Swift SDK is built on.
 /// 
 /// This is an internal protocol and should not be implemented outside of the PowerSync SDK.
+/// Emitted on `tableUpdates` when another process changed the database. The concrete
+/// tables are unknown (cross-process signals carry no payload), so consumers must treat
+/// this as potentially matching every table they watch.
+public let EXTERNAL_CHANGES_MARKER = "__powersync_external_changes__"
+
 public protocol SQLiteConnectionPoolProtocol: Sendable {
     var tableUpdates: AsyncStream<Set<String>> { get }
 
