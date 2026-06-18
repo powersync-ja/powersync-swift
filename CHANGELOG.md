@@ -13,7 +13,9 @@
 * Added an opt-in cross-process change signal: each pool posts a Darwin notification after
   every committed write and, on receipt, re-emits `tableUpdates` with
   `EXTERNAL_CHANGES_MARKER` so `watch` queries and the upload client wake for writes made by
-  other processes sharing the database file. In-memory databases skip the signal.
+  other processes sharing the database file. Only databases opened from an absolute path
+  (an App Group container) use the signal; in-memory and default-directory databases skip
+  it, since they can't be shared across processes.
 
 ## 1.14.3
 
