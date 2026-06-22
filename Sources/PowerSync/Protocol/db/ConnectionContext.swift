@@ -1,5 +1,6 @@
 import Foundation
 
+// TODO (breaking change): This type should not be sendable.
 public protocol ConnectionContext: Sendable {
     /**
      Executes a SQL statement with optional parameters.
