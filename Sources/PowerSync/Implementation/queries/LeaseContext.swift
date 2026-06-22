@@ -84,4 +84,9 @@ private struct ThreadPinnedValue<T: ~Copyable>: @unchecked Sendable, ~Copyable {
         
         return try action(&value.pointee)
     }
+    
+    deinit {
+        self.value.deinitialize(count: 1)
+        self.value.deallocate()
+    }
 }
