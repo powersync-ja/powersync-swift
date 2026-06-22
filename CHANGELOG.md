@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.4 (unreleased)
+
+- Fix crash when running a statement in a cursor callback ([#148](https://github.com/powersync-ja/powersync-swift/issues/148)).
+
 ## 1.14.3
 
 - Fix CRUD uploads entering a `Delaying due to previously encountered CRUD item` loop.
