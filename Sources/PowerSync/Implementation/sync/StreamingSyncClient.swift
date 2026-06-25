@@ -138,7 +138,8 @@ The next upload iteration will be delayed.
             parameters: [],
             mapper: { cursor in try cursor.getInt64(index: 0) })
 
-        if current_target == PowerSyncDatabaseImpl.maxOpId {
+        if current_target != PowerSyncDatabaseImpl.maxOpId {
+            // We should only update the targert if it is currently at the max value
             return
         }
         
