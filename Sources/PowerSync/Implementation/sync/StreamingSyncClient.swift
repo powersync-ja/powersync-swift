@@ -36,6 +36,38 @@ final class StreamingSyncClient: Sendable {
         }
     }
 
+    func requestCheckpoint() async throws -> CheckpointRequest {
+        let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
+        
+        // TODO, we need to increment and manage this number ourselves
+        
+        
+        let (_, request) = try await authenticatedRequest { endpoint in
+            endpoint.path += "/sync/request-checkpoint"
+            endpoint.queryItems = [.init(name: "client_id", value: clientId)]
+        }
+        let (response, _) = try await httpClient.readFully(request: request)
+        await self.handleCommonResponseErrors(response: response)
+        switch response.statusCode {
+            case 200:
+                () // All good
+            case 401: 
+                // TODO, may be retry
+                throw CheckPointRequestError.unauthenticated(message: "Received 401 from the PowerSync service.")
+            default:
+                throw CheckPointRequestError.operationFailed(message: "Unknown error occured, received resposne code")
+        }
+        final class Test: CheckpointRequest {
+            func waitForSync() async throws {
+                
+            }
+
+            
+        }
+
+        return Test()
+    }
+
     private func uploadLoop(signals: SyncSignals) async throws {
         let updates = db.pool.tableUpdates.filter { updates in updates.contains("ps_crud") }.map { _ in () }
         let allTriggers = MergeItemSequence(inner: AsyncAlgorithms.merge(updates, signals.signalCrudUpload.subscribe())).makeAsyncIterator()
@@ -101,12 +133,13 @@ The next upload iteration will be delayed.
     }
     
     private func uploadLocalTarget() async throws {
-        guard let _ = try await db.getOptional(
-            sql: "SELECT 1 FROM ps_buckets WHERE name = '$local' AND target_op = ?",
-            parameters: [PowerSyncDatabaseImpl.maxOpId],
-            mapper: { cursor in () }
-        ) else {
-            return // Nothing to update
+        let current_target   = try await db.get(
+            sql: "SELECT powersync_probe_local_target_op(NULL)",
+            parameters: [],
+            mapper: { cursor in try cursor.getInt64(index: 0) })
+
+        if current_target == PowerSyncDatabaseImpl.maxOpId {
+            return
         }
         
         guard let seqBefore = try await db.getOptional("SELECT seq FROM main.sqlite_sequence WHERE name = 'ps_crud'", mapper: { try $0.getInt64(index: 0) }) else {
@@ -128,7 +161,9 @@ The next upload iteration will be delayed.
                 return
             }
             
-            try tx.execute(sql: "UPDATE ps_buckets SET target_op = CAST(? AS INTEGER) WHERE name = '$local'", parameters: [opId])
+            // Update the target op - this pass is mostly relevant for legacy write-checkpoint2 requests
+            // For the new checkpoint-requests, this is essentially a duplicate set.
+            try tx.execute(sql: "SELECT powersync_probe_local_target_op(?)", parameters: [opId])
         }
     }
 

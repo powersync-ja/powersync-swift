@@ -328,7 +328,7 @@ final class CrudTests: XCTestCase {
         let tx = try await database.getNextCrudTransaction()!
         try await tx.complete(writeCheckpoint: "123")
 
-        let targetOp = try await database.get("SELECT target_op FROM ps_buckets WHERE name = '$local'") {
+        let targetOp = try await database.get("SELECT powersync_probe_local_target_op(NULL)") {
             try $0.getInt(index: 0)
         }
         XCTAssertEqual(targetOp, 123)
@@ -339,7 +339,7 @@ final class CrudTests: XCTestCase {
         )
         let batch = try await database.getCrudBatch()!
         try await batch.complete(writeCheckpoint: "124")
-        let newTargetOp = try await database.get("SELECT target_op FROM ps_buckets WHERE name = '$local'") {
+        let newTargetOp = try await database.get("SELECT powersync_probe_local_target_op(NULL)") {
             try $0.getInt(index: 0)
         }
         XCTAssertEqual(newTargetOp, 124)

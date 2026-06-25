@@ -228,6 +228,13 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// Use ``SyncStream/subscribe`` on the returned instance to subscribe to the stream.
     func syncStream(name: String, params: JsonParam?) -> any SyncStream
 
+
+    /// Request a checkpoint
+    /// This throws if the client is not currently connected or connecting
+    /// This makes a request to the PowerSync service instance. This throws
+    /// for network request erorrs.
+    func requestCheckpoint() async throws -> CheckpointRequest
+
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.
     ///

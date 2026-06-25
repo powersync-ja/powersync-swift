@@ -80,6 +80,10 @@ fileprivate struct SyncStatusDataImpl: SyncStatusData {
         }
     }
 
+    var lastSyncedCheckpointRequestId: Int64? {
+        core.lastSyncedCheckpointRequestId
+    }
+
     func statusForPriority(_ priority: BucketPriority) -> PriorityStatusEntry {
         for known in priorityStatusEntries {
             // Lower-priority buckets are synced after higher-priority buckets, and since priorityStatusEntries
@@ -212,6 +216,10 @@ final class SwiftSyncStatus: SyncStatus {
 
     var syncStreams: [SyncStreamStatus]? {
         self.readStatus { current in current.syncStreams }
+    }
+
+    var lastSyncedCheckpointRequestId: Int64? {
+        self.readStatus{ current in current.lastSyncedCheckpointRequestId}
     }
 
     func statusForPriority(_ priority: BucketPriority) -> PriorityStatusEntry {

@@ -176,6 +176,31 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         return watchImpl(db: self, options: options)
     }
 
+    func requestCheckpoint() async throws -> any CheckpointRequest {
+        try await initialize()
+
+        try await group.syncCoordinator.guardNotConnected(
+            inner: {
+                throw CheckPointRequestError.notConnected
+            },
+            ifConnected: {
+             }
+        )
+
+        // perform the request given the instance and auth
+
+        // return a CheckpointRequestImpl
+        final class Test: CheckpointRequest {
+            func waitForSync() async throws {
+                
+            }
+
+            
+        }
+
+        return Test()
+    }
+
     static let maxOpId = Int64.max
 }
 

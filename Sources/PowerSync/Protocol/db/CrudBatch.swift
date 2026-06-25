@@ -31,10 +31,10 @@ internal func completeCrudItems(_ db: any PowerSyncDatabaseProtocol, _ lastItemI
         if writeCheckpoint != nil {
             let hasCrud = (try tx.getOptional(sql: "SELECT 1 FROM ps_crud", parameters: nil) { cursor in () }) != nil
             if !hasCrud {
-                try tx.execute(sql: "UPDATE ps_buckets SET target_op = CAST(? AS INTEGER) WHERE name = '$local'", parameters: [writeCheckpoint])
+                try tx.execute(sql: "SELECT powersync_probe_local_target_op(?)", parameters: [writeCheckpoint])
                 return
             }
         }
-        try tx.execute(sql: "UPDATE ps_buckets SET target_op = ? WHERE name = '$local'", parameters: [PowerSyncDatabaseImpl.maxOpId])
+        try tx.execute(sql: "SELECT powersync_probe_local_target_op(?)", parameters: [PowerSyncDatabaseImpl.maxOpId])
     }
 }
