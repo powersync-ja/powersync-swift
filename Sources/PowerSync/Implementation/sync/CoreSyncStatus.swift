@@ -38,7 +38,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
             streams.append(try streamsContainer.decode(DecodableSyncStreamStatus.self).inner)
         }
         self.streams = streams
-        self.lastSyncedCheckpointRequestId = try container.decode(Int64.self, forKey: .lastSyncedCheckpointRequestId)
+        self.lastSyncedCheckpointRequestId = try container.decode(Int64?.self, forKey: .lastSyncedCheckpointRequestId)
     }
 }
 
