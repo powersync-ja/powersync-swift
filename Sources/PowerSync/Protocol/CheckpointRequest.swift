@@ -26,10 +26,56 @@ public enum CheckpointWaitError: Error, LocalizedError {
 }
 
 /// Result from calling db.requestCheckpoint
-/// TOOD, better docs
+/// TODO: Better docs.
 public protocol CheckpointRequest: Sendable {
+    /// If the checkpoint has been synced
+    var isSynced: Bool { get }
+    
     /// Waits for the checkpoint to have been synced back
     /// TODO: Triggers a connection retry if currently in a back-off period
-    /// Throws if a new sync error is reached or if a timeout has been reached.
-    func waitForSync() async throws 
+    /// Throws if a new sync error is reached.
+    func waitForSync() async throws
+
+    /// Waits for the checkpoint to have been synced back.
+    ///
+    /// - Parameter timeout: The maximum number of seconds to wait.
+    /// - Throws: ``CheckpointWaitError/timeout`` if the checkpoint was not synced before the timeout.
+    ///   Also throws if a new sync error is reached while waiting.
+    func waitForSync(timeout: TimeInterval) async throws
+}
+
+public extension CheckpointRequest {
+    func waitForSync(timeout: TimeInterval) async throws {
+        if isSynced {
+            return
+        }
+
+        if timeout <= 0 {
+            throw CheckpointWaitError.timeout
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await waitForSync()
+            }
+
+            group.addTask {
+                do {
+                    try await sleepForSeconds(seconds: timeout)
+                } catch is CancellationError {
+                    return
+                }
+
+                throw CheckpointWaitError.timeout
+            }
+
+            do {
+                let _ = try await group.next()
+                group.cancelAll()
+            } catch {
+                group.cancelAll()
+                throw error
+            }
+        }
+    }
 }

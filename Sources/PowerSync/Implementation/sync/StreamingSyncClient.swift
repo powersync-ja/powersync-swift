@@ -3,11 +3,22 @@ import Foundation
 
 fileprivate let tag = "StreamingSyncClient"
 
+enum CheckpointMode: Sendable {
+    /// Implementation which makes write checkpoint calls to the write-checkpoints2.json endpoint
+    case legacy
+    /// New implementation with client-side generated checkpoint request IDs which are sent to
+    /// the /sync/checkpoint-request route
+    case requests
+}
+
+
 final class StreamingSyncClient: Sendable {
     let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
     let connector: CachingCredentialsConnector
     let httpClient: any HttpClient
+
+    let checkpointMode: CheckpointMode
     
     init(
         db: PowerSyncDatabaseImpl,
@@ -19,6 +30,9 @@ final class StreamingSyncClient: Sendable {
         self.connector = CachingCredentialsConnector(inner: connector)
         self.httpClient = httpClient
         self.options = options
+
+        // TODO, make this configurable, or automatically detect
+        self.checkpointMode = .requests
     }
     
     /// Starts a task driving uploads and downloads by repeatedly connecting to the PowerSync service,
@@ -34,38 +48,6 @@ final class StreamingSyncClient: Sendable {
             
             let _ = try await (download, upload)
         }
-    }
-
-    func requestCheckpoint() async throws -> CheckpointRequest {
-        let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
-        
-        // TODO, we need to increment and manage this number ourselves
-        
-        
-        let (_, request) = try await authenticatedRequest { endpoint in
-            endpoint.path += "/sync/request-checkpoint"
-            endpoint.queryItems = [.init(name: "client_id", value: clientId)]
-        }
-        let (response, _) = try await httpClient.readFully(request: request)
-        await self.handleCommonResponseErrors(response: response)
-        switch response.statusCode {
-            case 200:
-                () // All good
-            case 401: 
-                // TODO, may be retry
-                throw CheckPointRequestError.unauthenticated(message: "Received 401 from the PowerSync service.")
-            default:
-                throw CheckPointRequestError.operationFailed(message: "Unknown error occured, received resposne code")
-        }
-        final class Test: CheckpointRequest {
-            func waitForSync() async throws {
-                
-            }
-
-            
-        }
-
-        return Test()
     }
 
     private func uploadLoop(signals: SyncSignals) async throws {
@@ -131,24 +113,31 @@ The next upload iteration will be delayed.
             }
         }
     }
-    
+
+    /// Called once all current CRUD items have been uploaded.
+    /// 
     private func uploadLocalTarget() async throws {
-        let current_target   = try await db.get(
+        let current_target = try await db.get(
             sql: "SELECT powersync_probe_local_target_op(NULL)",
             parameters: [],
-            mapper: { cursor in try cursor.getInt64(index: 0) })
+            mapper: { cursor in cursor.getInt64Optional(index: 0) })
 
         if current_target != PowerSyncDatabaseImpl.maxOpId {
-            // We should only update the targert if it is currently at the max value
+            // We should only update the target if it is currently at the max value
+            // This is set after having completed a CRUD Batch/Transaction
+            // This avoid overwriting a custom write checkpoint - which would have been set in the .complete handler
             return
         }
         
+        // If there never has been any crud items, we don't need to update the checkpoint
         guard let seqBefore = try await db.getOptional("SELECT seq FROM main.sqlite_sequence WHERE name = 'ps_crud'", mapper: { try $0.getInt64(index: 0) }) else {
             return // Nothing to update
         }
         
+        // Fetch the appropriate checkpoint ID from the implemnetation
         let opId = try await getWriteCheckpoint()
         
+        // This is inside a write transaction, to prevent conflicts with other writes
         try await db.writeTransaction { tx in
             let anyData = try tx.getOptional(sql: "SELECT 1 FROM ps_crud LIMIT 1", parameters: nil) { cursor in 1 }
             if anyData != nil {
@@ -162,8 +151,7 @@ The next upload iteration will be delayed.
                 return
             }
             
-            // Update the target op - this pass is mostly relevant for legacy write-checkpoint2 requests
-            // For the new checkpoint-requests, this is essentially a duplicate set.
+            // Update the target op
             try tx.execute(sql: "SELECT powersync_probe_local_target_op(?)", parameters: [opId])
         }
     }
@@ -174,20 +162,56 @@ The next upload iteration will be delayed.
         }
     }
 
-    private func getWriteCheckpoint() async throws -> String {
+    /// Bumps the client side requested checkpoint id
+    /// POSTs the update to the PowerSync service
+    /// This does not set any target OP, that is only done for write checkpoints in the code which
+    /// calls this.
+    public func requestCheckpoint() async throws -> Int64 {
         let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
-        let (_, request) = try await authenticatedRequest { endpoint in
-            endpoint.path += "/write-checkpoint2.json"
-            endpoint.queryItems = [.init(name: "client_id", value: clientId)]
+
+        // Bump the request_id on the client side
+        let request_id = try await db.writeTransaction {ctx in 
+            return try ctx.get(sql: "SELECT powersync_next_checkpoint_request_id()", parameters: []) {cursor in try cursor.getInt64(index: 0)}
         }
-        let (response, data) = try await httpClient.readFully(request: request)
+        // Report it to the PowerSync service
+        // Note: It's fine if the service rejects this, we only actually set the target later
+        var (_, request) = try await authenticatedRequest { endpoint in
+            endpoint.path += "/sync/checkpoint-request"
+        }
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try StreamingSyncClient.jsonEncoder.encode(CheckpointRequestPayload(
+            client_id: clientId,
+            checkpoint_request_id: request_id
+        ))
+        let (response, _) = try await httpClient.readFully(request: request)
         await self.handleCommonResponseErrors(response: response)
         if response.statusCode != 200 {
             throw PowerSyncError.operationFailed(message: "Error getting write checkpoint: \(response.statusCode)")
         }
-        
-        let body = try StreamingSyncClient.jsonDecoder.decode(WriteCheckpointResponse.self, from: data)
-        return body.data.write_checkpoint
+        return request_id
+    }
+
+    private func getWriteCheckpoint() async throws -> String {
+        switch checkpointMode  {
+            case .requests:
+                // Bump the request_id on the client side
+                return String(try await requestCheckpoint())
+            case .legacy:
+                let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
+                let (_, request) = try await authenticatedRequest { endpoint in
+                    endpoint.path += "/write-checkpoint2.json"
+                    endpoint.queryItems = [.init(name: "client_id", value: clientId)]
+                }
+                let (response, data) = try await httpClient.readFully(request: request)
+                await self.handleCommonResponseErrors(response: response)
+                if response.statusCode != 200 {
+                    throw PowerSyncError.operationFailed(message: "Error getting write checkpoint: \(response.statusCode)")
+                }
+                
+                let body = try StreamingSyncClient.jsonDecoder.decode(WriteCheckpointResponse.self, from: data)
+                return body.data.write_checkpoint
+        }
     }
 
     private func downloadLoop(signals: SyncSignals) async throws {
@@ -493,4 +517,9 @@ struct WriteCheckpointData: Codable {
 
 struct WriteCheckpointResponse: Codable {
     let data: WriteCheckpointData
+}
+
+private struct CheckpointRequestPayload: Encodable {
+    let client_id: String
+    let checkpoint_request_id: Int64
 }

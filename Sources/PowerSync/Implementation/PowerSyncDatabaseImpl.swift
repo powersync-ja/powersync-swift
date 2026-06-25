@@ -35,7 +35,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     func resolveOfflineSyncStatusIfNotConnected() async throws {
         try await group.syncCoordinator.guardNotConnected(inner: {
             try await resolveOfflineSyncStatus()
-        }, ifConnected: {})
+        }, ifConnected: { _ in })
     }
     
     private func initialize() async throws {
@@ -65,7 +65,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
                 await self.schema.withMutex { $0 = schema }
                 try await applySchema(schema: schema)
             },
-            ifConnected: { throw PowerSyncError.operationFailed(message: "Cannot update schema while connected") }
+            ifConnected: { _ in throw PowerSyncError.operationFailed(message: "Cannot update schema while connected") }
         )
     }
     
@@ -185,26 +185,16 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     func requestCheckpoint() async throws -> any CheckpointRequest {
         try await initialize()
 
-        try await group.syncCoordinator.guardNotConnected(
+        let requestId = try await group.syncCoordinator.guardNotConnected(
             inner: {
                 throw CheckPointRequestError.notConnected
             },
-            ifConnected: {
-             }
+            ifConnected: { client in
+                try await client.requestCheckpoint()
+            }
         )
 
-        // perform the request given the instance and auth
-
-        // return a CheckpointRequestImpl
-        final class Test: CheckpointRequest {
-            func waitForSync() async throws {
-                
-            }
-
-            
-        }
-
-        return Test()
+        return CheckpointRequestImpl(requestId: requestId, db: self)
     }
 
     static let maxOpId = Int64.max
