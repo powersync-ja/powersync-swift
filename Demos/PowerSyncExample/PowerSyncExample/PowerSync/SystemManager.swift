@@ -100,6 +100,11 @@ final class SystemManager {
         }
     }
 
+    func refreshFromRemote(timeout: TimeInterval = 30) async throws {
+        let checkpoint = try await db.requestCheckpoint()
+        try await checkpoint.waitForSync(timeout: timeout)
+    }
+
     func signOut() async throws {
         try await db.disconnectAndClear()
         try await connector.client.auth.signOut()

@@ -112,6 +112,9 @@ struct TodoListView: View {
         }
 #endif
         .animation(.default, value: todos)
+        .refreshable {
+            await refreshFromRemote()
+        }
         .navigationTitle("Todos")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -182,6 +185,15 @@ struct TodoListView: View {
             error = nil
             try await system.deleteTodo(todo: todo)
 
+        } catch {
+            self.error = error
+        }
+    }
+
+    func refreshFromRemote() async {
+        do {
+            error = nil
+            try await system.refreshFromRemote()
         } catch {
             self.error = error
         }
