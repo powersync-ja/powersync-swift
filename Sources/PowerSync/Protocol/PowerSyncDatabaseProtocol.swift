@@ -229,10 +229,11 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     func syncStream(name: String, params: JsonParam?) -> any SyncStream
 
 
-    /// Request a checkpoint
-    /// This throws if the client is not currently connected or connecting
-    /// This makes a request to the PowerSync service instance. This throws
-    /// for network request erorrs.
+    /// Requests a checkpoint from the PowerSync service.
+    ///
+    /// The returned request can be awaited to confirm that the local database has applied
+    /// server-side changes up to the checkpoint. This method requires an active or connecting
+    /// sync client and can throw for connection, authentication, or service request failures.
     func requestCheckpoint() async throws -> CheckpointRequest
 
     /// Close the database, releasing resources.

@@ -1,46 +1,60 @@
 import Foundation
 
+/// Errors thrown while creating a checkpoint request.
 public enum CheckPointRequestError: Error, LocalizedError {
     /// The target PowerSync service does not support checkpoint requests.
-    /// Please update the PowerSync service version
+    /// Update the PowerSync service to use this API.
     case instanceNotSupported
 
-    /// The creation of a checkpoint request requires the client to either
-    /// be connected or connecting. Checkpoint Requests wont ever resolve while offline.
+    /// Checkpoint requests require an active or connecting sync client.
+    ///
+    /// A request made while disconnected would not be delivered to the PowerSync service,
+    /// so it could never be observed in the sync stream.
     case notConnected
 
-    /// The request to the PowerSync service instance could not be completed due to authentication issues.
+    /// The PowerSync service rejected the checkpoint request because the current credentials are not valid.
     case unauthenticated(message: String)
 
-    /// Represents a failure in an operation
+    /// The checkpoint request could not be completed.
     case operationFailed(message: String? = nil, underlyingError: Error? = nil)
 }
 
-///
+/// Errors thrown while waiting for a checkpoint request to sync.
 public enum CheckpointWaitError: Error, LocalizedError {
-    /// A checkpoint request was not synced in the specified period
+    /// The checkpoint request was not synced before the timeout elapsed.
     case timeout
 
-    /// A sync error (download or upload was reached) while waiting
+    /// The sync status stream ended before the checkpoint request was synced.
+    case syncStatusClosed
+
+    /// The sync client reported a download or upload error while waiting.
     case errorDetected(error: Sendable)
 }
 
-/// Result from calling db.requestCheckpoint
-/// TODO: Better docs.
+/// A checkpoint request created by ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
+///
+/// Use this value to wait until the local database has applied server-side changes up to
+/// the requested checkpoint. This is useful for explicit refresh flows where the caller
+/// wants confirmation that the local view has caught up to the service.
 public protocol CheckpointRequest: Sendable {
-    /// If the checkpoint has been synced
+    /// Whether this checkpoint has already been synced locally.
+    ///
+    /// This is a snapshot of the current sync status. Use ``waitForSync()`` or
+    /// ``waitForSync(timeout:)`` to suspend until the checkpoint is reached.
     var isSynced: Bool { get }
     
-    /// Waits for the checkpoint to have been synced back
-    /// TODO: Triggers a connection retry if currently in a back-off period
-    /// Throws if a new sync error is reached.
+    /// Waits until this checkpoint has been synced locally.
+    ///
+    /// This method observes sync status updates for an already-created checkpoint request.
+    /// - Throws: ``CheckpointWaitError`` when the sync status stream closes before the
+    ///   checkpoint is reached, or when a sync error is present or reached while waiting.
     func waitForSync() async throws
 
-    /// Waits for the checkpoint to have been synced back.
+    /// Waits until this checkpoint has been synced locally, or until a timeout elapses.
     ///
     /// - Parameter timeout: The maximum number of seconds to wait.
     /// - Throws: ``CheckpointWaitError/timeout`` if the checkpoint was not synced before the timeout.
-    ///   Also throws if a new sync error is reached while waiting.
+    ///   Also throws if a sync error is present or reached while waiting.
     func waitForSync(timeout: TimeInterval) async throws
 }
 
@@ -55,6 +69,8 @@ public extension CheckpointRequest {
         }
 
         try await withThrowingTaskGroup(of: Void.self) { group in
+            defer { group.cancelAll() }
+
             group.addTask {
                 try await waitForSync()
             }
@@ -69,13 +85,8 @@ public extension CheckpointRequest {
                 throw CheckpointWaitError.timeout
             }
 
-            do {
-                let _ = try await group.next()
-                group.cancelAll()
-            } catch {
-                group.cancelAll()
-                throw error
-            }
+            let _ = try await group.next()
+            try Task.checkCancellation()
         }
     }
 }

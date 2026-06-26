@@ -4,10 +4,9 @@ import Foundation
 fileprivate let tag = "StreamingSyncClient"
 
 enum CheckpointMode: Sendable {
-    /// Implementation which makes write checkpoint calls to the write-checkpoints2.json endpoint
+    /// Uses the legacy `/write-checkpoint2.json` endpoint to obtain a target operation id.
     case legacy
-    /// New implementation with client-side generated checkpoint request IDs which are sent to
-    /// the /sync/checkpoint-request route
+    /// Uses client-generated checkpoint request IDs sent to `/sync/checkpoint-request`.
     case requests
 }
 
@@ -114,8 +113,11 @@ The next upload iteration will be delayed.
         }
     }
 
-    /// Called once all current CRUD items have been uploaded.
-    /// 
+    /// Updates the local target once all currently queued CRUD items have been uploaded.
+    ///
+    /// When using checkpoint requests, this stores the generated request ID as the local target.
+    /// The sync stream later reports the same ID once the corresponding checkpoint has been
+    /// applied locally.
     private func uploadLocalTarget() async throws {
         let current_target = try await db.get(
             sql: "SELECT powersync_probe_local_target_op(NULL)",
@@ -162,10 +164,10 @@ The next upload iteration will be delayed.
         }
     }
 
-    /// Bumps the client side requested checkpoint id
-    /// POSTs the update to the PowerSync service
-    /// This does not set any target OP, that is only done for write checkpoints in the code which
-    /// calls this.
+    /// Creates a checkpoint request with a client-generated request ID.
+    ///
+    /// The request ID is persisted by the core extension before it is sent to the service, so
+    /// later sync status updates can report when the same checkpoint request has been applied.
     public func requestCheckpoint() async throws -> Int64 {
         let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
 

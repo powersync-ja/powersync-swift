@@ -100,6 +100,10 @@ final class SystemManager {
         }
     }
 
+    /// Requests a remote checkpoint and waits until the local database has applied it.
+    ///
+    /// The demo uses this for pull-to-refresh so the refresh indicator only completes once
+    /// changes available on the service have been synced locally.
     func refreshFromRemote(timeout: TimeInterval = 30) async throws {
         let checkpoint = try await db.requestCheckpoint()
         try await checkpoint.waitForSync(timeout: timeout)
