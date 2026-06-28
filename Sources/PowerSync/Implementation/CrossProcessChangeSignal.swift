@@ -24,7 +24,7 @@ final class CrossProcessChangeSignal: @unchecked Sendable {
     init(databasePath: String, logger: any LoggerProtocol) {
         // Stable across processes: both sides derive the name from the canonical path.
         let canonical = URL(fileURLWithPath: databasePath).standardizedFileURL.path
-        self.name = "co.powersync.changes.\(Self.fnv1a(canonical))"
+        self.name = "com.powersync.changes.\(Self.fnv1a(canonical))"
         self.logger = logger
     }
 

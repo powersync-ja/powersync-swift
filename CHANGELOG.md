@@ -4,18 +4,8 @@
 
 * `PowerSyncDatabase(dbFilename:)` now accepts an absolute path (starting with `/`), used
   as-is so the database can live in an App Group container shared with app extensions.
-  Plain filenames keep the existing behavior, and `close(deleteDatabase: true)` deletes the
-  files at the absolute location.
-* Opening the connection pool retries while another process holds the database. The
-  `pragma journal_mode = WAL` transition reports `SQLITE_BUSY`/`SQLITE_BUSY_RECOVERY`
-  without consulting the busy handler, so concurrent cold opens (an app launching while its
-  extension opens the same file) used to fail; the pool now retries with backoff.
-* Added an opt-in cross-process change signal: each pool posts a Darwin notification after
-  every committed write and, on receipt, re-emits `tableUpdates` with
-  `EXTERNAL_CHANGES_MARKER` so `watch` queries and the upload client wake for writes made by
-  other processes sharing the database file. Only databases opened from an absolute path
-  (an App Group container) use the signal; in-memory and default-directory databases skip
-  it, since they can't be shared across processes.
+  Plain filenames keep the existing behavior. The SDK coordinates opening the database to
+  avoid conflicts and can share update notifications across the main app and extensions.
 
 ## 1.14.3
 
