@@ -32,10 +32,10 @@ jobs:
         run: xcrun xctrace list devices
 
       - name: Test on iOS simulator
-        run: xcodebuild test -scheme PowerSync-Package -destination "platform=iOS Simulator,name=iPhone 16"
+        run: xcodebuild test -scheme PowerSync-Package -destination "platform=iOS Simulator,name=iPhone 17"
       - name: Test on macOS simulator
         run: xcodebuild test -scheme PowerSync-Package -destination "platform=macOS,arch=arm64,name=My Mac"
       - name: Test on watchOS simulator
-        run: xcodebuild test -scheme PowerSync-Package -destination "platform=watchOS Simulator,arch=arm64,name=Apple Watch Ultra 2 (49mm)"
+        run: xcodebuild test -scheme PowerSync-Package -destination "platform=watchOS Simulator,arch=arm64,name=Apple Watch Ultra"
       - name: Test on tvOS simulator
         run: xcodebuild test -scheme PowerSync-Package -destination "platform=tvOS Simulator,arch=arm64,name=Apple TV"
