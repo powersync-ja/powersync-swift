@@ -37,7 +37,9 @@ final class StreamingSyncClient: Sendable {
     }
 
     private func uploadLoop(signals: SyncSignals) async throws {
-        let updates = db.pool.tableUpdates.filter { updates in updates.contains("ps_crud") }.map { _ in () }
+        let updates = db.pool.tableUpdates.filter { updates in
+            updates.contains("ps_crud") || updates.contains(EXTERNAL_CHANGES_MARKER)
+        }.map { _ in () }
         let allTriggers = MergeItemSequence(inner: AsyncAlgorithms.merge(updates, signals.signalCrudUpload.subscribe())).makeAsyncIterator()
         
         // Use a do-while loop to ensure we start an upload iteration even if we can't connect to the service.

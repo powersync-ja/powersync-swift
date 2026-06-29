@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+* `PowerSyncDatabase(dbFilename:)` now accepts an absolute path (starting with `/`), used
+  as-is so the database can live in an App Group container shared with app extensions.
+  Plain filenames keep the existing behavior. The SDK coordinates opening the database to
+  avoid conflicts and can share update notifications across the main app and extensions.
+
 ## 1.14.4
 
 - Fix crash when running a statement in a cursor callback ([#148](https://github.com/powersync-ja/powersync-swift/issues/148)).
