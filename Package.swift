@@ -1,6 +1,7 @@
 // swift-tools-version: 6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
+import CompilerPluginSupport
 import PackageDescription
 
 let packageName = "PowerSync"
@@ -57,13 +58,22 @@ let package = Package(
         .library(
             name: "PowerSyncGRDB",
             targets: ["PowerSyncGRDB"]
+        ),
+        .library(
+            name: "PowerSyncSwiftData",
+            targets: ["PowerSyncSwiftData"]
+        ),
+        .library(
+            name: "PowerSyncSwiftDataMacros",
+            targets: ["PowerSyncSwiftDataMacros"]
         )
     ],
     dependencies: conditionalDependencies + [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.0"),
         .package(url: "https://github.com/powersync-ja/CSQLite.git", exact: "3.51.2"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.0"),
-        .package(url: "https://github.com/apple/swift-collections.git", from: "1.4.0")
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.4.0"),
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -91,6 +101,23 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift")
             ]
         ),
+        .target(
+            name: "PowerSyncSwiftData",
+            dependencies: [
+                .target(name: "PowerSync")
+            ]
+        ),
+        .macro(
+            name: "PowerSyncSwiftDataMacrosPlugin",
+            dependencies: [
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax")
+            ]
+        ),
+        .target(
+            name: "PowerSyncSwiftDataMacros",
+            dependencies: ["PowerSyncSwiftDataMacrosPlugin"]
+        ),
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]
@@ -98,6 +125,10 @@ let package = Package(
         .testTarget(
             name: "PowerSyncGRDBTests",
             dependencies: ["PowerSync", "PowerSyncGRDB"]
+        ),
+        .testTarget(
+            name: "PowerSyncSwiftDataTests",
+            dependencies: ["PowerSync", "PowerSyncSwiftData", "PowerSyncSwiftDataMacros"]
         )
     ] + conditionalTargets
 )
