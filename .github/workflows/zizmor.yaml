@@ -17,7 +17,7 @@ jobs:
       security-events: write # Needed to upload findings as code scanning results.
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
