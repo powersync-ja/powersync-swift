@@ -80,8 +80,8 @@ fileprivate struct SyncStatusDataImpl: SyncStatusData {
         }
     }
 
-    var lastSyncedCheckpointRequestId: Int64? {
-        core.lastSyncedCheckpointRequestId
+    var lastAppliedCheckpointRequestId: Int64? {
+        core.lastAppliedCheckpointRequestId
     }
 
     func statusForPriority(_ priority: BucketPriority) -> PriorityStatusEntry {
@@ -218,8 +218,8 @@ final class SwiftSyncStatus: SyncStatus {
         self.readStatus { current in current.syncStreams }
     }
 
-    var lastSyncedCheckpointRequestId: Int64? {
-        self.readStatus{ current in current.lastSyncedCheckpointRequestId}
+    var lastAppliedCheckpointRequestId: Int64? {
+        self.readStatus { current in current.lastAppliedCheckpointRequestId }
     }
 
     func statusForPriority(_ priority: BucketPriority) -> PriorityStatusEntry {
@@ -255,4 +255,3 @@ struct IndexedCoreDownloadProgress: SyncDownloadProgress {
         return (prev.0 + total, prev.1 + downloaded)
     }
 }
-

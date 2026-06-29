@@ -187,7 +187,8 @@ class InMemorySyncIntegrationTests {
         var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
         try #require(try await query.next() == ["local write"])
 
-        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
+        try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
             op_id: "1",
@@ -221,7 +222,8 @@ class InMemorySyncIntegrationTests {
         var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
         try #require(try await query.next() == ["local write"])
 
-        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
+        try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
             op_id: "1",
@@ -266,6 +268,209 @@ class InMemorySyncIntegrationTests {
         )])))
         try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
         try #require(try await query.next() == ["from server"])
+    }
+
+    @Test func requestCheckpointWaitsUntilApplied() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpClient { request in channel })
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await waitForStatus(db.currentStatus) { $0.connected }
+
+        let checkpoint = try await db.requestCheckpoint()
+        try #require(!checkpoint.isSynced)
+
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(
+            last_op_id: "0",
+            buckets: [BucketChecksum(bucket: "a", checksum: 0)],
+            writeCheckpoint: "1"
+        )))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
+
+        try await checkpoint.waitForSync(timeout: 1)
+        try #require(checkpoint.isSynced)
+    }
+
+    @Test func requestCheckpointUsesReturnedCheckpointId() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in channel }
+        mockClient.checkpointRequestResponse = 5
+        let db = openDatabase(mockClient)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await waitForStatus(db.currentStatus) { $0.connected }
+
+        let checkpoint = try await db.requestCheckpoint()
+        try #require(mockClient.checkpointRequestIds == [1])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 1)
+
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(
+            last_op_id: "1",
+            buckets: [BucketChecksum(bucket: "a", checksum: 0)],
+            writeCheckpoint: "1"
+        )))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        await waitForStatus(db.currentStatus) { $0.lastAppliedCheckpointRequestId == 1 }
+        try #require(!checkpoint.isSynced)
+
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(
+            last_op_id: "2",
+            buckets: [BucketChecksum(bucket: "a", checksum: 0)],
+            writeCheckpoint: "5"
+        )))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "2"))
+
+        try await checkpoint.waitForSync(timeout: 1)
+        try #require(checkpoint.isSynced)
+    }
+
+    @Test func renewsLastRequestedCheckpointRequestOnConnect() async throws {
+        let didConnect = Signal()
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in
+            await didConnect.complete()
+            return channel
+        }
+        let db = openDatabase(mockClient)
+        try await setLocalTargetOp(db, 7)
+        try await setLastRequestedCheckpointRequestId(db, 4)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await didConnect.await()
+
+        try #require(mockClient.checkpointRequestIds == [4])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 4)
+        try #require(try await localTargetOp(db) == 7)
+    }
+
+    @Test func renewSeedsHigherReturnedCheckpointRequestIdOnConnect() async throws {
+        let didConnect = Signal()
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in
+            await didConnect.complete()
+            return channel
+        }
+        mockClient.checkpointRequestResponse = 9
+        let db = openDatabase(mockClient)
+        try await setLastRequestedCheckpointRequestId(db, 4)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await didConnect.await()
+
+        try #require(mockClient.checkpointRequestIds == [4])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 9)
+    }
+
+    @Test func retriesCheckpointRequestRenewalBeforeConnecting() async throws {
+        let didConnect = Signal()
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let connectionCount = Mutex(0)
+        let mockClient = MockHttpClient { request in
+            connectionCount.withLock { $0 += 1 }
+            await didConnect.complete()
+            return channel
+        }
+        mockClient.checkpointRequestFailuresRemaining = 1
+        let db = openDatabase(mockClient)
+        try await setLastRequestedCheckpointRequestId(db, 4)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(retryDelay: 0.05))
+        await didConnect.await()
+
+        try #require(mockClient.checkpointRequestIds == [4, 4])
+        try #require(connectionCount.withLock { $0 } == 1)
+    }
+
+    @Test func uploadLocalTargetWaitsForCheckpointRequestRenewal() async throws {
+        let didUpload = Signal()
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in channel }
+        mockClient.checkpointRequestFailuresRemaining = 100
+        let db = openDatabase(mockClient)
+
+        try await db.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["local write"])
+        try await db.connect(connector: TestConnector { db in
+            let tx = try await db.getNextCrudTransaction()
+            try await tx?.complete()
+            await didUpload.complete()
+        }, options: ConnectOptions(retryDelay: 0.05))
+
+        await didUpload.await()
+        try #require(!mockClient.checkpointRequestIds.contains(2))
+
+        mockClient.checkpointRequestFailuresRemaining = 0
+        try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
+    }
+
+    @Test func ignoresConcreteLocalTargetWithoutLastRequestedCheckpointRequestIdOnConnect() async throws {
+        let didConnect = Signal()
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in
+            await didConnect.complete()
+            return channel
+        }
+        let db = openDatabase(mockClient)
+        try await setLocalTargetOp(db, 4)
+        try await clearLastRequestedCheckpointRequestId(db)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await didConnect.await()
+
+        try #require(mockClient.checkpointRequestIds == [])
+        try #require(try await lastRequestedCheckpointRequestId(db) == nil)
+        try #require(try await localTargetOp(db) == 4)
+    }
+
+    @Test func renewsCheckpointRequestOnlyOncePerConnect() async throws {
+        let firstConnect = Signal()
+        let secondConnect = Signal()
+        let firstChannel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let secondChannel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let connectionCount = Mutex(0)
+        let mockClient = MockHttpClient { request in
+            let count = connectionCount.withLock {
+                $0 += 1
+                return $0
+            }
+
+            if count == 1 {
+                await firstConnect.complete()
+                return firstChannel
+            } else {
+                await secondConnect.complete()
+                return secondChannel
+            }
+        }
+        let db = openDatabase(mockClient)
+        try await setLastRequestedCheckpointRequestId(db, 4)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(retryDelay: 0.05))
+        await firstConnect.await()
+        try #require(mockClient.checkpointRequestIds == [4])
+
+        firstChannel.finish()
+        await secondConnect.await()
+        try #require(mockClient.checkpointRequestIds == [4])
+    }
+
+    @Test func seedsRequestCounterForMigratedMaxTargetOnConnect() async throws {
+        let didConnect = Signal()
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in
+            await didConnect.complete()
+            return channel
+        }
+        mockClient.checkpointRequestResponse = 9
+        let db = openDatabase(mockClient)
+        try await setLocalTargetOp(db, PowerSyncDatabaseImpl.maxOpId)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await didConnect.await()
+
+        try #require(mockClient.checkpointRequestIds == [1])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 9)
+        try #require(try await localTargetOp(db) == PowerSyncDatabaseImpl.maxOpId)
+        try #require(try await nextCheckpointRequestId(db) == 10)
     }
 
     @Test func tokenExpired() async throws {
@@ -831,6 +1036,49 @@ private func openDatabase(_ client: any HttpClient, schema: Schema = defaultSche
     )
 }
 
+private func setLocalTargetOp(_ db: any PowerSyncDatabaseProtocol, _ opId: Int64) async throws {
+    let _ = try await db.writeTransaction { tx in
+        try tx.execute(sql: "SELECT powersync_probe_local_target_op(?)", parameters: [opId])
+    }
+}
+
+private func localTargetOp(_ db: any PowerSyncDatabaseProtocol) async throws -> Int64? {
+    try await db.get(sql: "SELECT powersync_probe_local_target_op(NULL)", parameters: []) { cursor in
+        cursor.getInt64Optional(index: 0)
+    }
+}
+
+private func lastRequestedCheckpointRequestId(_ db: any PowerSyncDatabaseProtocol) async throws -> Int64? {
+    try await db.getOptional(
+        sql: "SELECT CAST(value AS INTEGER) FROM ps_kv WHERE key = 'last_requested_checkpoint_request_id'",
+        parameters: []
+    ) { cursor in
+        try cursor.getInt64(index: 0)
+    }
+}
+
+private func setLastRequestedCheckpointRequestId(_ db: any PowerSyncDatabaseProtocol, _ requestId: Int64) async throws {
+    try await db.execute(
+        sql: "INSERT OR REPLACE INTO ps_kv(key, value) VALUES('last_requested_checkpoint_request_id', ?)",
+        parameters: [requestId]
+    )
+}
+
+private func clearLastRequestedCheckpointRequestId(_ db: any PowerSyncDatabaseProtocol) async throws {
+    try await db.execute(
+        sql: "DELETE FROM ps_kv WHERE key = 'last_requested_checkpoint_request_id'",
+        parameters: []
+    )
+}
+
+private func nextCheckpointRequestId(_ db: any PowerSyncDatabaseProtocol) async throws -> Int64 {
+    try await db.writeTransaction { tx in
+        try tx.get(sql: "SELECT powersync_next_checkpoint_request_id()", parameters: []) { cursor in
+            try cursor.getInt64(index: 0)
+        }
+    }
+}
+
 let testCredentials = PowerSyncCredentials(
     endpoint: "https://powersynctest.example.org",
     token: "test-token"
@@ -879,6 +1127,18 @@ func waitForStatus(_ status: SyncStatus, predicate: @Sendable (borrowing SyncSta
     }
 
     let _ = await status.asFlow().first(where: predicate)
+}
+
+func waitUntil(_ predicate: @escaping @Sendable () -> Bool) async throws {
+    for _ in 0..<100 {
+        if predicate() {
+            return
+        }
+
+        try await sleepForSeconds(seconds: 0.05)
+    }
+
+    try #require(predicate())
 }
 
 func waitForProgress(_ status: SyncStatus, total: (Int32, Int32)) async {

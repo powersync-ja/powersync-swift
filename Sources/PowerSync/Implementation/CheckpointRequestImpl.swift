@@ -35,7 +35,7 @@ final class CheckpointRequestImpl: CheckpointRequest {
     }
 
     private static func isSynced(status: any SyncStatusData, requestId: Int64) -> Bool {
-        guard let lastId = status.lastSyncedCheckpointRequestId else {
+        guard let lastId = status.lastAppliedCheckpointRequestId else {
             return false
         }
 
