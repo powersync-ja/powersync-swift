@@ -15,6 +15,8 @@ The SDK provides two main products:
 - **PowerSync**: Core SDK with SQLite support for data synchronization.
 - **PowerSyncDynamic**: Forced dynamically linked version of `PowerSync` - useful for XCode previews.
 - **PowerSyncGRDB [ALPHA]**: GRDB integration allowing PowerSync to work with GRDB databases. This product is currently in an alpha release.
+- **PowerSyncSwiftData [ALPHA]**: A SwiftData custom `DataStore` backed by PowerSync, letting apps use `@Model`/`@Query`/`ModelContext` with PowerSync storage and sync. Requires iOS 18 / macOS 15. This product is currently in an alpha release; see [its README](./Sources/PowerSyncSwiftData/README.md).
+- **PowerSyncSwiftDataMacros [ALPHA]**: Optional companion to `PowerSyncSwiftData`: the `@PowerSyncModel` macro exposes a model's key paths through public Foundation API, removing the integration's reflection fallback for that model.
 
 ## Demo Apps / Example Projects
 
@@ -25,6 +27,8 @@ The easiest way to test the PowerSync Swift SDK is to run our demo application.
 - [Demos/GRDBDemo](./Demos/GRDBDemo/README.md): A simple to-do list application demonstrating the use of the PowerSync Swift SDK using a Supabase connector and GRDB connections.
 
 - [Demos/SwiftEncryptionDemo](./Demos/SwiftEncryptionDemo/README.md): A simple app opening an encrypted local PowerSync database.
+
+- [Demos/SwiftDataDemo](./Demos/SwiftDataDemo/README.md): A to-do list application built with SwiftData (`@Model`/`@Query`) stored and synced by PowerSync through `PowerSyncSwiftData`, including a read-only widget sharing the database via an App Group.
 
 ## Installation
 
@@ -118,6 +122,42 @@ Feel free to use the `DatabasePool` for view logic and the `PowerSyncDatabase` f
 - Updating the PowerSync schema, with `updateSchema`, is not currently fully supported with GRDB connections.
 - This integration currently requires statically linking PowerSync and GRDB.
 - This implementation requires defining the PowerSync Schema and GRDB data types. This results in some duplication.
+
+### SwiftData Integration
+
+If your app uses SwiftData, the `PowerSyncSwiftData` product provides a custom `DataStore` so `@Model`, `@Query` and `ModelContext` work directly on top of PowerSync: local writes are captured into PowerSync's upload queue, and downloaded changes update the UI live.
+
+**⚠️ Note:** The SwiftData integration is currently in **alpha** release and the API may change significantly. It requires iOS 18 / macOS 15 / watchOS 11 / tvOS 18.
+
+```swift
+import PowerSync
+import PowerSyncSwiftData
+import SwiftData
+
+@Model
+final class Note {
+    var id: String   // maps to PowerSync's id column
+    var title: String
+    var done: Bool
+    init(id: String, title: String, done: Bool) { ... }
+}
+
+// The PowerSync schema is derived from the models - declare them once.
+let database = PowerSyncDatabase(schema: try PowerSyncSchema(for: [Note.self]))
+try await database.connect(connector: MyConnector())
+
+let configuration = PowerSyncDataStoreConfiguration(name: "powersync", database: database)
+let container = try ModelContainer(
+    for: SwiftData.Schema([Note.self]),
+    configurations: [configuration]
+)
+
+// Re-injects sync downloads into SwiftData so @Query updates live.
+let observer = PowerSyncChangeObserver(container: container, configuration: configuration)
+try await observer.start(observing: [Note.self])
+```
+
+See the [module README](./Sources/PowerSyncSwiftData/README.md) for the supported attribute types, predicate translation, relationships, the read-only mode for widgets/extensions, and current limitations.
 
 ## Attachments
 

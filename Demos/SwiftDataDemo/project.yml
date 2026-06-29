@@ -1,0 +1,99 @@
+name: SwiftDataDemo
+options:
+  bundleIdPrefix: co.powersync
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+packages:
+  PowerSync:
+    path: ../..
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    majorVersion: 2.4.0
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: "1.0"
+
+targets:
+  SwiftDataDemo:
+    type: application
+    platform: iOS
+    sources:
+      - path: SwiftDataDemo
+        excludes:
+          - Secrets.template.swift
+      - path: SwiftDataDemo/Secrets.template.swift
+        buildPhase: none
+      - path: Shared
+    dependencies:
+      - target: SwiftDataDemoWidget
+      - package: PowerSync
+        product: PowerSync
+      - package: PowerSync
+        product: PowerSyncSwiftData
+      - package: Supabase
+        product: Supabase
+    info:
+      path: SwiftDataDemo/Info.plist
+      properties:
+        UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: SwiftDataDemo/SwiftDataDemo.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.co.powersync.swiftdatademo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.powersync.swiftdatademo
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+
+  SwiftDataDemoWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SwiftDataDemoWidget
+      - path: Shared
+    dependencies:
+      - package: PowerSync
+        product: PowerSync
+      - package: PowerSync
+        product: PowerSyncSwiftData
+    info:
+      path: SwiftDataDemoWidget/Info.plist
+      properties:
+        CFBundleDisplayName: SwiftDataDemo Widget
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: SwiftDataDemoWidget/SwiftDataDemoWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.co.powersync.swiftdatademo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.powersync.swiftdatademo.widget
+
+schemes:
+  SwiftDataDemo:
+    build:
+      targets:
+        SwiftDataDemo: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  SwiftDataDemoWidget:
+    build:
+      targets:
+        SwiftDataDemoWidget: all
+    run:
+      config: Debug

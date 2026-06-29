@@ -6,6 +6,17 @@
   as-is so the database can live in an App Group container shared with app extensions.
   Plain filenames keep the existing behavior. The SDK coordinates opening the database to
   avoid conflicts and can share update notifications across the main app and extensions.
+* Added Alpha `PowerSyncSwiftData` product: a SwiftData custom `DataStore` backed by
+  PowerSync, so apps can use `@Model`/`@Query`/`ModelContext` with PowerSync storage and
+  sync (iOS 18 / macOS 15 / watchOS 11 / tvOS 18). Includes derived PowerSync schemas
+  (`PowerSyncSchema(for:)`), predicate/sort translation to SQL, relationships, live
+  updates via `PowerSyncChangeObserver`, and a read-only mode for widgets and app
+  extensions. Combined with the multi-process support above, `PowerSyncSwiftData`
+  extensions can read and write the shared database with live `@Query` updates in the
+  app. See `Sources/PowerSyncSwiftData/README.md`.
+* Added optional `PowerSyncSwiftDataMacros` product with the `@PowerSyncModel` macro,
+  which generates a `PredicateCodableKeyPathProviding` conformance so models expose their
+  key paths through public API instead of the reflection fallback.
 
 ## 1.14.4
 
