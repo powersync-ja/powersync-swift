@@ -5,6 +5,60 @@ import Testing
 
 @Suite()
 class InMemorySyncIntegrationTests {
+    @Test func statusFlowEmitsImmutableSnapshots() async throws {
+        let status = SwiftSyncStatus()
+        var updates = status.asFlow().makeAsyncIterator()
+
+        let initial = try #require(await updates.next())
+        status.mutateStatus { $0.uploading = true }
+        let updated = try #require(await updates.next())
+
+        #expect(initial.uploading == false)
+        #expect(updated.uploading == true)
+    }
+
+    @Test func decodesCoreSyncStatusTimestampsAsMicroseconds() throws {
+        let data = """
+        {
+          "connected": true,
+          "connecting": false,
+          "priority_status": [
+            {
+              "priority": 2147483647,
+              "last_synced_at": 1740823200000000,
+              "has_synced": true
+            }
+          ],
+          "downloading": null,
+          "streams": [
+            {
+              "name": "default_stream",
+              "parameters": null,
+              "progress": {
+                "total": 1,
+                "downloaded": 1
+              },
+              "active": true,
+              "is_default": true,
+              "has_explicit_subscription": false,
+              "expires_at": 1740826800000000,
+              "last_synced_at": 1740823200000000,
+              "priority": 2147483647
+            }
+          ],
+          "last_applied_checkpoint_request_id": null
+        }
+        """.data(using: .utf8)!
+
+        let status = try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: data)
+        let priority = try #require(status.priorityStatus.first)
+        let stream = try #require(status.streams.first)
+
+        #expect(priority.lastSyncedAt?.timeIntervalSince1970 == TimeInterval(1_740_823_200))
+        #expect(stream.subscription.lastSyncedAt == TimeInterval(1_740_823_200))
+        #expect(stream.subscription.expiresAt == TimeInterval(1_740_826_800))
+    }
+
     @Test func setsHeaders() async throws {
         let didConnect = Signal()
         let db = openDatabase(MockHttpClient { request in

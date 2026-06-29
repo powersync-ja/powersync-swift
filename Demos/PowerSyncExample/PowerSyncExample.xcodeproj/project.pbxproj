@@ -31,6 +31,7 @@
 		B65C4D6D2C60D38B00176007 /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65C4D6C2C60D38B00176007 /* HomeScreen.swift */; };
 		B65C4D712C60D7D800176007 /* SignUpScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65C4D702C60D7D800176007 /* SignUpScreen.swift */; };
 		B65C4D732C60D7EB00176007 /* TodosScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65C4D722C60D7EB00176007 /* TodosScreen.swift */; };
+		B6A1D0022F1A000100000001 /* AdminScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A1D0002F1A000100000001 /* AdminScreen.swift */; };
 		B666585B2C620C3900159A81 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = B666585A2C620C3900159A81 /* Constants.swift */; };
 		B666585D2C620E9E00159A81 /* WifiIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = B666585C2C620E9E00159A81 /* WifiIcon.swift */; };
 		B666585F2C62115300159A81 /* ListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B666585E2C62115300159A81 /* ListRow.swift */; };
@@ -87,6 +88,7 @@
 		B65C4D6C2C60D38B00176007 /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
 		B65C4D702C60D7D800176007 /* SignUpScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpScreen.swift; sourceTree = "<group>"; };
 		B65C4D722C60D7EB00176007 /* TodosScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodosScreen.swift; sourceTree = "<group>"; };
+		B6A1D0002F1A000100000001 /* AdminScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminScreen.swift; sourceTree = "<group>"; };
 		B666585A2C620C3900159A81 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		B666585C2C620E9E00159A81 /* WifiIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WifiIcon.swift; sourceTree = "<group>"; };
 		B666585E2C62115300159A81 /* ListRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListRow.swift; sourceTree = "<group>"; };
@@ -213,6 +215,7 @@
 				B65C4D6C2C60D38B00176007 /* HomeScreen.swift */,
 				B65C4D702C60D7D800176007 /* SignUpScreen.swift */,
 				B65C4D722C60D7EB00176007 /* TodosScreen.swift */,
+				B6A1D0002F1A000100000001 /* AdminScreen.swift */,
 			);
 			path = Screens;
 			sourceTree = "<group>";
@@ -586,6 +589,7 @@
 				BEE4708B2E3BBB2500140D11 /* Secrets.swift in Sources */,
 				0B29DBE92E686D6000D60A06 /* FtsSetup.swift in Sources */,
 				B65C4D6D2C60D38B00176007 /* HomeScreen.swift in Sources */,
+				B6A1D0022F1A000100000001 /* AdminScreen.swift in Sources */,
 				6A7315882B9854220004CB17 /* PowerSyncExampleApp.swift in Sources */,
 				B666585F2C62115300159A81 /* ListRow.swift in Sources */,
 				BE2F26EC2DA54B2F0080F1AE /* SupabaseRemoteStorage.swift in Sources */,

@@ -28,7 +28,7 @@ public struct PriorityStatusEntry: Sendable, Decodable {
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.priority = try container.decode(BucketPriority.self, forKey: .priority)
-        self.lastSyncedAt = try container.decodeIfPresent(Int64.self, forKey: .lastSyncedAt).map { Date(timeIntervalSince1970: Double($0)) }
+        self.lastSyncedAt = try container.decodeIfPresent(Int64.self, forKey: .lastSyncedAt).map(coreTimestampDate)
         self.hasSynced = try container.decodeIfPresent(Bool.self, forKey: .hasSynced)
     }
 }
