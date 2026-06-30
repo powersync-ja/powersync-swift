@@ -111,7 +111,6 @@ fileprivate struct SyncStatusDataImpl: SyncStatusData {
 fileprivate struct SyncStatusContainer: ~Copyable {
     var inner: MutableSyncStatus
     var snapshot: SyncStatusDataImpl
-    var observable: Any? // ObservableSyncStatus, only available on newer platform versions
 
     init(inner: consuming MutableSyncStatus) {
         self.snapshot = SyncStatusDataImpl(status: inner)
@@ -122,6 +121,7 @@ fileprivate struct SyncStatusContainer: ~Copyable {
 final class SwiftSyncStatus: SyncStatus {
     private let current: Mutex<SyncStatusContainer>
     private let listeners: BroadcastStream<any SyncStatusData> = BroadcastStream()
+    @MainActor private var _observable: Any? // ObservableSyncStatus, only available on newer platform versions
 
     init() {
         self.current = Mutex(SyncStatusContainer(inner: MutableSyncStatus()))
@@ -164,19 +164,13 @@ final class SwiftSyncStatus: SyncStatus {
     
     @available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *)
     @MainActor var observable: ObservableSyncStatus {
-        let (observable, didCreate) = self.current.withLock {
-            if let observable = $0.observable as? ObservableSyncStatus {
-                return (observable, false)
-            }
-            
-            let observable = ObservableSyncStatus(status: $0.snapshot)
-            $0.observable = observable
-            return (observable, true)
+        if let observable = _observable as? ObservableSyncStatus {
+            return observable
         }
         
-        if didCreate {
-            observable.trackUpdates(from: self.listeners)
-        }
+        let observable = ObservableSyncStatus(status: copySnapshot())
+        observable.trackUpdates(from: self.listeners)
+        _observable = observable
         return observable
     }
 
