@@ -3,11 +3,22 @@ import Foundation
 
 fileprivate let tag = "StreamingSyncClient"
 
+enum CheckpointMode: Sendable {
+    /// Uses the legacy `/write-checkpoint2.json` endpoint to obtain a target operation id.
+    case legacy
+    /// Uses client-generated checkpoint request IDs sent to `/sync/checkpoint-request`.
+    case requests
+}
+
+
 final class StreamingSyncClient: Sendable {
     let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
     let connector: CachingCredentialsConnector
     let httpClient: any HttpClient
+
+    let checkpointMode: CheckpointMode
+    private let checkpointRequestRenewal = CheckpointRequestRenewal()
     
     init(
         db: PowerSyncDatabaseImpl,
@@ -19,6 +30,9 @@ final class StreamingSyncClient: Sendable {
         self.connector = CachingCredentialsConnector(inner: connector)
         self.httpClient = httpClient
         self.options = options
+
+        // TODO, make this configurable, or automatically detect
+        self.checkpointMode = .requests
     }
     
     /// Starts a task driving uploads and downloads by repeatedly connecting to the PowerSync service,
@@ -101,22 +115,40 @@ The next upload iteration will be delayed.
             }
         }
     }
-    
+
+    /// Updates the local target once all currently queued CRUD items have been uploaded.
+    ///
+    /// When using checkpoint requests, this stores the generated request ID as the local target.
+    /// The sync stream later reports the same ID once the corresponding checkpoint has been
+    /// applied locally.
     private func uploadLocalTarget() async throws {
-        guard let _ = try await db.getOptional(
-            sql: "SELECT 1 FROM ps_buckets WHERE name = '$local' AND target_op = ?",
-            parameters: [PowerSyncDatabaseImpl.maxOpId],
-            mapper: { cursor in () }
-        ) else {
-            return // Nothing to update
+        let current_target = try await db.get(
+            sql: "SELECT powersync_probe_local_target_op(NULL)",
+            parameters: [],
+            mapper: { cursor in cursor.getInt64Optional(index: 0) })
+
+        if current_target != PowerSyncDatabaseImpl.maxOpId {
+            // We should only update the target if it is currently at the max value
+            // This is set after having completed a CRUD Batch/Transaction
+            // This avoid overwriting a custom write checkpoint - which would have been set in the .complete handler
+            return
         }
         
+        // If there never has been any crud items, we don't need to update the checkpoint
         guard let seqBefore = try await db.getOptional("SELECT seq FROM main.sqlite_sequence WHERE name = 'ps_crud'", mapper: { try $0.getInt64(index: 0) }) else {
             return // Nothing to update
         }
+
+        // CRUD uploads can run while the connect-time checkpoint renewal is retrying, but local
+        // target updates must wait for renewal to finish. Otherwise a reconnect after
+        // disconnectAndClear or migration could allocate a new checkpoint request before the
+        // service has had a chance to return the managed checkpoint id it already knows about.
+        try await checkpointRequestRenewal.wait()
         
+        // Allocate or fetch the checkpoint ID that can satisfy this upload's local write gate.
         let opId = try await getWriteCheckpoint()
         
+        // This is inside a write transaction, to prevent conflicts with other writes
         try await db.writeTransaction { tx in
             let anyData = try tx.getOptional(sql: "SELECT 1 FROM ps_crud LIMIT 1", parameters: nil) { cursor in 1 }
             if anyData != nil {
@@ -130,7 +162,8 @@ The next upload iteration will be delayed.
                 return
             }
             
-            try tx.execute(sql: "UPDATE ps_buckets SET target_op = CAST(? AS INTEGER) WHERE name = '$local'", parameters: [opId])
+            // Update the target op
+            try tx.execute(sql: "SELECT powersync_probe_local_target_op(?)", parameters: [opId])
         }
     }
 
@@ -140,20 +173,159 @@ The next upload iteration will be delayed.
         }
     }
 
-    private func getWriteCheckpoint() async throws -> String {
-        let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
-        let (_, request) = try await authenticatedRequest { endpoint in
-            endpoint.path += "/write-checkpoint2.json"
-            endpoint.queryItems = [.init(name: "client_id", value: clientId)]
+    /// Creates a checkpoint request with a client-generated request ID.
+    ///
+    /// The request ID is persisted by the core extension before it is sent to the service, so
+    /// later sync status updates can report when the same checkpoint request has been applied.
+    /// This does not update the local target op: explicit checkpoint requests are wait markers,
+    /// not local upload gates.
+    public func requestCheckpoint() async throws -> Int64 {
+        // Allocate the request ID locally before reporting it to the service.
+        let requestId = try await db.writeTransaction { ctx in
+            return try ctx.get(sql: "SELECT powersync_next_checkpoint_request_id()", parameters: []) { cursor in
+                try cursor.getInt64(index: 0)
+            }
         }
+
+        let acceptedId = try await sendCheckpointRequest(requestId: requestId)
+        return acceptedId
+    }
+
+    /// Sends a checkpoint request and returns the checkpoint id accepted by the service.
+    ///
+    /// The service can return a value greater than the supplied request id when the request is
+    /// stale and storage has already advanced the managed checkpoint for this client.
+    private func sendCheckpointRequest(requestId: Int64) async throws -> Int64 {
+        let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
+
+        var (_, request) = try await authenticatedRequest { endpoint in
+            endpoint.path += "/sync/checkpoint-request"
+        }
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try StreamingSyncClient.jsonEncoder.encode(CheckpointRequestPayload(
+            client_id: clientId,
+            checkpoint_request_id: requestId
+        ))
         let (response, data) = try await httpClient.readFully(request: request)
         await self.handleCommonResponseErrors(response: response)
         if response.statusCode != 200 {
             throw PowerSyncError.operationFailed(message: "Error getting write checkpoint: \(response.statusCode)")
         }
-        
-        let body = try StreamingSyncClient.jsonDecoder.decode(WriteCheckpointResponse.self, from: data)
-        return body.data.write_checkpoint
+
+        let checkpoint = try StreamingSyncClient.decodeWriteCheckpoint(from: data)
+        guard let checkpointId = Int64(checkpoint) else {
+            throw PowerSyncError.operationFailed(message: "Invalid write checkpoint returned by service: \(checkpoint)")
+        }
+        if checkpointId < requestId {
+            throw PowerSyncError.operationFailed(message: "Checkpoint request returned \(checkpointId), older than requested id \(requestId)")
+        }
+
+        return checkpointId
+    }
+
+    /// Re-sends persisted checkpoint request ids before opening the sync stream.
+    ///
+    /// Checkpoint requests can expire on the service. When reconnecting, re-posting the current
+    /// target/request id lets the service recreate the managed checkpoint without advancing the
+    /// local counter. For max-target edge cases without a stored request id, this seeds the local
+    /// request counter from the concrete id returned by the service, leaving the target for the
+    /// upload path to update normally.
+    private func renewCheckpointRequestOnConnect() async throws {
+        guard checkpointMode == .requests else {
+            checkpointRequestRenewal.complete()
+            return
+        }
+
+        let state = try await checkpointRequestState()
+        let requestId: Int64?
+
+        if let lastRequested = state.lastRequestedCheckpointRequestId {
+            requestId = lastRequested
+        } else if state.localTargetOp == PowerSyncDatabaseImpl.maxOpId {
+            // Cleared or migrated databases can have a max-op target without a seeded request counter.
+            // Asking with `1` lets the service return any higher stored managed checkpoint id.
+            requestId = 1
+        } else {
+            requestId = nil
+        }
+
+        if let requestId {
+            let acceptedId = try await sendCheckpointRequest(requestId: requestId)
+            if acceptedId > (state.lastRequestedCheckpointRequestId ?? 0) {
+                let _ = try await db.writeTransaction { tx in
+                    // Seed only the request counter from the id accepted by the service.
+                    //
+                    // This can be higher than the id we sent when the service already has a
+                    // managed write checkpoint for this client. That can happen after a request
+                    // expires, after local sync state is cleared with disconnectAndClear, or when
+                    // opening a migrated database with a MAX_OP_ID local target but no last
+                    // requested checkpoint id. Persisting the accepted id keeps later
+                    // client-created checkpoint request ids monotonic with the service's state.
+                    //
+                    // Do not update the local target op here. On connect this is just repairing or
+                    // renewing the checkpoint request bookkeeping; the upload path still owns
+                    // turning local writes into a concrete target once uploads have completed.
+                    try tx.execute(
+                        sql: """
+                            INSERT INTO ps_kv(key, value)
+                            VALUES('last_requested_checkpoint_request_id', ?)
+                            ON CONFLICT(key) DO UPDATE SET value = CASE
+                                WHEN CAST(value AS INTEGER) < CAST(excluded.value AS INTEGER) THEN excluded.value
+                                ELSE value
+                            END
+                            """,
+                        parameters: [acceptedId]
+                    )
+                }
+            }
+        }
+
+        checkpointRequestRenewal.complete()
+    }
+
+    private func checkpointRequestState() async throws -> CheckpointRequestState {
+        try await db.readLock { ctx in
+            let localTargetOp = try ctx.get(sql: "SELECT powersync_probe_local_target_op(NULL)", parameters: []) { cursor in
+                cursor.getInt64Optional(index: 0)
+            }
+            let lastRequestedCheckpointRequestId = try ctx.getOptional(
+                sql: "SELECT CAST(value AS INTEGER) FROM ps_kv WHERE key = 'last_requested_checkpoint_request_id'",
+                parameters: []
+            ) { cursor in
+                try cursor.getInt64(index: 0)
+            }
+
+            return CheckpointRequestState(
+                localTargetOp: localTargetOp,
+                lastRequestedCheckpointRequestId: lastRequestedCheckpointRequestId
+            )
+        }
+    }
+
+    /// Returns the checkpoint identifier to store as the local target after uploads complete.
+    ///
+    /// With checkpoint requests this allocates and posts a request ID. The caller stores that
+    /// concrete ID only after the service accepts it and the CRUD queue is still empty.
+    private func getWriteCheckpoint() async throws -> String {
+        switch checkpointMode {
+            case .requests:
+                return String(try await requestCheckpoint())
+            case .legacy:
+                let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
+                let (_, request) = try await authenticatedRequest { endpoint in
+                    endpoint.path += "/write-checkpoint2.json"
+                    endpoint.queryItems = [.init(name: "client_id", value: clientId)]
+                }
+                let (response, data) = try await httpClient.readFully(request: request)
+                await self.handleCommonResponseErrors(response: response)
+                if response.statusCode != 200 {
+                    throw PowerSyncError.operationFailed(message: "Error getting write checkpoint: \(response.statusCode)")
+                }
+                
+                let body = try StreamingSyncClient.jsonDecoder.decode(WriteCheckpointResponse.self, from: data)
+                return body.data.write_checkpoint
+        }
     }
 
     private func downloadLoop(signals: SyncSignals) async throws {
@@ -161,6 +333,13 @@ The next upload iteration will be delayed.
         
         while (!Task.isCancelled) {
             do {
+                // We retry this on every download loop to retry any potential issues:
+                // e.g. network or invalid auth.
+                // We only need to renew this once.
+                if !checkpointRequestRenewal.isComplete {
+                    try await renewCheckpointRequestOnConnect()
+                }
+
                 try await withThrowingTaskGroup(of: Void.self) { group in
                     let iteration = ActiveSyncIteration(syncClient: self, signals: signals)
                     var group: ThrowingTaskGroup<Void, any Error>? = group
@@ -236,6 +415,14 @@ The next upload iteration will be delayed.
     
     static let jsonEncoder = JSONEncoder()
     static let jsonDecoder = JSONDecoder()
+
+    private static func decodeWriteCheckpoint(from data: Data) throws -> String {
+        if let body = try? jsonDecoder.decode(WriteCheckpointData.self, from: data) {
+            return body.write_checkpoint
+        }
+
+        return try jsonDecoder.decode(WriteCheckpointResponse.self, from: data).data.write_checkpoint
+    }
 }
 
 private struct ActiveSyncIteration: Sendable {
@@ -435,6 +622,43 @@ private struct SyncIterationResult {
     }
 }
 
+private final class CheckpointRequestRenewal: Sendable {
+    private let stream: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+    private let completed = Mutex(false)
+
+    init() {
+        let renewal = AsyncStream<Void>.makeStream()
+        self.stream = renewal.stream
+        self.continuation = renewal.continuation
+    }
+
+    var isComplete: Bool {
+        completed.withLock { $0 }
+    }
+
+    func complete() {
+        completed.withLock { completed in
+            assert(!completed, "Checkpoint request renewal completed more than once")
+            completed = true
+        }
+
+        continuation.finish()
+    }
+
+    func wait() async throws {
+        if isComplete {
+            try Task.checkCancellation()
+            return
+        }
+
+        for await _ in stream {
+            try Task.checkCancellation()
+        }
+        try Task.checkCancellation()
+    }
+}
+
 /// Allows the concurrent upload and download tasks to communicate.
 /// 
 /// The download task might request a CRUD upload (when we run into a checkpoint that couldn't
@@ -459,4 +683,14 @@ struct WriteCheckpointData: Codable {
 
 struct WriteCheckpointResponse: Codable {
     let data: WriteCheckpointData
+}
+
+private struct CheckpointRequestState {
+    let localTargetOp: Int64?
+    let lastRequestedCheckpointRequestId: Int64?
+}
+
+private struct CheckpointRequestPayload: Encodable {
+    let client_id: String
+    let checkpoint_request_id: Int64
 }

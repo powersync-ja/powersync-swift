@@ -5,6 +5,9 @@ import Testing
 
 final class MockHttpClient: HttpClient {
     private let _writeCheckpoint = PowerSync.Mutex(1000)
+    private let _checkpointRequestIds = PowerSync.Mutex<[Int64]>([])
+    private let _checkpointRequestResponse = PowerSync.Mutex<Int64?>(nil)
+    private let _checkpointRequestFailuresRemaining = PowerSync.Mutex(0)
     let handleSyncLines: @Sendable (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>
     
     var writeCheckpoint: Int {
@@ -13,6 +16,28 @@ final class MockHttpClient: HttpClient {
         }
         set {
             _writeCheckpoint.withLock { $0 = newValue }
+        }
+    }
+
+    var checkpointRequestIds: [Int64] {
+        _checkpointRequestIds.withLock { $0 }
+    }
+
+    var checkpointRequestResponse: Int64? {
+        get {
+            _checkpointRequestResponse.withLock { $0 }
+        }
+        set {
+            _checkpointRequestResponse.withLock { $0 = newValue }
+        }
+    }
+
+    var checkpointRequestFailuresRemaining: Int {
+        get {
+            _checkpointRequestFailuresRemaining.withLock { $0 }
+        }
+        set {
+            _checkpointRequestFailuresRemaining.withLock { $0 = newValue }
         }
     }
     
@@ -30,17 +55,58 @@ final class MockHttpClient: HttpClient {
     }
     
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data) {
-        // The sync client only uses this method to get /write-checkpoint2.json.
-        try #require(request.url?.path == "/write-checkpoint2.json")
+        let path = try #require(request.url?.path)
 
-        let checkpoint = writeCheckpoint
-        let body = WriteCheckpointResponse(data: WriteCheckpointData(write_checkpoint: String(checkpoint)))
+        switch path {
+        case "/sync/checkpoint-request":
+            try #require(request.httpMethod == "POST")
 
-        let data = try StreamingSyncClient.jsonEncoder.encode(body)
-        let response = HTTPURLResponse(url: request.url!, mimeType: "application/json", expectedContentLength: data.count, textEncodingName: "utf-8")
+            let contentType = try #require(request.value(forHTTPHeaderField: "Content-Type"))
+            #expect(contentType.hasPrefix("application/json"))
 
-        return (response, data)
+            let data = try #require(request.httpBody)
+            let body = try StreamingSyncClient.jsonDecoder.decode(CheckpointRequestBody.self, from: data)
+            #expect(!body.client_id.isEmpty)
+            #expect(body.checkpoint_request_id > 0)
+            _checkpointRequestIds.withLock { $0.append(body.checkpoint_request_id) }
+
+            let shouldFail = _checkpointRequestFailuresRemaining.withLock { failures in
+                if failures > 0 {
+                    failures -= 1
+                    return true
+                }
+
+                return false
+            }
+            if shouldFail {
+                let response = HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!
+                return (response, Data())
+            }
+
+            let checkpoint = checkpointRequestResponse ?? body.checkpoint_request_id
+            let responseBody = WriteCheckpointData(write_checkpoint: String(checkpoint))
+            let responseData = try StreamingSyncClient.jsonEncoder.encode(responseBody)
+            let response = HTTPURLResponse(url: request.url!, mimeType: "application/json", expectedContentLength: responseData.count, textEncodingName: "utf-8")
+            return (response, responseData)
+
+        case "/write-checkpoint2.json":
+            let checkpoint = writeCheckpoint
+            let body = WriteCheckpointResponse(data: WriteCheckpointData(write_checkpoint: String(checkpoint)))
+
+            let data = try StreamingSyncClient.jsonEncoder.encode(body)
+            let response = HTTPURLResponse(url: request.url!, mimeType: "application/json", expectedContentLength: data.count, textEncodingName: "utf-8")
+
+            return (response, data)
+
+        default:
+            throw PowerSyncError.operationFailed(message: "Unsupported mock request path: \(path)")
+        }
     }
+}
+
+private struct CheckpointRequestBody: Decodable {
+    let client_id: String
+    let checkpoint_request_id: Int64
 }
 
 private struct MockSyncLineResponse: SyncLineResponse {

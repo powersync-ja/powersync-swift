@@ -63,6 +63,9 @@ struct ListView: View {
             }
         }
         .animation(.default, value: lists)
+        .refreshable {
+            await refreshFromRemote()
+        }
         .navigationTitle("Lists")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -110,6 +113,15 @@ struct ListView: View {
 
             try await system.deleteList(id: listsToDelete[0].id)
 
+        } catch {
+            self.error = error
+        }
+    }
+
+    func refreshFromRemote() async {
+        do {
+            error = nil
+            try await system.refreshFromRemote()
         } catch {
             self.error = error
         }

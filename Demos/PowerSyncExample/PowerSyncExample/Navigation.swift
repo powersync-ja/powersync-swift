@@ -5,6 +5,7 @@ enum Route: Hashable {
     case signIn
     case signUp
     case search
+    case admin
 }
 
 @Observable

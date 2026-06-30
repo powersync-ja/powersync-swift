@@ -80,6 +80,10 @@ fileprivate struct SyncStatusDataImpl: SyncStatusData {
         }
     }
 
+    var lastAppliedCheckpointRequestId: Int64? {
+        core.lastAppliedCheckpointRequestId
+    }
+
     func statusForPriority(_ priority: BucketPriority) -> PriorityStatusEntry {
         for known in priorityStatusEntries {
             // Lower-priority buckets are synced after higher-priority buckets, and since priorityStatusEntries
@@ -130,6 +134,10 @@ final class SwiftSyncStatus: SyncStatus {
         return self.current.withLock { status($0.snapshot) }
     }
 
+    private func snapshot() -> SyncStatusDataImpl {
+        self.current.withLock { $0.snapshot }
+    }
+
     internal func mutateStatus(update: (_ status: inout MutableSyncStatus) -> Void) {
         maybeMutateStatus(shouldUpdate: { _ in true }, apply: update)
     }
@@ -138,23 +146,23 @@ final class SwiftSyncStatus: SyncStatus {
         shouldUpdate: (_ status: borrowing MutableSyncStatus) -> Bool,
         apply: (_ status: inout MutableSyncStatus) -> Void
     ) {
-        let didUpdate = self.current.withLock {
+        let updatedSnapshot: SyncStatusDataImpl? = self.current.withLock {
             if shouldUpdate($0.inner) {
                 apply(&$0.inner)
                 $0.snapshot = SyncStatusDataImpl(status: $0.inner)
-                return true
+                return $0.snapshot
             } else {
-                return false
+                return nil
             }
         }
         
-        if didUpdate {
-            self.listeners.dispatch(event: self)
+        if let updatedSnapshot {
+            self.listeners.dispatch(event: updatedSnapshot)
         }
     }
 
     func asFlow() -> AsyncStream<any SyncStatusData> {
-        self.listeners.subscribe(addInitial: self)
+        self.listeners.subscribe(addInitial: snapshot())
     }
 
     /// Waits for the first sync status matching a predicate.
@@ -214,6 +222,10 @@ final class SwiftSyncStatus: SyncStatus {
         self.readStatus { current in current.syncStreams }
     }
 
+    var lastAppliedCheckpointRequestId: Int64? {
+        self.readStatus { current in current.lastAppliedCheckpointRequestId }
+    }
+
     func statusForPriority(_ priority: BucketPriority) -> PriorityStatusEntry {
         self.readStatus { current in current.statusForPriority(priority) }
     }
@@ -247,4 +259,3 @@ struct IndexedCoreDownloadProgress: SyncDownloadProgress {
         return (prev.0 + total, prev.1 + downloaded)
     }
 }
-

@@ -5,6 +5,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
     let priorityStatus: [PriorityStatusEntry]
     let downloading: CoreSyncDownloadProgress?
     let streams: [SyncStreamStatus]
+    let lastAppliedCheckpointRequestId: Int64?
 
     enum CodingKeys: String, CodingKey {
         case connected
@@ -12,6 +13,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
         case priorityStatus = "priority_status"
         case downloading
         case streams
+        case lastAppliedCheckpointRequestId = "last_applied_checkpoint_request_id"
     }
 
     init() {
@@ -20,6 +22,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
         self.priorityStatus = []
         self.downloading = nil
         self.streams = []
+        self.lastAppliedCheckpointRequestId = nil
     }
 
     init(from decoder: any Decoder) throws {
@@ -35,6 +38,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
             streams.append(try streamsContainer.decode(DecodableSyncStreamStatus.self).inner)
         }
         self.streams = streams
+        self.lastAppliedCheckpointRequestId = try container.decode(Int64?.self, forKey: .lastAppliedCheckpointRequestId)
     }
 }
 

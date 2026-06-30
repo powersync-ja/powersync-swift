@@ -25,16 +25,23 @@ public struct CrudBatch: Sendable {
     }
 }
 
+/// Removes uploaded CRUD items and updates the local target marker.
+///
+/// If a custom write checkpoint is supplied and no CRUD items remain, that checkpoint becomes
+/// the target. Otherwise, the target is reset to ``PowerSyncDatabaseImpl/maxOpId`` so the sync
+/// client can create a standard write checkpoint later.
 internal func completeCrudItems(_ db: any PowerSyncDatabaseProtocol, _ lastItemId: Int64, writeCheckpoint: String? = nil) async throws {
     return try await db.writeTransaction { tx in
         try tx.execute(sql: "DELETE FROM ps_crud WHERE id <= ?", parameters: [lastItemId])
         if writeCheckpoint != nil {
             let hasCrud = (try tx.getOptional(sql: "SELECT 1 FROM ps_crud", parameters: nil) { cursor in () }) != nil
             if !hasCrud {
-                try tx.execute(sql: "UPDATE ps_buckets SET target_op = CAST(? AS INTEGER) WHERE name = '$local'", parameters: [writeCheckpoint])
+                // Setting a concrete target here prevents the sync client from replacing it
+                // with a standard write checkpoint after upload completion.
+                try tx.execute(sql: "SELECT powersync_probe_local_target_op(?)", parameters: [writeCheckpoint])
                 return
             }
         }
-        try tx.execute(sql: "UPDATE ps_buckets SET target_op = ? WHERE name = '$local'", parameters: [PowerSyncDatabaseImpl.maxOpId])
+        try tx.execute(sql: "SELECT powersync_probe_local_target_op(?)", parameters: [PowerSyncDatabaseImpl.maxOpId])
     }
 }

@@ -2,6 +2,7 @@
 actor SyncCoordinator {
     nonisolated let streams = StreamTracker()
     private var activeSync: Task<Void, any Error>?
+    private var syncClient: StreamingSyncClient?
     
     func connect(db: PowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: HttpClient) async {
         if let task = activeSync {
@@ -14,6 +15,7 @@ actor SyncCoordinator {
         }
 
         let sync = StreamingSyncClient(db: db, connector: connector, httpClient: client, options: options)
+        syncClient = sync
         activeSync = sync.run()
     }
     
@@ -32,16 +34,16 @@ actor SyncCoordinator {
     }
     
     /// Executes an inner function, but only if no connection is active or scheduled.
-    func guardNotConnected<T>(inner: () async throws -> T, ifConnected: () async throws -> T) async rethrows -> T {
-        if activeSync == nil {
+    func guardNotConnected<T>(inner: () async throws -> T, ifConnected: (StreamingSyncClient) async throws -> T) async rethrows -> T {
+        guard activeSync != nil, let sync = syncClient else {
             return try await inner();
-        } else {
-            return try await ifConnected()
         }
+        return try await ifConnected(sync)
     }
     
     private func finishSyncTask(task: Task<Void, any Error>) async {
         self.activeSync = nil
+        self.syncClient = nil
         task.cancel()
         do {
             try await task.value

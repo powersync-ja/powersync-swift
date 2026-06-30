@@ -35,7 +35,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     func resolveOfflineSyncStatusIfNotConnected() async throws {
         try await group.syncCoordinator.guardNotConnected(inner: {
             try await resolveOfflineSyncStatus()
-        }, ifConnected: {})
+        }, ifConnected: { _ in })
     }
     
     private func initialize() async throws {
@@ -65,7 +65,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
                 await self.schema.withMutex { $0 = schema }
                 try await applySchema(schema: schema)
             },
-            ifConnected: { throw PowerSyncError.operationFailed(message: "Cannot update schema while connected") }
+            ifConnected: { _ in throw PowerSyncError.operationFailed(message: "Cannot update schema while connected") }
         )
     }
     
@@ -76,7 +76,9 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
                 throw PowerSyncError.operationFailed(message: "Could not serialize schema")
             }
 
-            let _ = try writer.execute(sql: "SELECT powersync_replace_schema(?)", parameters: [.string(asString)])
+            let _ = try TransactionImpl.run(conn: ConnectionLeaseContext(lease: writer)) { tx in
+                try tx.execute(sql: "SELECT powersync_replace_schema(?)", parameters: [asString])
+            }
 
             for reader in readers {
                 // Update the schema on all read connections
@@ -149,7 +151,11 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             
             do {
                 let flags = flags
-                let _ = try await writeLockInner { ctx in try ctx.execute(sql: "SELECT powersync_clear(?)", parameters: [flags]) }
+                let _ = try await writeLockInner { ctx in
+                    try TransactionImpl.run(conn: ctx) { tx in
+                        try tx.execute(sql: "SELECT powersync_clear(?)", parameters: [flags])
+                    }
+                }
             }
         }
     }
@@ -180,6 +186,21 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         return watchImpl(db: self, options: options)
     }
 
+    func requestCheckpoint() async throws -> any CheckpointRequest {
+        try await initialize()
+
+        let requestId = try await group.syncCoordinator.guardNotConnected(
+            inner: {
+                throw CheckPointRequestError.notConnected
+            },
+            ifConnected: { client in
+                try await client.requestCheckpoint()
+            }
+        )
+
+        return CheckpointRequestImpl(requestId: requestId, db: self)
+    }
+
     static let maxOpId = Int64.max
 }
 
@@ -202,7 +223,9 @@ private actor DatabaseInitializationAction {
 
             db.logger.debug("Opened connection. SQLite version \(sqliteVersion), PowerSync SQLite core extension \(powerSyncVersion)", tag: "PowerSyncDatabase")
 
-            try conn.execute(sql: "SELECT powersync_init()", parameters: [])
+            try TransactionImpl.run(conn: conn) { tx in
+                try tx.execute(sql: "SELECT powersync_init()", parameters: [])
+            }
             return powerSyncVersion
         }
 
