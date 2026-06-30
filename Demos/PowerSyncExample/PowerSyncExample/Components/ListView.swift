@@ -13,16 +13,23 @@ struct ListView: View {
 
     var body: some View {
         let status = system.db.currentStatus.observable
-        
+
         if status.hasSynced != true {
-            Text("Busy with initial sync...")
-            if let progress = status.downloadProgress {
-                ProgressView(value: progress.fraction)
-                
-                if progress.downloadedOperations == progress.totalOperations {
-                    Text("Applying server-side changes...")
+            VStack {
+                if status.hasSynced != nil {
+                    Text("Busy with initial sync...")
+                    if let progress = status.downloadProgress {
+                        ProgressView(value: progress.fraction)
+                        
+                        if progress.downloadedOperations == progress.totalOperations {
+                            Text("Applying server-side changes...")
+                        } else {
+                            Text("Downloaded \(progress.downloadedOperations) out of \(progress.totalOperations)")
+                        }
+                    }
                 } else {
-                    Text("Downloaded \(progress.downloadedOperations) out of \(progress.totalOperations)")
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
                 }
             }
         }
