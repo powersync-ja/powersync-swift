@@ -4,6 +4,7 @@ import Foundation
 import Testing
 
 struct SyncStatusTests {
+    @available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *)
     @Test @MainActor func canObserve() async throws {
         let status = SwiftSyncStatus()
         let observable = status.observable
