@@ -6,10 +6,12 @@
   as-is so the database can live in an App Group container shared with app extensions.
   Plain filenames keep the existing behavior. The SDK coordinates opening the database to
   avoid conflicts and can share update notifications across the main app and extensions.
+* Fix `SyncStatus.asFlow()` emitting the same object, causing SwiftUI to miss updates.
+* Add the `ObservableSyncStatus` utility, which can be used to track Sync Status updates through an `@Observable` class.
 
 ## 1.14.4
 
-- Fix crash when running a statement in a cursor callback ([#148](https://github.com/powersync-ja/powersync-swift/issues/148)).
+* Fix crash when running a statement in a cursor callback ([#148](https://github.com/powersync-ja/powersync-swift/issues/148)).
 
 ## 1.14.3
 

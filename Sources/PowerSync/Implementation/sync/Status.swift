@@ -111,6 +111,7 @@ fileprivate struct SyncStatusDataImpl: SyncStatusData {
 fileprivate struct SyncStatusContainer: ~Copyable {
     var inner: MutableSyncStatus
     var snapshot: SyncStatusDataImpl
+    var observable: Any? // ObservableSyncStatus, only available on newer platform versions
 
     init(inner: consuming MutableSyncStatus) {
         self.snapshot = SyncStatusDataImpl(status: inner)
@@ -128,6 +129,10 @@ final class SwiftSyncStatus: SyncStatus {
 
     private func readStatus<T>(status: (borrowing SyncStatusDataImpl) -> T) -> T {
         return self.current.withLock { status($0.snapshot) }
+    }
+    
+    private func copySnapshot() -> any SyncStatusData {
+        self.current.withLock { status in status.snapshot }
     }
 
     internal func mutateStatus(update: (_ status: inout MutableSyncStatus) -> Void) {
@@ -149,12 +154,30 @@ final class SwiftSyncStatus: SyncStatus {
         }
         
         if didUpdate {
-            self.listeners.dispatch(event: self)
+            self.listeners.dispatch(event: copySnapshot())
         }
     }
 
     func asFlow() -> AsyncStream<any SyncStatusData> {
-        self.listeners.subscribe(addInitial: self)
+        self.listeners.subscribe(addInitial: copySnapshot())
+    }
+    
+    @available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *)
+    @MainActor var observable: ObservableSyncStatus {
+        let (observable, didCreate) = self.current.withLock {
+            if let observable = $0.observable as? ObservableSyncStatus {
+                return (observable, false)
+            }
+            
+            let observable = ObservableSyncStatus(status: $0.snapshot)
+            $0.observable = observable
+            return (observable, true)
+        }
+        
+        if didCreate {
+            observable.trackUpdates(from: self.listeners)
+        }
+        return observable
     }
 
     /// Waits for the first sync status matching a predicate.
@@ -247,4 +270,3 @@ struct IndexedCoreDownloadProgress: SyncDownloadProgress {
         return (prev.0 + total, prev.1 + downloaded)
     }
 }
-
