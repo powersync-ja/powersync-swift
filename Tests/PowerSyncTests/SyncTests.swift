@@ -738,7 +738,10 @@ class InMemorySyncIntegrationTests {
 
     @Test func subscriptionsUpdateWhileOffline() async throws {
         let db = openDatabase(PlatformHttpClient.shared)
+        // Make sure the database is initialized
+        try await db.readLock { _ in }
         var statusUpdates = db.currentStatus.asFlow().makeAsyncIterator()
+        let _ = try #require(await statusUpdates.next()) // Initial snapshot
 
         // Subscribing while offline should add the stream to subscriptions reported in the status.
         let subscription = try await db.syncStream(name: "a", params: nil).subscribe()
