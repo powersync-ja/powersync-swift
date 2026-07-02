@@ -18,9 +18,6 @@ public enum CheckPointRequestError: Error, LocalizedError {
     /// calling ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
     case checkpointRequestsNotEnabled
 
-    /// The PowerSync service rejected the checkpoint request because the current credentials are not valid.
-    case unauthenticated(message: String)
-
     /// The checkpoint request could not be completed.
     case operationFailed(message: String? = nil, underlyingError: Error? = nil)
 }

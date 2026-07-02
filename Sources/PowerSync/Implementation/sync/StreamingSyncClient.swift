@@ -180,9 +180,11 @@ The next upload iteration will be delayed.
     /// reports a download or upload failure, but status no longer drives the success condition.
     func waitForCheckpointRequest(_ requestId: Int64) async throws {
         if isCheckpointRequestApplied(requestId) {
+            db.logger.debug("Checkpoint request id \(requestId) already applied", tag: tag)
             return
         }
 
+        db.logger.debug("Waiting for checkpoint request id \(requestId) to be applied", tag: tag)
         try await withThrowingTaskGroup(of: Void.self) { group in
             defer {
                 group.cancelAll()
@@ -198,6 +200,7 @@ The next upload iteration will be delayed.
 
             _ = try await group.next()
         }
+        db.logger.debug("Finished waiting for checkpoint request id \(requestId)", tag: tag)
     }
 
     private func throwOnSyncError(untilCheckpointRequestApplied requestId: Int64) async throws {
@@ -260,7 +263,12 @@ The next upload iteration will be delayed.
                 return localTarget
             }
 
-            // Start from the largest value known locally. On normal reconnects, this is the core hint.
+            // Start from the largest value known locally. On normal reconnects, this is the core
+            // hint. The concrete local target fallback mainly guards legacy-to-request-mode
+            // transitions or unusual migrated state where core has a target but no request hint.
+            // In most legacy-to-request transitions the service should already have the concrete
+            // checkpoint record and return it when we affirm the current request state, so this
+            // fallback is likely over-cautious.
             let startingRequestId = max(lastCheckpointRequestId ?? 0, concreteLocalTarget ?? 0)
             let seed = try await requestCheckpointFromService(requestId: startingRequestId > 0 ? startingRequestId : 1)
 
@@ -547,6 +555,7 @@ private struct ActiveSyncIteration: Sendable {
         case .checkpointRequestId(requestId: _):
             throw PowerSyncError.operationFailed(message: "CheckpointRequestId must be handled by its caller")
         case .checkpointRequestApplied(requestId: let requestId):
+            syncClient.db.logger.debug("Applied checkpoint request id \(requestId)", tag: tag)
             signals.markCheckpointRequestApplied(requestId)
         case .localTargetOp(targetOp: _):
             throw PowerSyncError.operationFailed(message: "LocalTargetOp must be handled by its caller")
