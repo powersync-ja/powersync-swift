@@ -12,6 +12,12 @@ public enum CheckPointRequestError: Error, LocalizedError {
     /// so it could never be observed in the sync stream.
     case notConnected
 
+    /// The active connection was not configured to use checkpoint requests.
+    ///
+    /// Reconnect with ``ConnectOptions/checkpointMode`` set to ``CheckpointMode/requests`` before
+    /// calling ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
+    case checkpointRequestsNotEnabled
+
     /// The PowerSync service rejected the checkpoint request because the current credentials are not valid.
     case unauthenticated(message: String)
 

@@ -110,7 +110,9 @@ final class SystemManager {
                     ) { message in
                         self.db.logger.debug(message, tag: "SyncRequest")
                     }
-                )
+                ),
+                // This enables the requestCheckpoint method
+                checkpointMode: .requests
             )
         )
         try await attachments?.startSync()

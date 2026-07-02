@@ -20,6 +20,17 @@ public struct SyncClientConfiguration: Sendable {
     }
 }
 
+/// Selects the service checkpoint mechanism used by a PowerSync connection.
+public enum CheckpointMode: Sendable {
+    /// Uses the legacy `/write-checkpoint2.json` endpoint to obtain a target operation id.
+    case legacy
+
+    /// Uses client-generated checkpoint request IDs sent to `/sync/checkpoint-request`.
+    ///
+    /// This mode is required for ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
+    case requests
+}
+
 /// Options for configuring a PowerSync connection.
 ///
 /// Provides optional parameters to customize sync behavior such as throttling and retry policies.
@@ -88,6 +99,12 @@ public struct ConnectOptions: Sendable {
     /// when they don't have an explicit subscription.
     public var includeDefaultStreams: Bool
 
+    /// Selects the service checkpoint mechanism for this connection.
+    ///
+    /// Use ``CheckpointMode/requests`` to enable ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
+    /// Defaults to ``CheckpointMode/legacy`` for backwards-compatible write checkpoints.
+    public var checkpointMode: CheckpointMode
+
     /// Initializes a `ConnectOptions` instance with optional values.
     ///
     /// - Parameters:
@@ -95,13 +112,15 @@ public struct ConnectOptions: Sendable {
     ///   - retryDelay: Delay TimeInterval between retry attempts in milliseconds. Defaults to `5` seconds.
     ///   - params: Custom sync parameters to send to the server. Defaults to an empty dictionary.
     ///   - clientConfiguration: Configuration for the HTTP client used to connect to PowerSync.
+    ///   - checkpointMode: Service checkpoint mechanism to use for this connection.
     public init(
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
         params: JsonParam = [:],
         clientConfiguration: SyncClientConfiguration? = nil,
         appMetadata: [String: String] = [:],
-        includeDefaultStreams: Bool = true
+        includeDefaultStreams: Bool = true,
+        checkpointMode: CheckpointMode = .legacy
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
@@ -110,6 +129,7 @@ public struct ConnectOptions: Sendable {
         self.clientConfiguration = clientConfiguration
         self.appMetadata = appMetadata
         self.includeDefaultStreams = includeDefaultStreams
+        self.checkpointMode = checkpointMode
     }
 
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
@@ -125,7 +145,8 @@ public struct ConnectOptions: Sendable {
         newClientImplementation: Bool = true,
         clientConfiguration: SyncClientConfiguration? = nil,
         appMetadata: [String: String] = [:],
-        includeDefaultStreams: Bool = true
+        includeDefaultStreams: Bool = true,
+        checkpointMode: CheckpointMode = .legacy
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
@@ -134,6 +155,7 @@ public struct ConnectOptions: Sendable {
         self.clientConfiguration = clientConfiguration
         self.appMetadata = appMetadata
         self.includeDefaultStreams = includeDefaultStreams
+        self.checkpointMode = checkpointMode
     }
 }
 
@@ -233,7 +255,9 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     ///
     /// The returned request can be awaited to confirm that the local database has applied
     /// server-side changes up to the checkpoint. This method requires an active or connecting
-    /// sync client and can throw for connection, authentication, or service request failures.
+    /// sync client connected with ``ConnectOptions/checkpointMode`` set to
+    /// ``CheckpointMode/requests``. It can throw for connection, mode, authentication, or service
+    /// request failures.
     func requestCheckpoint() async throws -> CheckpointRequest
 
     /// Close the database, releasing resources.

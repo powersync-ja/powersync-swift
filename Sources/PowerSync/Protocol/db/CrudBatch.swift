@@ -33,15 +33,18 @@ public struct CrudBatch: Sendable {
 internal func completeCrudItems(_ db: any PowerSyncDatabaseProtocol, _ lastItemId: Int64, writeCheckpoint: String? = nil) async throws {
     return try await db.writeTransaction { tx in
         try tx.execute(sql: "DELETE FROM ps_crud WHERE id <= ?", parameters: [lastItemId])
-        if writeCheckpoint != nil {
+        if let writeCheckpoint {
             let hasCrud = (try tx.getOptional(sql: "SELECT 1 FROM ps_crud", parameters: nil) { cursor in () }) != nil
             if !hasCrud {
+                guard let checkpointId = Int64(writeCheckpoint) else {
+                    throw PowerSyncError.operationFailed(message: "Invalid write checkpoint: \(writeCheckpoint)")
+                }
                 // Setting a concrete target here prevents the sync client from replacing it
                 // with a standard write checkpoint after upload completion.
-                try tx.execute(sql: "SELECT powersync_probe_local_target_op(?)", parameters: [writeCheckpoint])
+                _ = try tx.powersyncLocalTargetOp(checkpointId)
                 return
             }
         }
-        try tx.execute(sql: "SELECT powersync_probe_local_target_op(?)", parameters: [PowerSyncDatabaseImpl.maxOpId])
+        _ = try tx.powersyncLocalTargetOp(PowerSyncDatabaseImpl.maxOpId)
     }
 }

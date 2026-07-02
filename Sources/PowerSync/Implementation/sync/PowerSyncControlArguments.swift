@@ -1,3 +1,5 @@
+import Foundation
+
 /// Arguments to the `powersync_control()` SQL function driving the sync process.
 enum PowerSyncControlArguments {
     case start(start: StartSyncIteration)
@@ -9,10 +11,13 @@ enum PowerSyncControlArguments {
     case connectionEstablished
     case responseStreamEnd
     case updateSubscriptions(streams: [StreamKey])
+    case nextCheckpointRequestId
+    case localTargetOp(targetOp: Int64?)
+    case seedCheckpointRequestId(requestId: Int64?)
     
     func execute(_ context: ConnectionContext) throws -> String {
         let op: String
-        let param: Sendable?
+        let param: (any Sendable)?
         
         switch (self) {
         case .start(let start):
@@ -42,6 +47,15 @@ enum PowerSyncControlArguments {
         case .updateSubscriptions(streams: let streams):
             op = "update_subscriptions"
             param = String(data: try StreamingSyncClient.jsonEncoder.encode(streams), encoding: .utf8)
+        case .nextCheckpointRequestId:
+            op = "next_checkpoint_request_id"
+            param = nil
+        case .localTargetOp(targetOp: let targetOp):
+            op = "local_target_op"
+            param = targetOp
+        case .seedCheckpointRequestId(requestId: let requestId):
+            op = "seed_checkpoint_request_id"
+            param = requestId
         }
         
         return try context.get(sql: "SELECT powersync_control(?, ?)", parameters: [op, param]) { cursor in

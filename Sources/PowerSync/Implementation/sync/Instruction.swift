@@ -8,11 +8,14 @@ enum CoreLogSeverity: String, Decodable {
 enum Instruction {
     case logLine(severity: CoreLogSeverity, line: String)
     case updateSyncStatus(status: CoreDownloadSyncStatus)
-    case establishSyncStream(request: JsonParam)
+    case establishSyncStream(request: JsonParam, lastCheckpointRequestId: Int64?)
     case fetchCredentials(didExpire: Bool)
+    case checkpointRequestId(requestId: Int64)
+    case localTargetOp(targetOp: Int64?)
     case closeSyncStream(hideDisconnect: Bool)
     case flushFileSystem
     case didCompleteSync
+    case handleDiagnostics
 }
 
 extension Instruction: Decodable {
@@ -21,9 +24,12 @@ extension Instruction: Decodable {
         case updateSyncStatus = "UpdateSyncStatus"
         case establishSyncStream = "EstablishSyncStream"
         case fetchCredentials = "FetchCredentials"
+        case checkpointRequestId = "CheckpointRequestId"
+        case localTargetOp = "LocalTargetOp"
         case closeSyncStream = "CloseSyncStream"
         case flushFileSystem = "FlushFileSystem"
         case didCompleteSync = "DidCompleteSync"
+        case handleDiagnostics = "HandleDiagnostics"
     }
     
     enum LogLineCodingKeys: CodingKey {
@@ -35,12 +41,21 @@ extension Instruction: Decodable {
         case status
     }
     
-    enum EstablishSyncStreamCodingKeys: CodingKey {
+    enum EstablishSyncStreamCodingKeys: String, CodingKey {
         case request
+        case lastCheckpointRequestId = "last_checkpoint_request_id"
     }
     
     enum FetchCredentialsCodingKeys: String, CodingKey {
         case didExpire = "did_expire"
+    }
+
+    enum CheckpointRequestIdCodingKeys: String, CodingKey {
+        case requestId = "request_id"
+    }
+
+    enum LocalTargetOpCodingKeys: String, CodingKey {
+        case targetOp = "target_op"
     }
     
     enum CloseSyncStreamCodingKeys: String, CodingKey {
@@ -75,10 +90,19 @@ extension Instruction: Decodable {
             self = Instruction.updateSyncStatus(status: try nestedContainer.decode(CoreDownloadSyncStatus.self, forKey: Instruction.UpdateSyncStatusCodingKeys.status))
         case .establishSyncStream:
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.EstablishSyncStreamCodingKeys.self, forKey: .establishSyncStream)
-            self = Instruction.establishSyncStream(request: try nestedContainer.decode(JsonParam.self, forKey: Instruction.EstablishSyncStreamCodingKeys.request))
+            self = Instruction.establishSyncStream(
+                request: try nestedContainer.decode(JsonParam.self, forKey: Instruction.EstablishSyncStreamCodingKeys.request),
+                lastCheckpointRequestId: try nestedContainer.decodeIfPresent(Int64.self, forKey: Instruction.EstablishSyncStreamCodingKeys.lastCheckpointRequestId)
+            )
         case .fetchCredentials:
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.FetchCredentialsCodingKeys.self, forKey: .fetchCredentials)
             self = Instruction.fetchCredentials(didExpire: try nestedContainer.decode(Bool.self, forKey: Instruction.FetchCredentialsCodingKeys.didExpire))
+        case .checkpointRequestId:
+            let nestedContainer = try container.nestedContainer(keyedBy: Instruction.CheckpointRequestIdCodingKeys.self, forKey: .checkpointRequestId)
+            self = Instruction.checkpointRequestId(requestId: try nestedContainer.decode(Int64.self, forKey: Instruction.CheckpointRequestIdCodingKeys.requestId))
+        case .localTargetOp:
+            let nestedContainer = try container.nestedContainer(keyedBy: Instruction.LocalTargetOpCodingKeys.self, forKey: .localTargetOp)
+            self = Instruction.localTargetOp(targetOp: try nestedContainer.decodeIfPresent(Int64.self, forKey: Instruction.LocalTargetOpCodingKeys.targetOp))
         case .closeSyncStream:
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.CloseSyncStreamCodingKeys.self, forKey: .closeSyncStream)
             self = Instruction.closeSyncStream(hideDisconnect: try nestedContainer.decode(Bool.self, forKey: Instruction.CloseSyncStreamCodingKeys.hideDisconnect))
@@ -86,6 +110,8 @@ extension Instruction: Decodable {
             self = Instruction.flushFileSystem
         case .didCompleteSync:
             self = Instruction.didCompleteSync
+        case .handleDiagnostics:
+            self = Instruction.handleDiagnostics
         }
     }
 }

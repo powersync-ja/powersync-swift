@@ -320,6 +320,8 @@ final class CrudTests: XCTestCase {
     }
 
     func testCustomWriteCheckpoints() async throws {
+        let database = self.database!
+
         try await database.execute(
             sql: "INSERT INTO users (id, name) VALUES (uuid(), 'a')",
             parameters: []
@@ -328,10 +330,17 @@ final class CrudTests: XCTestCase {
         let tx = try await database.getNextCrudTransaction()!
         try await tx.complete(writeCheckpoint: "123")
 
-        let targetOp = try await database.get("SELECT powersync_probe_local_target_op(NULL)") {
-            try $0.getInt(index: 0)
+        let targetOp = try await database.writeTransaction { tx in
+            try tx.powersyncLocalTargetOp()
         }
         XCTAssertEqual(targetOp, 123)
+        let requestedCheckpoint = try await database.getOptional(
+            sql: "SELECT CAST(value AS INTEGER) FROM ps_kv WHERE key = 'last_requested_checkpoint_request_id'",
+            parameters: []
+        ) {
+            try $0.getInt(index: 0)
+        }
+        XCTAssertEqual(requestedCheckpoint, 123)
 
         try await database.execute(
             sql: "INSERT INTO users (id, name) VALUES (uuid(), 'a')",
@@ -339,8 +348,8 @@ final class CrudTests: XCTestCase {
         )
         let batch = try await database.getCrudBatch()!
         try await batch.complete(writeCheckpoint: "124")
-        let newTargetOp = try await database.get("SELECT powersync_probe_local_target_op(NULL)") {
-            try $0.getInt(index: 0)
+        let newTargetOp = try await database.writeTransaction { tx in
+            try tx.powersyncLocalTargetOp()
         }
         XCTAssertEqual(newTargetOp, 124)
     }
