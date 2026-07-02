@@ -156,22 +156,64 @@ The next upload iteration will be delayed.
     /// Creates a checkpoint request with a client-generated request ID.
     ///
     /// The request ID is persisted by the core extension before it is sent to the service, so
-    /// later sync status updates can report when the same checkpoint request has been applied.
+    /// later sync-loop events can report when the same checkpoint request has been applied.
     /// This does not update the local target op: explicit checkpoint requests are wait markers,
     /// not local upload gates.
-    public func requestCheckpoint() async throws -> Int64 {
+    func requestCheckpoint() async throws -> any CheckpointRequest {
         guard checkpointMode == .requests else {
             throw CheckPointRequestError.checkpointRequestsNotEnabled
         }
 
-        try await signals.waitForCheckpointRequestsReady()
-
         // Allocate the request ID locally before reporting it to the service.
-        let requestId = try await db.writeTransaction { ctx in
-            try ctx.powersyncNextCheckpointRequestId()
+        let requestId = try await nextCheckpointRequestId()
+        let effectiveRequestId = try await requestCheckpointFromService(requestId: requestId)
+        return CheckpointRequestImpl(requestId: effectiveRequestId, syncClient: self)
+    }
+
+    func isCheckpointRequestApplied(_ requestId: Int64) -> Bool {
+        signals.isCheckpointRequestApplied(requestId)
+    }
+
+    /// Waits until core emits `CheckpointRequestApplied` for `requestId` or a newer request.
+    ///
+    /// Sync status is still observed for errors so callers fail quickly when the active sync loop
+    /// reports a download or upload failure, but status no longer drives the success condition.
+    func waitForCheckpointRequest(_ requestId: Int64) async throws {
+        if isCheckpointRequestApplied(requestId) {
+            return
         }
 
-        return try await requestCheckpointFromService(requestId: requestId)
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            defer {
+                group.cancelAll()
+            }
+
+            group.addTask {
+                try await self.signals.waitForCheckpointRequestApplied(requestId)
+            }
+
+            group.addTask {
+                try await self.throwOnSyncError(untilCheckpointRequestApplied: requestId)
+            }
+
+            _ = try await group.next()
+        }
+    }
+
+    private func throwOnSyncError(untilCheckpointRequestApplied requestId: Int64) async throws {
+        for await update in db.currentStatus.asFlow() {
+            if isCheckpointRequestApplied(requestId) {
+                return
+            }
+
+            if let error = update.anyError {
+                // `asFlow()` emits the current status first. We intentionally fail fast if the
+                // sync client is already in an error state when the caller starts waiting.
+                throw CheckpointWaitError.errorDetected(error: String(describing: error))
+            }
+        }
+
+        throw CheckpointWaitError.syncStatusClosed
     }
 
     /// Sends or affirms a checkpoint request and returns the effective id accepted by the service.
@@ -243,9 +285,18 @@ The next upload iteration will be delayed.
     private func getWriteCheckpoint() async throws -> Int64 {
         switch checkpointMode {
             case .requests:
-                return try await requestCheckpoint()
+                let checkpoint = try await requestCheckpointFromService(requestId: try await nextCheckpointRequestId())
+                return checkpoint
             case .legacy:
                 return try await getLegacyWriteCheckpoint()
+        }
+    }
+
+    private func nextCheckpointRequestId() async throws -> Int64 {
+        try await signals.waitForCheckpointRequestsReady()
+
+        return try await db.writeTransaction { ctx in
+            try ctx.powersyncNextCheckpointRequestId()
         }
     }
 
@@ -387,15 +438,37 @@ private struct ActiveSyncIteration: Sendable {
             appMetadata: syncClient.options.appMetadata,
         )))
 
-        var controlArgs: AsyncMerge2Sequence<ControlInvocationsFromStream, AsyncStream<PowerSyncControlArguments>>?
+        var controlArgs: SyncControlEvents?
 
         for instruction in initialInstructions {
             if case .establishSyncStream(request: let request, lastCheckpointRequestId: let lastCheckpointRequestId) = instruction {
-                // When using checkpoint requests, we need to validate the last checkpoint request ID on connect
-                try await syncClient.seedCheckpointRequestState(lastCheckpointRequestId: lastCheckpointRequestId)
-                
-                let serviceEvents = try await syncClient.fetchSyncLines(request: request)
-                controlArgs = AsyncAlgorithms.merge(serviceEvents, localEvents.subscribe())
+                // Start checkpoint request validation while establishing the sync stream, but
+                // don't block line processing on it. Operations that allocate checkpoint
+                // requests wait for the validation signal themselves.
+                let checkpointRequestStateSeed = Task {
+                    try await syncClient.seedCheckpointRequestState(lastCheckpointRequestId: lastCheckpointRequestId)
+                }
+
+                do {
+                    let serviceEvents = try await syncClient.fetchSyncLines(request: request)
+                    // Merge the real stream, the checkpoint-validation sentinel stream and
+                    // local events into a single control loop. The validation stream never
+                    // yields control arguments: it only finishes when seeding succeeds, or
+                    // throws when seeding fails. Since AsyncAlgorithms.merge rethrows failures
+                    // from any input sequence, a seed failure still tears down this sync
+                    // iteration even while sync-line events are allowed to flow before
+                    // checkpoint request state is ready.
+                    controlArgs = AsyncAlgorithms.merge(
+                        AsyncAlgorithms.merge(
+                            serviceEvents,
+                            checkpointRequestStateValidationEvents(task: checkpointRequestStateSeed)
+                        ),
+                        localEvents.subscribe()
+                    )
+                } catch {
+                    try await checkpointRequestStateSeed.value
+                    throw error
+                }
             } else {
                 try await self.execute(instr: instruction, group: &group)
             }
@@ -473,6 +546,8 @@ private struct ActiveSyncIteration: Sendable {
             throw PowerSyncError.operationFailed(message: "There can only be one establishSyncStream instruction per sync iteration")
         case .checkpointRequestId(requestId: _):
             throw PowerSyncError.operationFailed(message: "CheckpointRequestId must be handled by its caller")
+        case .checkpointRequestApplied(requestId: let requestId):
+            signals.markCheckpointRequestApplied(requestId)
         case .localTargetOp(targetOp: _):
             throw PowerSyncError.operationFailed(message: "LocalTargetOp must be handled by its caller")
         case .closeSyncStream(hideDisconnect: _):
@@ -514,6 +589,35 @@ private struct ActiveSyncIteration: Sendable {
         let uploads = signals.signalCrudUploadComplete.subscribe()
         for await _ in uploads {
             self.localEvents.dispatch(event: .completedUpload)
+        }
+    }
+}
+
+fileprivate typealias CheckpointRequestStateValidationEvents = AsyncThrowingStream<PowerSyncControlArguments, any Error>
+fileprivate typealias SyncControlEvents = AsyncMerge2Sequence<
+    AsyncMerge2Sequence<ControlInvocationsFromStream, CheckpointRequestStateValidationEvents>,
+    AsyncStream<PowerSyncControlArguments>
+>
+
+/// Converts checkpoint request validation into an event stream that only signals completion/error.
+///
+/// The stream intentionally emits no `PowerSyncControlArguments`. It exists so `AsyncAlgorithms.merge`
+/// can monitor the validation task alongside sync-line and local events. If the task throws, the
+/// merged control loop throws on iteration and the outer download loop records/retries the error.
+fileprivate func checkpointRequestStateValidationEvents(task: Task<Void, any Error>) -> CheckpointRequestStateValidationEvents {
+    AsyncThrowingStream<PowerSyncControlArguments, any Error> { continuation in
+        let waiter = Task {
+            do {
+                try await task.value
+                continuation.finish()
+            } catch {
+                continuation.finish(throwing: error)
+            }
+        }
+
+        continuation.onTermination = { @Sendable _ in
+            waiter.cancel()
+            task.cancel()
         }
     }
 }

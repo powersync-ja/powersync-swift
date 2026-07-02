@@ -45,13 +45,14 @@ public enum CheckpointWaitError: Error, LocalizedError {
 public protocol CheckpointRequest: Sendable {
     /// Whether this checkpoint has already been synced locally.
     ///
-    /// This is a snapshot of the current sync status. Use ``waitForSync()`` or
-    /// ``waitForSync(timeout:)`` to suspend until the checkpoint is reached.
+    /// This is a snapshot of checkpoint request events observed by the sync client.
+    /// Use ``waitForSync()`` or ``waitForSync(timeout:)`` to suspend until the checkpoint is reached.
     var isSynced: Bool { get }
     
     /// Waits until this checkpoint has been synced locally.
     ///
-    /// This method observes sync status updates for an already-created checkpoint request.
+    /// This method observes sync-loop checkpoint application events for an already-created
+    /// checkpoint request.
     /// - Throws: ``CheckpointWaitError`` when the sync status stream closes before the
     ///   checkpoint is reached, or when a sync error is present or reached while waiting.
     func waitForSync() async throws

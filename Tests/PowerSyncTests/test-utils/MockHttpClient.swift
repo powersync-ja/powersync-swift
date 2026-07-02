@@ -13,6 +13,7 @@ final class MockHttpClient: HttpClient {
     private let _checkpointRequestFailureStatusCode = PowerSync.Mutex(500)
     private let _requestPaths = PowerSync.Mutex<[String]>([])
     let handleSyncLines: @Sendable (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>
+    let checkpointRequestHook: (@Sendable (_ requestId: Int64) async -> Void)?
     
     var writeCheckpoint: Int {
         get {
@@ -80,8 +81,12 @@ final class MockHttpClient: HttpClient {
         _requestPaths.withLock { $0 }
     }
     
-    init(handleSyncLines: @Sendable @escaping (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>) {
+    init(
+        handleSyncLines: @Sendable @escaping (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>,
+        checkpointRequestHook: (@Sendable (_ requestId: Int64) async -> Void)? = nil
+    ) {
         self.handleSyncLines = handleSyncLines
+        self.checkpointRequestHook = checkpointRequestHook
     }
     
     func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any SyncLineResponse) {
@@ -112,6 +117,7 @@ final class MockHttpClient: HttpClient {
             #expect(requestId >= 0)
             _checkpointRequestIds.withLock { $0.append(requestId) }
             _checkpointRequestStateHints.withLock { $0.append(requestId) }
+            await checkpointRequestHook?(requestId)
 
             let shouldFail = _checkpointRequestFailuresRemaining.withLock { failures in
                 if failures > 0 {

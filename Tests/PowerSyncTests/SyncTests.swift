@@ -45,8 +45,7 @@ class InMemorySyncIntegrationTests {
               "last_synced_at": 1740823200000000,
               "priority": 2147483647
             }
-          ],
-          "last_applied_checkpoint_request_id": null
+          ]
         }
         """.data(using: .utf8)!
 
@@ -57,6 +56,24 @@ class InMemorySyncIntegrationTests {
         #expect(priority.lastSyncedAt?.timeIntervalSince1970 == TimeInterval(1_740_823_200))
         #expect(stream.subscription.lastSyncedAt == TimeInterval(1_740_823_200))
         #expect(stream.subscription.expiresAt == TimeInterval(1_740_826_800))
+    }
+
+    @Test func decodesCheckpointRequestAppliedInstruction() throws {
+        let data = """
+        [
+          {
+            "CheckpointRequestApplied": {
+              "request_id": 7
+            }
+          }
+        ]
+        """.data(using: .utf8)!
+
+        let instructions = try StreamingSyncClient.jsonDecoder.decode([Instruction].self, from: data)
+        guard case .checkpointRequestApplied(requestId: 7) = try #require(instructions.first) else {
+            Issue.record("Expected CheckpointRequestApplied instruction")
+            return
+        }
     }
 
     @Test func setsHeaders() async throws {
@@ -520,6 +537,30 @@ class InMemorySyncIntegrationTests {
         try #require(mockClient.checkpointRequestStateHints == [1])
         try #require(try await lastRequestedCheckpointRequestId(db) == 1)
         try #require(try await nextCheckpointRequestId(db) == 2)
+    }
+
+    @Test func readsSyncLinesBeforeCheckpointRequestStateIsReady() async throws {
+        let seedStarted = Signal()
+        let finishSeed = Signal()
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in channel },
+            checkpointRequestHook: { _ in
+                await seedStarted.complete()
+                await finishSeed.await()
+            }
+        )
+        let db = openDatabase(mockClient)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
+        await seedStarted.await()
+        try await waitUntil { db.currentStatus.connected }
+
+        await finishSeed.complete()
+        try await waitUntilAsync {
+            try await lastRequestedCheckpointRequestId(db) == 1
+        }
+        try await db.disconnect()
     }
 
     @Test func uploadLocalTargetUsesSeededCheckpointRequestId() async throws {

@@ -11,6 +11,7 @@ enum Instruction {
     case establishSyncStream(request: JsonParam, lastCheckpointRequestId: Int64?)
     case fetchCredentials(didExpire: Bool)
     case checkpointRequestId(requestId: Int64)
+    case checkpointRequestApplied(requestId: Int64)
     case localTargetOp(targetOp: Int64?)
     case closeSyncStream(hideDisconnect: Bool)
     case flushFileSystem
@@ -25,6 +26,7 @@ extension Instruction: Decodable {
         case establishSyncStream = "EstablishSyncStream"
         case fetchCredentials = "FetchCredentials"
         case checkpointRequestId = "CheckpointRequestId"
+        case checkpointRequestApplied = "CheckpointRequestApplied"
         case localTargetOp = "LocalTargetOp"
         case closeSyncStream = "CloseSyncStream"
         case flushFileSystem = "FlushFileSystem"
@@ -51,6 +53,10 @@ extension Instruction: Decodable {
     }
 
     enum CheckpointRequestIdCodingKeys: String, CodingKey {
+        case requestId = "request_id"
+    }
+
+    enum CheckpointRequestAppliedCodingKeys: String, CodingKey {
         case requestId = "request_id"
     }
 
@@ -100,6 +106,9 @@ extension Instruction: Decodable {
         case .checkpointRequestId:
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.CheckpointRequestIdCodingKeys.self, forKey: .checkpointRequestId)
             self = Instruction.checkpointRequestId(requestId: try nestedContainer.decode(Int64.self, forKey: Instruction.CheckpointRequestIdCodingKeys.requestId))
+        case .checkpointRequestApplied:
+            let nestedContainer = try container.nestedContainer(keyedBy: Instruction.CheckpointRequestAppliedCodingKeys.self, forKey: .checkpointRequestApplied)
+            self = Instruction.checkpointRequestApplied(requestId: try nestedContainer.decode(Int64.self, forKey: Instruction.CheckpointRequestAppliedCodingKeys.requestId))
         case .localTargetOp:
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.LocalTargetOpCodingKeys.self, forKey: .localTargetOp)
             self = Instruction.localTargetOp(targetOp: try nestedContainer.decodeIfPresent(Int64.self, forKey: Instruction.LocalTargetOpCodingKeys.targetOp))

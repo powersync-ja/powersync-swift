@@ -59,8 +59,9 @@ public protocol SyncStatusData: Sendable {
 
     /// The latest checkpoint request ID applied by the sync client.
     ///
-    /// This value is `nil` when the status is still being loaded or when no checkpoint
-    /// request has been applied yet.
+    /// Current core versions report checkpoint request application through sync-loop events
+    /// instead of sync status. This value remains for compatibility with older status payloads,
+    /// and may stay `nil` even after checkpoint requests have been applied.
     var lastAppliedCheckpointRequestId: Int64? { get }
 }
 

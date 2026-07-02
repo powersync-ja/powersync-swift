@@ -65,7 +65,6 @@ struct AdminScreen: View {
                     statusRow("Uploading", bool(status.uploading))
                     statusRow("Has synced", optionalBool(status.hasSynced))
                     statusRow("Last synced", format(status.lastSyncedAt))
-                    statusRow("Last applied checkpoint request ID", format(status.lastAppliedCheckpointRequestId))
 
                     if let progress = status.downloadProgress {
                         VStack(alignment: .leading, spacing: 8) {
@@ -187,14 +186,6 @@ struct AdminScreen: View {
         }
 
         return date.formatted(date: .abbreviated, time: .standard)
-    }
-
-    private func format(_ value: Int64?) -> String {
-        guard let value else {
-            return "None"
-        }
-
-        return String(value)
     }
 
     private func formatUnixTime(_ time: TimeInterval?) -> String {

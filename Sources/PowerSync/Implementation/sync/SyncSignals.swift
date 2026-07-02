@@ -11,11 +11,24 @@ final class SyncSignals: Sendable {
         var waiters: [AsyncThrowingStream<Void, any Error>.Continuation] = []
     }
 
+    private struct CheckpointRequestApplicationWaiter {
+        let id: Int64
+        let requestId: Int64
+        let continuation: AsyncThrowingStream<Void, any Error>.Continuation
+    }
+
+    private struct CheckpointRequestApplicationState {
+        var latestAppliedRequestId: Int64?
+        var nextWaiterId: Int64 = 0
+        var waiters: [CheckpointRequestApplicationWaiter] = []
+    }
+
     let signalCrudUpload = BroadcastStream<Void>()
     let signalCrudUploadComplete = BroadcastStream<Void>()
     private let signalCheckpointRequestWaitingForReady = BroadcastStream<Void>()
     private let shouldSkipRetryDelay = Mutex(false)
     private let checkpointRequests = Mutex(CheckpointRequestsState())
+    private let checkpointRequestApplications = Mutex(CheckpointRequestApplicationState())
 
     func triggerAsyncCrudUpload() {
         self.signalCrudUpload.dispatch(event: ())
@@ -98,6 +111,81 @@ final class SyncSignals: Sendable {
                 continuation.finish(throwing: error)
             case nil:
                 break
+            }
+        }
+
+        for try await _ in stream {
+            try Task.checkCancellation()
+        }
+        try Task.checkCancellation()
+    }
+
+    func isCheckpointRequestApplied(_ requestId: Int64) -> Bool {
+        checkpointRequestApplications.withLock { state in
+            guard let latestAppliedRequestId = state.latestAppliedRequestId else {
+                return false
+            }
+
+            return latestAppliedRequestId >= requestId
+        }
+    }
+
+    func markCheckpointRequestApplied(_ requestId: Int64) {
+        let waiters = checkpointRequestApplications.withLock { state in
+            state.latestAppliedRequestId = max(state.latestAppliedRequestId ?? requestId, requestId)
+            guard let latestAppliedRequestId = state.latestAppliedRequestId else {
+                return [] as [AsyncThrowingStream<Void, any Error>.Continuation]
+            }
+
+            var readyWaiters: [AsyncThrowingStream<Void, any Error>.Continuation] = []
+            state.waiters.removeAll { waiter in
+                if latestAppliedRequestId >= waiter.requestId {
+                    readyWaiters.append(waiter.continuation)
+                    return true
+                }
+
+                return false
+            }
+
+            return readyWaiters
+        }
+
+        for waiter in waiters {
+            waiter.finish()
+        }
+    }
+
+    func waitForCheckpointRequestApplied(_ requestId: Int64) async throws {
+        if isCheckpointRequestApplied(requestId) {
+            try Task.checkCancellation()
+            return
+        }
+
+        let stream = AsyncThrowingStream<Void, any Error> { continuation in
+            let waiterId = checkpointRequestApplications.withLock { state -> Int64? in
+                if let latestAppliedRequestId = state.latestAppliedRequestId, latestAppliedRequestId >= requestId {
+                    return nil
+                }
+
+                state.nextWaiterId += 1
+                let waiterId = state.nextWaiterId
+                state.waiters.append(CheckpointRequestApplicationWaiter(
+                    id: waiterId,
+                    requestId: requestId,
+                    continuation: continuation
+                ))
+                return waiterId
+            }
+
+            guard let waiterId else {
+                continuation.finish()
+                return
+            }
+
+            continuation.onTermination = { @Sendable _ in
+                self.checkpointRequestApplications.withLock { state in
+                    state.waiters.removeAll { $0.id == waiterId }
+                }
             }
         }
 
