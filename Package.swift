@@ -7,7 +7,7 @@ let packageName = "PowerSync"
 
 // Set this to the absolute path of your powersync-sqlite-core checkout if you want to use a
 // local build of the core extension.
-let localCoreExtension: String? = nil
+let localCoreExtension: String? = "/Users/stevenontong/Documents/platform_code/powersync/powersync-sqlite-core"
 
 // Our target and dependency setup is different when a local Kotlin SDK is used. Without the local
 // SDK, we have no package dependency on Kotlin and download the XCFramework from Kotlin releases as

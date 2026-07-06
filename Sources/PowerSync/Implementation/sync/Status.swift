@@ -135,10 +135,6 @@ final class SwiftSyncStatus: SyncStatus {
         self.current.withLock { status in status.snapshot }
     }
 
-    private func snapshot() -> SyncStatusDataImpl {
-        self.current.withLock { $0.snapshot }
-    }
-
     internal func mutateStatus(update: (_ status: inout MutableSyncStatus) -> Void) {
         maybeMutateStatus(shouldUpdate: { _ in true }, apply: update)
     }
@@ -147,13 +143,13 @@ final class SwiftSyncStatus: SyncStatus {
         shouldUpdate: (_ status: borrowing MutableSyncStatus) -> Bool,
         apply: (_ status: inout MutableSyncStatus) -> Void
     ) {
-        let updatedSnapshot: SyncStatusDataImpl? = self.current.withLock {
+        let didUpdate = self.current.withLock {
             if shouldUpdate($0.inner) {
                 apply(&$0.inner)
                 $0.snapshot = SyncStatusDataImpl(status: $0.inner)
-                return $0.snapshot
+                return true
             } else {
-                return nil
+                return false
             }
         }
         
