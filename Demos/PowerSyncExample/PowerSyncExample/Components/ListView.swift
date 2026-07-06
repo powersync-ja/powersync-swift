@@ -58,13 +58,18 @@ struct ListView: View {
             }
             .onDelete { indexSet in
                 Task {
-                    await handleDelete(at: indexSet)
+                    await $error.catching {
+                        let listsToDelete = indexSet.map { lists[$0] }
+                        try await system.deleteList(id: listsToDelete[0].id)
+                    }
                 }
             }
         }
         .animation(.default, value: lists)
         .refreshable {
-            await refreshFromRemote()
+            await $error.catching {
+                try await system.refreshFromRemote()
+            }
         }
         .navigationTitle("Lists")
         .toolbar {
@@ -106,26 +111,6 @@ struct ListView: View {
         }
     }
 
-    func handleDelete(at offset: IndexSet) async {
-        do {
-            error = nil
-            let listsToDelete = offset.map { lists[$0] }
-
-            try await system.deleteList(id: listsToDelete[0].id)
-
-        } catch {
-            self.error = error
-        }
-    }
-
-    func refreshFromRemote() async {
-        do {
-            error = nil
-            try await system.refreshFromRemote()
-        } catch {
-            self.error = error
-        }
-    }
 }
 
 #Preview {
