@@ -13,11 +13,13 @@ final class NodeConnector: CustomCheckpointRequestConnector {
     private let backendUrl: URL
     private let powerSyncUrl: String?
     private let userId: String
+    private let logger: any LoggerProtocol
 
-    init(backendUrl: URL, powerSyncUrl: String?, userId: String) {
+    init(backendUrl: URL, powerSyncUrl: String?, userId: String, logger: any LoggerProtocol) {
         self.backendUrl = backendUrl
         self.powerSyncUrl = powerSyncUrl
         self.userId = userId
+        self.logger = logger
     }
 
     func fetchCredentials() async throws -> PowerSyncCredentials? {
@@ -68,7 +70,13 @@ final class NodeConnector: CustomCheckpointRequestConnector {
     /// receives. Requests are scoped to the PowerSync client ID, which the service path sends
     /// automatically but a custom connector supplies itself.
     func postCheckpointRequest(_ checkpointRequestId: Int64, clientId: String) async throws -> Int64 {
-        var request = URLRequest(url: try backendEndpoint("api/data/checkpoint-request"))
+        let url = try backendEndpoint("api/data/checkpoint-request")
+        logger.debug(
+            "Posting checkpoint request id \(checkpointRequestId) for client \(clientId) to \(url)",
+            tag: "CustomCheckpointDemo"
+        )
+
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(CheckpointRequestPayload(
@@ -85,6 +93,10 @@ final class NodeConnector: CustomCheckpointRequestConnector {
         // when the local database was cleared and the client restarted its request counter).
         do {
             let accepted = try JSONDecoder().decode(CheckpointRequestResponse.self, from: data)
+            logger.debug(
+                "Backend accepted checkpoint request state \(accepted.checkpointRequestId)",
+                tag: "CustomCheckpointDemo"
+            )
             return accepted.checkpointRequestId
         } catch let error as CheckpointRequestError {
             throw error

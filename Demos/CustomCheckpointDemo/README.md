@@ -11,12 +11,17 @@ Node.js todo backend. It uses that backend's auth, batch upload, and checkpoint 
 ```sh
 cd Demos/CustomCheckpointDemo
 BACKEND_URL=http://localhost:6060 \
-POWERSYNC_URL=http://localhost:8080 \
-USER_ID=UserID \
 swift run
 ```
 
-`POWERSYNC_URL` is optional when the backend token response includes `powersync_url`.
+`BACKEND_URL` defaults to `http://localhost:6060`, `POWERSYNC_URL` defaults to
+`http://localhost:8080`, and `USER_ID` defaults to
+`00000000-0000-4000-8000-000000000001`. If set explicitly, `POWERSYNC_URL` must be an absolute
+`http` or `https` URL and `USER_ID` should be a UUID for the Node.js todo backend's default
+Postgres schema.
+
+The demo uses an in-memory local database. If `USER_ID` is set to a non-UUID value, the demo prints
+a warning and falls back to the default UUID.
 
 ## Backend Contract
 

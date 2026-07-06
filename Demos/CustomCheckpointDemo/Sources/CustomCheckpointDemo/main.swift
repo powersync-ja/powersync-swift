@@ -9,24 +9,36 @@ let environment = ProcessInfo.processInfo.environment
 guard let backendUrl = URL(string: environment["BACKEND_URL"] ?? "http://localhost:6060") else {
     fatalError("BACKEND_URL is not a valid URL")
 }
-let powerSyncUrl = environment["POWERSYNC_URL"]
-let userId = environment["USER_ID"] ?? "UserID"
+let defaultPowerSyncUrl = "http://localhost:8080"
+let powerSyncUrl = environment["POWERSYNC_URL"] ?? defaultPowerSyncUrl
+let defaultUserId = "00000000-0000-4000-8000-000000000001"
+let userId = resolveUserId(environment["USER_ID"], defaultUserId: defaultUserId)
+let logger = DefaultLogger(minSeverity: .debug, writers: [StdoutLogWriter()])
 
 let db = PowerSyncDatabase(
     schema: AppSchema,
-    dbFilename: "custom-checkpoint-demo.sqlite"
+    dbFilename: ":memory:",
+    logger: logger
 )
 let connector = NodeConnector(
     backendUrl: backendUrl,
     powerSyncUrl: powerSyncUrl,
-    userId: userId
+    userId: userId,
+    logger: logger
 )
 
-if let powerSyncUrl {
-    print("Connecting to PowerSync at \(powerSyncUrl), uploading to backend at \(backendUrl)")
+if environment["POWERSYNC_URL"] == nil {
+    print("Connecting to PowerSync at \(powerSyncUrl) (default), uploading to backend at \(backendUrl)")
 } else {
-    print("Connecting with PowerSync endpoint from backend token response, uploading to backend at \(backendUrl)")
+    print("Connecting to PowerSync at \(powerSyncUrl), uploading to backend at \(backendUrl)")
 }
+print("Using user ID \(userId) with an in-memory local database")
+
+let syncErrorMonitor = monitorSyncErrors(db.currentStatus)
+defer {
+    syncErrorMonitor.cancel()
+}
+
 try await db.connect(
     connector: connector,
     options: ConnectOptions(checkpointMode: .requests)
@@ -57,3 +69,54 @@ print("Lists in the local database: \(listCount)")
 
 try await db.disconnect()
 try await db.close()
+
+private func monitorSyncErrors(_ status: any SyncStatus) -> Task<Void, Never> {
+    Task {
+        var previousDownloadError: String?
+        var previousUploadError: String?
+
+        for await update in status.asFlow() {
+            guard !Task.isCancelled else {
+                return
+            }
+
+            reportSyncError(update.downloadError, label: "download", previousError: &previousDownloadError)
+            reportSyncError(update.uploadError, label: "upload", previousError: &previousUploadError)
+        }
+    }
+}
+
+private func resolveUserId(_ configuredUserId: String?, defaultUserId: String) -> String {
+    guard let configuredUserId, !configuredUserId.isEmpty else {
+        return defaultUserId
+    }
+
+    guard UUID(uuidString: configuredUserId) != nil else {
+        print("Ignoring USER_ID=\(configuredUserId); the Node.js todo backend expects a UUID. Using \(defaultUserId).")
+        return defaultUserId
+    }
+
+    return configuredUserId
+}
+
+private func reportSyncError(_ error: Any?, label: String, previousError: inout String?) {
+    guard let error else {
+        previousError = nil
+        return
+    }
+
+    let message = String(describing: error)
+    guard message != previousError else {
+        return
+    }
+
+    previousError = message
+    print("Sync \(label) error: \(message)")
+}
+
+private final class StdoutLogWriter: LogWriterProtocol {
+    func log(severity: LogSeverity, message: String, tag: String?) {
+        let tagPrefix = tag.map { !$0.isEmpty ? "[\($0)] " : "" } ?? ""
+        print("\(severity.stringValue): \(tagPrefix)\(message)")
+    }
+}
