@@ -489,8 +489,14 @@ private struct ActiveSyncIteration: Sendable {
                         localEvents.subscribe()
                     )
                 } catch {
-                    try await checkpointRequestStateSeed.value
-                    throw error
+                    let streamError = error
+                    do {
+                        try await checkpointRequestStateSeed.value
+                    } catch {
+                        // The stream error is the primary failure for this branch: validation
+                        // errors are surfaced by the sentinel once the stream has been established.
+                    }
+                    throw streamError
                 }
             } else {
                 try await self.execute(instr: instruction, group: &group)

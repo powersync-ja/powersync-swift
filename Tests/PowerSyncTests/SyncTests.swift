@@ -527,6 +527,31 @@ class InMemorySyncIntegrationTests {
         }
     }
 
+    @Test func streamErrorIsPreferredWhenCheckpointRequestValidationAlsoFails() async throws {
+        let streamErrorMessage = "Fake stream error for test"
+        let mockClient = MockHttpClient { _ in
+            throw PowerSyncError.operationFailed(message: streamErrorMessage)
+        }
+        mockClient.checkpointRequestFailuresRemaining = .max
+        mockClient.checkpointRequestFailureStatusCode = 404
+        let db = openDatabase(mockClient)
+
+        try await db.connect(
+            connector: TestConnector(),
+            options: ConnectOptions(retryDelay: 60, checkpointMode: .requests)
+        )
+        await waitForStatus(db.currentStatus) { $0.downloadError != nil }
+
+        let downloadError = try #require(db.currentStatus.downloadError as? PowerSyncError)
+        guard case .operationFailed(message: let message, underlyingError: nil) = downloadError,
+              message == streamErrorMessage else {
+            Issue.record("Expected stream error, got \(downloadError)")
+            return
+        }
+
+        try await db.disconnect()
+    }
+
     @Test func requestCheckpointUsesEffectiveCheckpointId() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let mockClient = MockHttpClient { request in channel }
