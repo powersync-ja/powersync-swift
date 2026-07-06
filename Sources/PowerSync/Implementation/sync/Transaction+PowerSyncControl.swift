@@ -24,13 +24,15 @@ extension Transaction {
     }
 
     /// Reads the current local target op, or updates it when a target op is supplied.
+    ///
+    /// - Returns: The target op observed *before* the optional update was applied.
     func powersyncLocalTargetOp(_ targetOp: Int64? = nil) throws -> Int64? {
         let instructions = try powersyncControl(.localTargetOp(targetOp: targetOp))
-        guard instructions.count == 1, case let .localTargetOp(targetOp) = instructions[0] else {
+        guard instructions.count == 1, case let .localTargetOp(observedTargetOp) = instructions[0] else {
             throw PowerSyncError.operationFailed(message: "Expected a LocalTargetOp instruction")
         }
 
-        return targetOp
+        return observedTargetOp
     }
 
     /// Seeds the local checkpoint request counter from service state before opening the sync stream.

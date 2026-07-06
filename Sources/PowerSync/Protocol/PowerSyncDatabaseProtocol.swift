@@ -108,8 +108,8 @@ public struct ConnectOptions: Sendable {
     /// Initializes a `ConnectOptions` instance with optional values.
     ///
     /// - Parameters:
-    ///   - crudThrottle: TimeInterval between CRUD operations in milliseconds. Defaults to `1` second.
-    ///   - retryDelay: Delay TimeInterval between retry attempts in milliseconds. Defaults to `5` seconds.
+    ///   - crudThrottle: TimeInterval between CRUD operations in seconds. Defaults to `1` second.
+    ///   - retryDelay: Delay TimeInterval between retry attempts in seconds. Defaults to `5` seconds.
     ///   - params: Custom sync parameters to send to the server. Defaults to an empty dictionary.
     ///   - clientConfiguration: Configuration for the HTTP client used to connect to PowerSync.
     ///   - checkpointMode: Service checkpoint mechanism to use for this connection.
@@ -250,7 +250,6 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// Use ``SyncStream/subscribe`` on the returned instance to subscribe to the stream.
     func syncStream(name: String, params: JsonParam?) -> any SyncStream
 
-
     /// Requests a checkpoint from the PowerSync service.
     ///
     /// The returned request can be awaited to confirm that the local database has applied
@@ -258,7 +257,11 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// sync client connected with ``ConnectOptions/checkpointMode`` set to
     /// ``CheckpointMode/requests``. It can throw for connection, mode, authentication, or service
     /// request failures.
-    func requestCheckpoint() async throws -> CheckpointRequest
+    ///
+    /// Creating the request has no timeout of its own: while the sync client keeps retrying a
+    /// failing connection, this call keeps waiting. Cancel the calling task to stop waiting, and
+    /// use ``CheckpointRequest/waitForSync(timeout:)`` to bound the wait for the checkpoint itself.
+    func requestCheckpoint() async throws -> any CheckpointRequest
 
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.

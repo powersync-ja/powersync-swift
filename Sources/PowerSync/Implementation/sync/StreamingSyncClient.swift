@@ -32,9 +32,13 @@ final class StreamingSyncClient: Sendable {
     /// control for that (that's the responsibility of a ``SyncCoordinator``).
     func run() -> Task<Void, any Error> {
         Task(name: "StreamingSyncClient.run") {
+            // Once both loops end, no further sync iteration can resume checkpoint request
+            // waiters, so fail any that are still pending instead of leaving them suspended.
+            defer { signals.tearDown() }
+
             async let download: () = downloadLoop(signals: signals)
             async let upload: () = uploadLoop(signals: signals)
-            
+
             let _ = try await (download, upload)
         }
     }
@@ -161,7 +165,7 @@ The next upload iteration will be delayed.
     /// not local upload gates.
     func requestCheckpoint() async throws -> any CheckpointRequest {
         guard checkpointMode == .requests else {
-            throw CheckPointRequestError.checkpointRequestsNotEnabled
+            throw CheckpointRequestError.checkpointRequestsNotEnabled
         }
 
         // Allocate the request ID locally before reporting it to the service.
@@ -212,7 +216,7 @@ The next upload iteration will be delayed.
             if let error = update.anyError {
                 // `asFlow()` emits the current status first. We intentionally fail fast if the
                 // sync client is already in an error state when the caller starts waiting.
-                throw CheckpointWaitError.errorDetected(error: String(describing: error))
+                throw CheckpointWaitError.errorDetected(message: String(describing: error))
             }
         }
 
@@ -235,10 +239,10 @@ The next upload iteration will be delayed.
         let (response, data) = try await httpClient.readFully(request: request)
         await self.handleCommonResponseErrors(response: response)
         if response.statusCode == 404 {
-            throw CheckPointRequestError.instanceNotSupported
+            throw CheckpointRequestError.instanceNotSupported
         }
         if response.statusCode != 200 {
-            throw PowerSyncError.operationFailed(message: "Error getting write checkpoint: \(response.statusCode)")
+            throw PowerSyncError.operationFailed(message: "Checkpoint request failed with status code: \(response.statusCode)")
         }
 
         return try StreamingSyncClient.decodeWriteCheckpointId(from: data)
@@ -280,9 +284,9 @@ The next upload iteration will be delayed.
             }
 
             signals.markCheckpointRequestsReady()
-        } catch CheckPointRequestError.instanceNotSupported {
-            signals.failCheckpointRequests(CheckPointRequestError.instanceNotSupported)
-            throw CheckPointRequestError.instanceNotSupported
+        } catch CheckpointRequestError.instanceNotSupported {
+            signals.failCheckpointRequests(CheckpointRequestError.instanceNotSupported)
+            throw CheckpointRequestError.instanceNotSupported
         }
     }
 
@@ -292,11 +296,10 @@ The next upload iteration will be delayed.
     /// concrete ID only after the service accepts it and the CRUD queue is still empty.
     private func getWriteCheckpoint() async throws -> Int64 {
         switch checkpointMode {
-            case .requests:
-                let checkpoint = try await requestCheckpointFromService(requestId: try await nextCheckpointRequestId())
-                return checkpoint
-            case .legacy:
-                return try await getLegacyWriteCheckpoint()
+        case .requests:
+            return try await requestCheckpointFromService(requestId: try await nextCheckpointRequestId())
+        case .legacy:
+            return try await getLegacyWriteCheckpoint()
         }
     }
 

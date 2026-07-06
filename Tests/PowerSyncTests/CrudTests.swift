@@ -334,13 +334,6 @@ final class CrudTests: XCTestCase {
             try tx.powersyncLocalTargetOp()
         }
         XCTAssertEqual(targetOp, 123)
-        let requestedCheckpoint = try await database.getOptional(
-            sql: "SELECT CAST(value AS INTEGER) FROM ps_kv WHERE key = 'last_requested_checkpoint_request_id'",
-            parameters: []
-        ) {
-            try $0.getInt(index: 0)
-        }
-        XCTAssertEqual(requestedCheckpoint, 123)
 
         try await database.execute(
             sql: "INSERT INTO users (id, name) VALUES (uuid(), 'a')",

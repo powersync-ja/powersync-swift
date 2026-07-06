@@ -370,15 +370,79 @@ class InMemorySyncIntegrationTests {
         do {
             _ = try await db.requestCheckpoint()
             Issue.record("Expected requestCheckpoint() to throw when checkpoint requests are not enabled")
-        } catch CheckPointRequestError.checkpointRequestsNotEnabled {
+        } catch CheckpointRequestError.checkpointRequestsNotEnabled {
         } catch {
             Issue.record("Expected checkpointRequestsNotEnabled, got \(error)")
         }
     }
 
+    @Test func requestCheckpointRequiresConnection() async throws {
+        let db = openDatabase(MockHttpClient { _ in AsyncThrowingChannel<PowerSync.SyncLine, any Error>() })
+
+        do {
+            _ = try await db.requestCheckpoint()
+            Issue.record("Expected requestCheckpoint() to throw when not connected")
+        } catch CheckpointRequestError.notConnected {
+        } catch {
+            Issue.record("Expected notConnected, got \(error)")
+        }
+    }
+
+    @Test func waitForSyncFailsWhenDisconnecting() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpClient { request in channel })
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
+        await waitForStatus(db.currentStatus) { $0.connected }
+
+        let checkpoint = try await db.requestCheckpoint()
+        try #require(!checkpoint.isSynced)
+
+        let waiter = Task {
+            do {
+                try await checkpoint.waitForSync()
+                Issue.record("Expected waitForSync() to throw after disconnect")
+            } catch CheckpointWaitError.disconnected {
+            } catch {
+                Issue.record("Expected CheckpointWaitError.disconnected, got \(error)")
+            }
+        }
+
+        try await db.disconnect()
+        await waiter.value
+    }
+
+    @Test func requestCheckpointFailsWhenDisconnectedBeforeReady() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient(handleSyncLines: { _ in channel }, checkpointRequestHook: { _ in
+            // Block the connect-time seed request so checkpoint requests never become ready.
+            try? await Task.sleep(nanoseconds: 60_000_000_000)
+        })
+        let db = openDatabase(mockClient)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
+
+        let request = Task {
+            do {
+                _ = try await db.requestCheckpoint()
+                Issue.record("Expected requestCheckpoint() to throw after disconnect")
+            } catch CheckpointRequestError.notConnected {
+            } catch {
+                Issue.record("Expected notConnected, got \(error)")
+            }
+        }
+
+        // Wait for the blocked seed request to arrive so the client is mid-validation.
+        try await waitUntil { mockClient.checkpointRequestIds.count >= 1 }
+        try await db.disconnect()
+        await request.value
+    }
+
     @Test func requestCheckpointThrowsInstanceNotSupportedWhenServiceDoesNotSupportEndpoint() async throws {
         let mockClient = MockHttpClient { _ in AsyncThrowingChannel<PowerSync.SyncLine, any Error>() }
-        mockClient.checkpointRequestFailuresRemaining = 1
+        // The endpoint is missing on this service, so every request fails. A new sync iteration
+        // revalidates checkpoint request support, so the failure must be persistent.
+        mockClient.checkpointRequestFailuresRemaining = .max
         mockClient.checkpointRequestFailureStatusCode = 404
         let db = openDatabase(mockClient)
 
@@ -388,7 +452,7 @@ class InMemorySyncIntegrationTests {
         )
         await waitForStatus(db.currentStatus) { $0.downloadError != nil }
 
-        let downloadError = try #require(db.currentStatus.downloadError as? CheckPointRequestError)
+        let downloadError = try #require(db.currentStatus.downloadError as? CheckpointRequestError)
         guard case .instanceNotSupported = downloadError else {
             Issue.record("Expected instanceNotSupported download error, got \(downloadError)")
             return
@@ -397,7 +461,7 @@ class InMemorySyncIntegrationTests {
         do {
             _ = try await db.requestCheckpoint()
             Issue.record("Expected requestCheckpoint() to throw instanceNotSupported")
-        } catch CheckPointRequestError.instanceNotSupported {
+        } catch CheckpointRequestError.instanceNotSupported {
         } catch {
             Issue.record("Expected instanceNotSupported, got \(error)")
         }

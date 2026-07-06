@@ -56,13 +56,6 @@ public protocol SyncStatusData: Sendable {
 
     /// Status information for the given stream, if it's a stream that is currently tracked by the sync client.
     func forStream(stream: SyncStreamDescription) -> SyncStreamStatus?
-
-    /// The latest checkpoint request ID applied by the sync client.
-    ///
-    /// Current core versions report checkpoint request application through sync-loop events
-    /// instead of sync status. This value remains for compatibility with older status payloads,
-    /// and may stay `nil` even after checkpoint requests have been applied.
-    var lastAppliedCheckpointRequestId: Int64? { get }
 }
 
 /// A protocol extending `SyncStatusData` to include flow-based updates for synchronization status.

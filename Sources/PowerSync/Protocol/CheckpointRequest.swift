@@ -1,7 +1,7 @@
 import Foundation
 
 /// Errors thrown while creating a checkpoint request.
-public enum CheckPointRequestError: Error, LocalizedError {
+public enum CheckpointRequestError: Error, LocalizedError {
     /// The target PowerSync service does not support checkpoint requests.
     /// Update the PowerSync service to use this API.
     case instanceNotSupported
@@ -20,6 +20,26 @@ public enum CheckPointRequestError: Error, LocalizedError {
 
     /// The checkpoint request could not be completed.
     case operationFailed(message: String? = nil, underlyingError: Error? = nil)
+
+    public var errorDescription: String? {
+        switch self {
+        case .instanceNotSupported:
+            return "The PowerSync service does not support checkpoint requests. Update the PowerSync service to use this API."
+        case .notConnected:
+            return "Checkpoint requests require an active or connecting sync client."
+        case .checkpointRequestsNotEnabled:
+            return "The active connection was not configured to use checkpoint requests. Connect with checkpointMode set to .requests."
+        case .operationFailed(let message, let underlyingError):
+            var description = "The checkpoint request could not be completed."
+            if let message {
+                description += " \(message)"
+            }
+            if let underlyingError {
+                description += " (\(underlyingError))"
+            }
+            return description
+        }
+    }
 }
 
 /// Errors thrown while waiting for a checkpoint request to sync.
@@ -27,11 +47,27 @@ public enum CheckpointWaitError: Error, LocalizedError {
     /// The checkpoint request was not synced before the timeout elapsed.
     case timeout
 
+    /// The sync client disconnected before the checkpoint request was synced.
+    case disconnected
+
     /// The sync status stream ended before the checkpoint request was synced.
     case syncStatusClosed
 
     /// The sync client reported a download or upload error while waiting.
-    case errorDetected(error: Sendable)
+    case errorDetected(message: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .timeout:
+            return "The checkpoint request was not synced before the timeout elapsed."
+        case .disconnected:
+            return "The sync client disconnected before the checkpoint request was synced."
+        case .syncStatusClosed:
+            return "The sync status stream ended before the checkpoint request was synced."
+        case .errorDetected(let message):
+            return "The sync client reported an error while waiting for the checkpoint request: \(message)"
+        }
+    }
 }
 
 /// A checkpoint request created by ``PowerSyncDatabaseProtocol/requestCheckpoint()``.

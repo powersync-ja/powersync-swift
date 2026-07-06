@@ -107,13 +107,6 @@ final class SupabaseConnector: PowerSyncBackendConnectorProtocol {
                 case .put:
                     var data = entry.opData ?? [:]
                     data["id"] = entry.id
-                    if tableName == LISTS_TABLE,
-                       let nameValue = data["name"],
-                       let name = nameValue
-                    {
-                        // Demo-only: make server-applied list creates visibly different after sync.
-                        data["name"] = "\(name) (uploaded)"
-                    }
                     try await table.upsert(data).execute()
                 case .patch:
                     guard let opData = entry.opData else { continue }

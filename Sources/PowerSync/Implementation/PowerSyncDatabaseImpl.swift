@@ -187,7 +187,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
         return try await group.syncCoordinator.guardNotConnected(
             inner: {
-                throw CheckPointRequestError.notConnected
+                throw CheckpointRequestError.notConnected
             },
             ifConnected: { client in
                 try await client.requestCheckpoint()
