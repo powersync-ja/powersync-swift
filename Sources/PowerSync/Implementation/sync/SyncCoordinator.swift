@@ -2,20 +2,27 @@
 actor SyncCoordinator {
     nonisolated let streams = StreamTracker()
     private var activeSync: Task<Void, any Error>?
-    private var syncClient: StreamingSyncClient?
-    
+    /// Mutex-backed instead of actor-isolated so ``syncClient`` can be read synchronously.
+    /// Only mutated from the actor.
+    private nonisolated let currentClient = Mutex<StreamingSyncClient?>(nil)
+
+    /// A snapshot of the sync client for the active connection, if any.
+    nonisolated var syncClient: StreamingSyncClient? {
+        currentClient.withLock { $0 }
+    }
+
     func connect(db: PowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: HttpClient) async {
         if let task = activeSync {
             await self.finishSyncTask(task: task)
         }
-        
+
         var client = client
         if let logger = options.clientConfiguration?.requestLogger {
             client = LoggingClient(inner: client, logger: logger)
         }
 
         let sync = StreamingSyncClient(db: db, connector: connector, httpClient: client, options: options)
-        syncClient = sync
+        currentClient.withLock { $0 = sync }
         activeSync = sync.run()
     }
     
@@ -43,7 +50,7 @@ actor SyncCoordinator {
     
     private func finishSyncTask(task: Task<Void, any Error>) async {
         self.activeSync = nil
-        self.syncClient = nil
+        currentClient.withLock { $0 = nil }
         task.cancel()
         do {
             try await task.value

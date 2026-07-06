@@ -48,6 +48,9 @@ public enum CheckpointWaitError: Error, LocalizedError {
     case timeout
 
     /// The sync client disconnected before the checkpoint request was synced.
+    ///
+    /// The checkpoint request itself remains valid: request IDs are persisted by the core
+    /// extension, so ``CheckpointRequest/waitForSync()`` can be called again after reconnecting.
     case disconnected
 
     /// The sync status stream ended before the checkpoint request was synced.
@@ -75,19 +78,28 @@ public enum CheckpointWaitError: Error, LocalizedError {
 /// Use this value to wait until the local database has applied server-side changes up to
 /// the requested checkpoint. This is useful for explicit refresh flows where the caller
 /// wants confirmation that the local view has caught up to the service.
+///
+/// The request is tracked against the database, not a single connection: request IDs are
+/// persisted by the core extension, so this value stays usable across disconnect/reconnect
+/// cycles. A wait interrupted by a disconnect throws ``CheckpointWaitError/disconnected``,
+/// but the same request can be awaited again once a new connection is established.
 public protocol CheckpointRequest: Sendable {
     /// Whether this checkpoint has already been synced locally.
     ///
-    /// This is a snapshot of checkpoint request events observed by the sync client.
+    /// This is a snapshot of checkpoint request events observed by the sync client, and stays
+    /// true once the checkpoint has been applied. While disconnected, a checkpoint that was
+    /// not yet applied reports false until a new connection observes its application.
     /// Use ``waitForSync()`` or ``waitForSync(timeout:)`` to suspend until the checkpoint is reached.
     var isSynced: Bool { get }
-    
+
     /// Waits until this checkpoint has been synced locally.
     ///
     /// This method observes sync-loop checkpoint application events for an already-created
-    /// checkpoint request.
-    /// - Throws: ``CheckpointWaitError`` when the sync status stream closes before the
-    ///   checkpoint is reached, or when a sync error is present or reached while waiting.
+    /// checkpoint request, using the currently active sync client.
+    /// - Throws: ``CheckpointWaitError`` when no sync client is active, when the sync status
+    ///   stream closes before the checkpoint is reached, or when a sync error is present or
+    ///   reached while waiting. Throws ``CheckpointRequestError/checkpointRequestsNotEnabled``
+    ///   when the active connection was not configured with ``CheckpointMode/requests``.
     func waitForSync() async throws
 
     /// Waits until this checkpoint has been synced locally, or until a timeout elapses.

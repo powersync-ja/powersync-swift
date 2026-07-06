@@ -411,6 +411,55 @@ class InMemorySyncIntegrationTests {
         await waiter.value
     }
 
+    @Test func checkpointRequestRemainsUsableAcrossReconnects() async throws {
+        let channels = Mutex<[AsyncThrowingChannel<PowerSync.SyncLine, any Error>]>([])
+        let mockClient = MockHttpClient { _ in
+            let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+            channels.withLock { $0.append(channel) }
+            return channel
+        }
+        let db = openDatabase(mockClient)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
+        await waitForStatus(db.currentStatus) { $0.connected }
+
+        let checkpoint = try await db.requestCheckpoint()
+        try #require(mockClient.checkpointRequestIds == [1, 2])
+        try #require(!checkpoint.isSynced)
+
+        try await db.disconnect()
+        try #require(!checkpoint.isSynced)
+        do {
+            try await checkpoint.waitForSync()
+            Issue.record("Expected waitForSync() to throw while disconnected")
+        } catch CheckpointWaitError.disconnected {
+        } catch {
+            Issue.record("Expected CheckpointWaitError.disconnected, got \(error)")
+        }
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
+        // The new connection re-affirms the persisted request counter with the service.
+        try await waitUntil { mockClient.checkpointRequestIds == [1, 2, 2] }
+        try await waitUntil { channels.withLock { $0.count } >= 2 }
+        await waitForStatus(db.currentStatus) { $0.connected }
+
+        let channel = try #require(channels.withLock { $0[1] })
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(
+            last_op_id: "1",
+            buckets: [BucketChecksum(bucket: "a", checksum: 0)],
+            writeCheckpoint: "2"
+        )))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+
+        // The request created on the first connection is satisfied by the second one.
+        try await checkpoint.waitForSync(timeout: 1)
+        try #require(checkpoint.isSynced)
+
+        // Once applied, the checkpoint request stays synced even without a connection.
+        try await db.disconnect()
+        try #require(checkpoint.isSynced)
+    }
+
     @Test func requestCheckpointFailsWhenDisconnectedBeforeReady() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let mockClient = MockHttpClient(handleSyncLines: { _ in channel }, checkpointRequestHook: { _ in

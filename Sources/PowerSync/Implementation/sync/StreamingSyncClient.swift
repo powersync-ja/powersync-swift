@@ -173,7 +173,7 @@ The next upload iteration will be delayed.
         // Allocate the request ID locally before reporting it to the service.
         let requestId = try await nextCheckpointRequestId()
         let effectiveRequestId = try await requestCheckpointFromService(requestId: requestId)
-        return CheckpointRequestImpl(requestId: effectiveRequestId, syncClient: self)
+        return CheckpointRequestImpl(requestId: effectiveRequestId, group: db.group)
     }
 
     func isCheckpointRequestApplied(_ requestId: Int64) -> Bool {
