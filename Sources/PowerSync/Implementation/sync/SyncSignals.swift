@@ -166,6 +166,8 @@ final class SyncSignals: Sendable {
         }
 
         var didRegisterWaiter = false
+        // This is a one-shot wait; `AsyncThrowingStream` is a convenience because `onTermination`
+        // lets us remove the registered waiter when the waiting task is cancelled.
         let stream = AsyncThrowingStream<Void, any Error> { continuation in
             let immediateResult = pendingCheckpointRequests.withLock { state -> ImmediateResult in
                 if let failure = state.failure {
@@ -255,6 +257,8 @@ final class SyncSignals: Sendable {
             case registered(waiterId: Int64)
         }
 
+        // This is a one-shot wait; `AsyncThrowingStream` is a convenience because `onTermination`
+        // lets us remove the registered waiter when the waiting task is cancelled.
         let stream = AsyncThrowingStream<Void, any Error> { continuation in
             let immediateResult = checkpointRequestApplications.withLock { state -> ImmediateResult in
                 if let latestAppliedRequestId = state.latestAppliedRequestId, latestAppliedRequestId >= requestId {

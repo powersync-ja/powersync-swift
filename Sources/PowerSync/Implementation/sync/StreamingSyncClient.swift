@@ -115,7 +115,7 @@ The next upload iteration will be delayed.
     /// The sync stream later reports the same ID once the corresponding checkpoint has been
     /// applied locally.
     private func uploadLocalTarget() async throws {
-        let currentTarget = try await db.writeTransaction { tx in
+        let currentTarget: Int64? = try await db.writeTransaction { tx in
             try tx.powersyncLocalTargetOp()
         }
 
@@ -468,6 +468,7 @@ private struct ActiveSyncIteration: Sendable {
                 // Start checkpoint request validation while establishing the sync stream, but
                 // don't block line processing on it. Operations that allocate checkpoint
                 // requests wait for the validation signal themselves.
+                // Keeping this as a separate task also lets stream-establishment errors stay primary.
                 let checkpointRequestStateSeed = Task {
                     try await syncClient.seedCheckpointRequestState(lastCheckpointRequestId: lastCheckpointRequestId)
                 }
