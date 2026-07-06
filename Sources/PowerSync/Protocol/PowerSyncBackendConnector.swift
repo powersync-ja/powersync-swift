@@ -56,7 +56,19 @@ public protocol CustomCheckpointRequestConnector: PowerSyncBackendConnectorProto
     ///
     /// Any thrown errors are treated like other sync errors: the sync iteration fails and is
     /// retried after the configured retry delay.
-    func postCheckpointRequest(_ checkpointRequestId: Int64) async throws -> Int64
+    ///
+    /// Throw a ``CheckpointRequestError`` to control the error reported by checkpoint requests.
+    /// Other thrown errors are wrapped as
+    /// ``CheckpointRequestError/operationFailed(message:underlyingError:)``.
+    ///
+    /// This method is called independently from ``fetchCredentials()`` and does not receive the
+    /// PowerSync token used internally for sync. If the checkpoint request endpoint requires
+    /// application backend authentication, the connector should fetch or cache its own token for
+    /// this request.
+    /// - Parameters:
+    ///   - checkpointRequestId: The client-generated checkpoint request ID.
+    ///   - clientId: The PowerSync client ID this request is scoped to.
+    func postCheckpointRequest(_ checkpointRequestId: Int64, clientId: String) async throws -> Int64
 }
 
 @available(*, deprecated, message: "PowerSyncBackendConnector is deprecated. Please implement PowerSyncBackendConnectorProtocol directly in your own class.")

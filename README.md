@@ -26,6 +26,8 @@ The easiest way to test the PowerSync Swift SDK is to run our demo application.
 
 - [Demos/SwiftEncryptionDemo](./Demos/SwiftEncryptionDemo/README.md): A simple app opening an encrypted local PowerSync database.
 
+- [Demos/CustomCheckpointDemo](./Demos/CustomCheckpointDemo/README.md): A basic SwiftPM executable demonstrating custom write checkpoint requests against a Node.js backend.
+
 ## Installation
 
 Add

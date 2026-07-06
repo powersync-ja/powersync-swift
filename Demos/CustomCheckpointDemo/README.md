@@ -1,0 +1,40 @@
+# CustomCheckpointDemo
+
+A small SwiftPM command line demo for custom checkpoint requests.
+
+The connector is shaped around the
+[powersync-ja/powersync-nodejs-backend-todolist-demo](https://github.com/powersync-ja/powersync-nodejs-backend-todolist-demo)
+Node.js todo backend. It uses that backend's auth, batch upload, and checkpoint request endpoints.
+
+## Run
+
+```sh
+cd Demos/CustomCheckpointDemo
+BACKEND_URL=http://localhost:6060 \
+POWERSYNC_URL=http://localhost:8080 \
+USER_ID=UserID \
+swift run
+```
+
+`POWERSYNC_URL` is optional when the backend token response includes `powersync_url`.
+
+## Backend Contract
+
+Existing endpoints used by the demo:
+
+- `GET /api/auth/token?user_id=<user id>` returns `{ "token": "...", "powersync_url": "..." }`.
+- `POST /api/data` receives `{ "batch": [{ "op": "PUT|PATCH|DELETE", "table": "...", "data": { "id": "...", ... } }] }`.
+
+Checkpoint request endpoint used by the demo:
+
+- `POST /api/data/checkpoint-request`
+- Request body: `{ "user_id": "...", "client_id": "...", "checkpoint_request_id": "..." }`
+- Response body: `{ "checkpoint_request_id": "..." }`
+
+The returned checkpoint request ID should be the effective request state accepted by the backend.
+Usually this is the posted ID, but if the backend already has a newer request recorded for the same
+client it should return that newer ID.
+
+The SDK does not attach the PowerSync sync token to `postCheckpointRequest` calls. If this endpoint
+needs application backend authentication, the connector should fetch or cache a suitable backend
+token and add it to the request itself.

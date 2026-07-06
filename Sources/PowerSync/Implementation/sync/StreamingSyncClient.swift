@@ -234,11 +234,20 @@ The next upload iteration will be delayed.
     /// When the connector implements ``CustomCheckpointRequestConnector``, the request is posted to
     /// the custom backend instead of the service endpoint, with the same state contract.
     private func requestCheckpointFromService(requestId: Int64) async throws -> Int64 {
-        if let customCheckpointRequestConnector {
-            return try await customCheckpointRequestConnector.postCheckpointRequest(requestId)
-        }
-
         let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
+
+        if let customCheckpointRequestConnector {
+            do {
+                return try await customCheckpointRequestConnector.postCheckpointRequest(requestId, clientId: clientId)
+            } catch let error as CheckpointRequestError {
+                throw error
+            } catch {
+                throw CheckpointRequestError.operationFailed(
+                    message: "Custom checkpoint request failed.",
+                    underlyingError: error
+                )
+            }
+        }
 
         var (_, request) = try await authenticatedRequest { endpoint in
             endpoint.path += "/sync/checkpoint-request"
@@ -255,10 +264,17 @@ The next upload iteration will be delayed.
             throw CheckpointRequestError.instanceNotSupported
         }
         if response.statusCode != 200 {
-            throw PowerSyncError.operationFailed(message: "Checkpoint request failed with status code: \(response.statusCode)")
+            throw CheckpointRequestError.operationFailed(message: "Checkpoint request failed with status code: \(response.statusCode)")
         }
 
-        return try StreamingSyncClient.decodeWriteCheckpointId(from: data)
+        do {
+            return try StreamingSyncClient.decodeCheckpointRequestId(from: data)
+        } catch {
+            throw CheckpointRequestError.operationFailed(
+                message: "Invalid checkpoint request response.",
+                underlyingError: error
+            )
+        }
     }
 
     /// Ensures the core checkpoint request counter has been seeded for the current stream.
@@ -432,6 +448,15 @@ The next upload iteration will be delayed.
         }
 
         return checkpointId
+    }
+
+    private static func decodeCheckpointRequestId(from data: Data) throws -> Int64 {
+        let requestId = try jsonDecoder.decode(CheckpointRequestResponse.self, from: data).data.checkpoint_request_id
+        guard let checkpointRequestId = Int64(requestId) else {
+            throw PowerSyncError.operationFailed(message: "Invalid checkpoint request returned by service: \(requestId)")
+        }
+
+        return checkpointRequestId
     }
 }
 
@@ -713,6 +738,14 @@ struct WriteCheckpointResponse: Codable {
 
 struct WriteCheckpointData: Codable {
     let write_checkpoint: String
+}
+
+private struct CheckpointRequestResponse: Codable {
+    let data: CheckpointRequestResponseData
+}
+
+private struct CheckpointRequestResponseData: Codable {
+    let checkpoint_request_id: String
 }
 
 private struct CheckpointRequestPayload: Encodable {

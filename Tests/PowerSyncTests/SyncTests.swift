@@ -750,6 +750,8 @@ class InMemorySyncIntegrationTests {
         let checkpoint = try await db.requestCheckpoint()
         // The connect-time seed (ID 1) and the explicit request (ID 2) both go to the connector.
         try #require(connector.postedCheckpointRequests == [1, 2])
+        let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
+        try #require(connector.postedCheckpointClientIds == [clientId, clientId])
         // The service endpoint is never used with a custom checkpoint request connector.
         try #require(mockClient.checkpointRequestIds.isEmpty)
 
@@ -762,6 +764,93 @@ class InMemorySyncIntegrationTests {
 
         try await checkpoint.waitForSync(timeout: 1)
         try #require(checkpoint.isSynced)
+    }
+
+    @Test func checkpointRequestConnectorPropagatesCheckpointRequestErrors() async throws {
+        final actor BackendConnector: CustomCheckpointRequestConnector {
+            var checkpointRequests = 0
+
+            func fetchCredentials() async throws -> PowerSyncCredentials? {
+                testCredentials
+            }
+
+            func uploadData(database: any PowerSyncDatabaseProtocol) async throws {}
+
+            func postCheckpointRequest(_ checkpointRequestId: Int64, clientId: String) async throws -> Int64 {
+                checkpointRequests += 1
+                if checkpointRequests == 1 {
+                    return checkpointRequestId
+                }
+                throw CheckpointRequestError.instanceNotSupported
+            }
+        }
+
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let connector = BackendConnector()
+        let db = openDatabase(MockHttpClient { _ in channel })
+
+        try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests))
+        await waitForStatus(db.currentStatus) { $0.connected }
+        try await waitUntilAsync {
+            await connector.checkpointRequests == 1
+        }
+
+        do {
+            _ = try await db.requestCheckpoint()
+            Issue.record("Expected custom checkpoint request error to propagate")
+        } catch CheckpointRequestError.instanceNotSupported {
+        } catch {
+            Issue.record("Expected instanceNotSupported, got \(error)")
+        }
+
+        try await db.disconnect()
+    }
+
+    @Test func checkpointRequestConnectorWrapsCustomErrors() async throws {
+        final actor BackendConnector: CustomCheckpointRequestConnector {
+            var checkpointRequests = 0
+
+            func fetchCredentials() async throws -> PowerSyncCredentials? {
+                testCredentials
+            }
+
+            func uploadData(database: any PowerSyncDatabaseProtocol) async throws {}
+
+            func postCheckpointRequest(_ checkpointRequestId: Int64, clientId: String) async throws -> Int64 {
+                checkpointRequests += 1
+                if checkpointRequests == 1 {
+                    return checkpointRequestId
+                }
+                throw PowerSyncError.operationFailed(message: "raw connector failure")
+            }
+        }
+
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let connector = BackendConnector()
+        let db = openDatabase(MockHttpClient { _ in channel })
+
+        try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests))
+        await waitForStatus(db.currentStatus) { $0.connected }
+        try await waitUntilAsync {
+            await connector.checkpointRequests == 1
+        }
+
+        do {
+            _ = try await db.requestCheckpoint()
+            Issue.record("Expected custom checkpoint request error to be wrapped")
+        } catch CheckpointRequestError.operationFailed(let message, let underlyingError) {
+            try #require(message == "Custom checkpoint request failed.")
+            guard let powerSyncError = underlyingError as? PowerSyncError,
+                  case .operationFailed(message: let rawMessage, underlyingError: nil) = powerSyncError,
+                  rawMessage == "raw connector failure" else {
+                Issue.record("Expected raw connector error as underlying error, got \(String(describing: underlyingError))")
+                return
+            }
+        } catch {
+            Issue.record("Expected operationFailed, got \(error)")
+        }
+
+        try await db.disconnect()
     }
 
     @Test func checkpointRequestConnectorReaffirmsRequestOnReconnect() async throws {
@@ -1608,6 +1697,7 @@ private final class TestConnector: PowerSyncBackendConnectorProtocol {
 /// A connector that handles checkpoint requests itself instead of the service endpoint.
 private final class TestCheckpointRequestConnector: CustomCheckpointRequestConnector {
     private let _postedCheckpointRequests = Mutex<[Int64]>([])
+    private let _postedCheckpointClientIds = Mutex<[String]>([])
     private let _stateResponse = Mutex<Int64?>(nil)
     private let uploadDataCallback: @Sendable (_ database: any PowerSyncDatabaseProtocol) async throws -> ()
 
@@ -1621,6 +1711,10 @@ private final class TestCheckpointRequestConnector: CustomCheckpointRequestConne
 
     var postedCheckpointRequests: [Int64] {
         _postedCheckpointRequests.withLock { $0 }
+    }
+
+    var postedCheckpointClientIds: [String] {
+        _postedCheckpointClientIds.withLock { $0 }
     }
 
     /// A one-shot state response for the next post, simulating a backend whose recorded
@@ -1638,8 +1732,9 @@ private final class TestCheckpointRequestConnector: CustomCheckpointRequestConne
         try await self.uploadDataCallback(database)
     }
 
-    func postCheckpointRequest(_ checkpointRequestId: Int64) async throws -> Int64 {
+    func postCheckpointRequest(_ checkpointRequestId: Int64, clientId: String) async throws -> Int64 {
         _postedCheckpointRequests.withLock { $0.append(checkpointRequestId) }
+        _postedCheckpointClientIds.withLock { $0.append(clientId) }
         let stateResponse = _stateResponse.withLock { state -> Int64? in
             let value = state
             state = nil

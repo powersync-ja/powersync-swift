@@ -142,7 +142,7 @@ final class MockHttpClient: HttpClient {
             } else {
                 checkpoint = checkpointRequestResponse ?? requestId
             }
-            let responseData = try encodeWriteCheckpointResponse(checkpoint)
+            let responseData = try encodeCheckpointRequestResponse(checkpoint)
             let response = HTTPURLResponse(url: request.url!, mimeType: "application/json", expectedContentLength: responseData.count, textEncodingName: "utf-8")
             return (response, responseData)
 
@@ -162,10 +162,25 @@ final class MockHttpClient: HttpClient {
         let response = WriteCheckpointResponse(data: WriteCheckpointData(write_checkpoint: String(checkpoint)))
         return try StreamingSyncClient.jsonEncoder.encode(response)
     }
+
+    private func encodeCheckpointRequestResponse(_ checkpointRequestId: Int64) throws -> Data {
+        let response = CheckpointRequestResponse(
+            data: CheckpointRequestResponseData(checkpoint_request_id: String(checkpointRequestId))
+        )
+        return try StreamingSyncClient.jsonEncoder.encode(response)
+    }
 }
 
 private struct CheckpointRequestBody: Decodable {
     let client_id: String
+    let checkpoint_request_id: String
+}
+
+private struct CheckpointRequestResponse: Codable {
+    let data: CheckpointRequestResponseData
+}
+
+private struct CheckpointRequestResponseData: Codable {
     let checkpoint_request_id: String
 }
 
