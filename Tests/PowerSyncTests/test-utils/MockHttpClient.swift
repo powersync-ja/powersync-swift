@@ -114,7 +114,7 @@ final class MockHttpClient: HttpClient {
             let body = try StreamingSyncClient.jsonDecoder.decode(CheckpointRequestBody.self, from: data)
             #expect(!body.client_id.isEmpty)
             let requestId = try #require(Int64(body.checkpoint_request_id))
-            #expect(requestId >= 0)
+            #expect(requestId > 0)
             _checkpointRequestIds.withLock { $0.append(requestId) }
             _checkpointRequestStateHints.withLock { $0.append(requestId) }
             await checkpointRequestHook?(requestId)
@@ -139,8 +139,6 @@ final class MockHttpClient: HttpClient {
             let checkpoint: Int64
             if let configuredStateResponse {
                 checkpoint = configuredStateResponse ?? requestId
-            } else if requestId == 0 {
-                checkpoint = requestId
             } else {
                 checkpoint = checkpointRequestResponse ?? requestId
             }

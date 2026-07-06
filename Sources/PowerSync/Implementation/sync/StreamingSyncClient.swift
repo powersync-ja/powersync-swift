@@ -10,8 +10,10 @@ final class StreamingSyncClient: Sendable {
     let httpClient: any HttpClient
 
     let checkpointMode: CheckpointMode
+    /// Set when the connector posts checkpoint requests to a custom backend itself.
+    private let customCheckpointRequestConnector: (any CustomCheckpointRequestConnector)?
     private let signals = SyncSignals()
-    
+
     init(
         db: PowerSyncDatabaseImpl,
         connector: PowerSyncBackendConnectorProtocol,
@@ -23,6 +25,7 @@ final class StreamingSyncClient: Sendable {
         self.httpClient = httpClient
         self.options = options
         self.checkpointMode = options.checkpointMode
+        self.customCheckpointRequestConnector = connector as? any CustomCheckpointRequestConnector
     }
     
     /// Starts a task driving uploads and downloads by repeatedly connecting to the PowerSync service,
@@ -226,11 +229,15 @@ The next upload iteration will be delayed.
         throw CheckpointWaitError.disconnected
     }
 
-    /// Sends or affirms a checkpoint request and returns the effective id accepted by the service.
+    /// Sends or affirms a checkpoint request and returns the effective id accepted remotely.
     ///
-    /// A request ID of 0 only queries the current service-side state without affirming a
-    /// request; it is used by the connect-time seed on fresh databases.
+    /// When the connector implements ``CustomCheckpointRequestConnector``, the request is posted to
+    /// the custom backend instead of the service endpoint, with the same state contract.
     private func requestCheckpointFromService(requestId: Int64) async throws -> Int64 {
+        if let customCheckpointRequestConnector {
+            return try await customCheckpointRequestConnector.postCheckpointRequest(requestId)
+        }
+
         let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
 
         var (_, request) = try await authenticatedRequest { endpoint in
@@ -280,13 +287,12 @@ The next upload iteration will be delayed.
             // checkpoint record and return it when we affirm the current request state, so this
             // fallback is likely over-cautious.
             //
-            // On a fresh database this probes with 0, which queries service state without
-            // affirming a real request ID. Core seeds the counter at the returned value (0 when
-            // the service has no record either), so the first real request allocates ID 1. The
-            // probe must not affirm an ID it doesn't consume: a checkpoint created between an
-            // affirmation and a later request reusing that ID would wrongly satisfy the request.
+            // On a fresh database this affirms request ID 1, which consumes the ID: an affirmed
+            // ID must not be reused by a later real request, since a checkpoint created between
+            // the affirmation and that request would wrongly satisfy it. Real requests on a
+            // fresh database therefore start at 2.
             let startingRequestId = max(lastCheckpointRequestId ?? 0, concreteLocalTarget ?? 0)
-            let seed = try await requestCheckpointFromService(requestId: startingRequestId)
+            let seed = try await requestCheckpointFromService(requestId: startingRequestId > 0 ? startingRequestId : 1)
 
             // Seed only when the service returns a different value, such as after disconnectAndClear.
             if lastCheckpointRequestId != seed {

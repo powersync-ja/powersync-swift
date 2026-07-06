@@ -21,12 +21,16 @@ public struct SyncClientConfiguration: Sendable {
 }
 
 /// Selects the service checkpoint mechanism used by a PowerSync connection.
+///
+/// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
 public enum CheckpointMode: Sendable {
     /// Uses the legacy `/write-checkpoint2.json` endpoint to obtain a target operation id.
     case legacy
 
-    /// Uses client-generated checkpoint request IDs sent to `/sync/checkpoint-request`.
+    /// Uses client-generated checkpoint request IDs.
     ///
+    /// Requests are sent to the service's `/sync/checkpoint-request` endpoint, or to the
+    /// connector when it implements ``CustomCheckpointRequestConnector``.
     /// This mode is required for ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
     case requests
 }
@@ -101,8 +105,11 @@ public struct ConnectOptions: Sendable {
 
     /// Selects the service checkpoint mechanism for this connection.
     ///
-    /// Use ``CheckpointMode/requests`` to enable ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
+    /// Use ``CheckpointMode/requests`` to enable ``PowerSyncDatabaseProtocol/requestCheckpoint()``
+    /// and connectors implementing ``CustomCheckpointRequestConnector``.
     /// Defaults to ``CheckpointMode/legacy`` for backwards-compatible write checkpoints.
+    ///
+    /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
     public var checkpointMode: CheckpointMode
 
     /// Initializes a `ConnectOptions` instance with optional values.
@@ -261,6 +268,8 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// Creating the request has no timeout of its own: while the sync client keeps retrying a
     /// failing connection, this call keeps waiting. Cancel the calling task to stop waiting, and
     /// use ``CheckpointRequest/waitForSync(timeout:)`` to bound the wait for the checkpoint itself.
+    ///
+    /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
     func requestCheckpoint() async throws -> any CheckpointRequest
 
     /// Close the database, releasing resources.

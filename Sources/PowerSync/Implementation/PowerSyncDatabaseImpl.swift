@@ -135,7 +135,16 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func connect(connector: any PowerSyncBackendConnectorProtocol, options: ConnectOptions?) async throws {
         try await initialize()
-        await group.syncCoordinator.connect(db: self, connector: connector, options: options ?? ConnectOptions(), client: httpClient)
+
+        let options = options ?? ConnectOptions()
+        if connector is CustomCheckpointRequestConnector, options.checkpointMode == .legacy {
+            logger.warning(
+                "The connector implements CustomCheckpointRequestConnector, but the connection uses CheckpointMode.legacy and will not post checkpoint requests to it. Connect with checkpointMode set to .requests to use the connector's checkpoint requests.",
+                tag: "PowerSyncDatabase"
+            )
+        }
+
+        await group.syncCoordinator.connect(db: self, connector: connector, options: options, client: httpClient)
     }
 
     func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws {

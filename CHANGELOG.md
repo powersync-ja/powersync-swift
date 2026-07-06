@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+* Add alpha support for checkpoint requests, which let clients wait until the local database
+  has caught up to the current server-side state — useful for explicit pull-to-refresh flows.
+  Connect with `checkpointMode: .requests` (requires a PowerSync service supporting
+  `/sync/checkpoint-request`), then:
+
+  ```swift
+  try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests))
+
+  let checkpoint = try await db.requestCheckpoint()
+  try await checkpoint.waitForSync(timeout: 30)
+  // The local database now contains all changes up to when the checkpoint was requested.
+  ```
+
+  Backends that process uploads asynchronously can handle checkpoint requests themselves by
+  implementing `CustomCheckpointRequestConnector` on their connector.
+  These APIs are in alpha and may change in future releases.
 * `PowerSyncDatabase(dbFilename:)` now accepts an absolute path (starting with `/`), used
   as-is so the database can live in an App Group container shared with app extensions.
   Plain filenames keep the existing behavior. The SDK coordinates opening the database to

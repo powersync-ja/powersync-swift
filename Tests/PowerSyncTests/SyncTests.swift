@@ -245,8 +245,9 @@ class InMemorySyncIntegrationTests {
         var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
         try #require(try await query.next() == ["local write"])
 
-        try await waitUntil { mockClient.checkpointRequestIds.contains(1) }
-        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
+        // The connect-time seed consumes request ID 1, so the upload's write checkpoint is 2.
+        try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
             op_id: "1",
@@ -279,8 +280,9 @@ class InMemorySyncIntegrationTests {
         var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
         try #require(try await query.next() == ["local write"])
 
-        try await waitUntil { mockClient.checkpointRequestIds.contains(1) }
-        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
+        // The connect-time seed consumes request ID 1, so the upload's write checkpoint is 2.
+        try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
             op_id: "1",
@@ -313,7 +315,8 @@ class InMemorySyncIntegrationTests {
         try #require(try await query.next() == ["local write"])
         
         allowConnection.withLock { $0 = true }
-        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
+        // The connect-time seed consumes request ID 1, so the upload's write checkpoint is 2.
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
             op_id: "1",
@@ -336,10 +339,11 @@ class InMemorySyncIntegrationTests {
         let checkpoint = try await db.requestCheckpoint()
         try #require(!checkpoint.isSynced)
 
+        // The connect-time seed consumes request ID 1, so this request is ID 2.
         try await channel.pushLine(.fullCheckpoint(Checkpoint(
             last_op_id: "0",
             buckets: [BucketChecksum(bucket: "a", checksum: 0)],
-            writeCheckpoint: "1"
+            writeCheckpoint: "2"
         )))
         try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
 
@@ -436,7 +440,8 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { $0.connected }
 
         let checkpoint = try await db.requestCheckpoint()
-        try #require(mockClient.checkpointRequestIds == [0, 1])
+        // The connect-time seed consumes request ID 1, so the explicit request is ID 2.
+        try #require(mockClient.checkpointRequestIds == [1, 2])
         try #require(!checkpoint.isSynced)
 
         try await db.disconnect()
@@ -451,7 +456,7 @@ class InMemorySyncIntegrationTests {
 
         try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
         // The new connection re-affirms the persisted request counter with the service.
-        try await waitUntil { mockClient.checkpointRequestIds == [0, 1, 1] }
+        try await waitUntil { mockClient.checkpointRequestIds == [1, 2, 2] }
         try await waitUntil { channels.withLock { $0.count } >= 2 }
         await waitForStatus(db.currentStatus) { $0.connected }
 
@@ -459,7 +464,7 @@ class InMemorySyncIntegrationTests {
         try await channel.pushLine(.fullCheckpoint(Checkpoint(
             last_op_id: "1",
             buckets: [BucketChecksum(bucket: "a", checksum: 0)],
-            writeCheckpoint: "1"
+            writeCheckpoint: "2"
         )))
         try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
 
@@ -563,8 +568,8 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { $0.connected }
 
         let checkpoint = try await db.requestCheckpoint()
-        try #require(mockClient.checkpointRequestIds == [0, 1])
-        try #require(try await lastRequestedCheckpointRequestId(db) == 1)
+        try #require(mockClient.checkpointRequestIds == [1, 2])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 2)
 
         try await channel.pushLine(.fullCheckpoint(Checkpoint(
             last_op_id: "1",
@@ -588,8 +593,8 @@ class InMemorySyncIntegrationTests {
         _ = try await db.requestCheckpoint()
 
         let checkpoint = try await db.requestCheckpoint()
-        try #require(mockClient.checkpointRequestIds == [0, 1, 2])
-        try #require(try await lastRequestedCheckpointRequestId(db) == 2)
+        try #require(mockClient.checkpointRequestIds == [1, 2, 3])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 3)
 
         try await channel.pushLine(.fullCheckpoint(Checkpoint(
             last_op_id: "1",
@@ -637,7 +642,7 @@ class InMemorySyncIntegrationTests {
         }
 
         let checkpoint = try await requestTask.value
-        try #require(mockClient.checkpointRequestIds == [0, 0, 1])
+        try #require(mockClient.checkpointRequestIds == [1, 1, 2])
         try #require(!checkpoint.isSynced)
         try await db.disconnect()
     }
@@ -721,16 +726,130 @@ class InMemorySyncIntegrationTests {
 
         try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
         await didConnect.await()
-        // The connect-time probe uses 0 so it doesn't consume a request ID; the counter is
-        // seeded at 0 and the first real request allocates ID 1.
+        // The connect-time seed affirms and consumes request ID 1, so the first real request
+        // will allocate ID 2.
         try await waitUntilAsync {
-            try await lastRequestedCheckpointRequestId(db) == 0
+            try await lastRequestedCheckpointRequestId(db) == 1
         }
 
-        try #require(mockClient.checkpointRequestIds == [0])
-        try #require(mockClient.checkpointRequestStateHints == [0])
-        try #require(try await lastRequestedCheckpointRequestId(db) == 0)
-        try #require(try await nextCheckpointRequestId(db) == 1)
+        try #require(mockClient.checkpointRequestIds == [1])
+        try #require(mockClient.checkpointRequestStateHints == [1])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 1)
+        try #require(try await nextCheckpointRequestId(db) == 2)
+    }
+
+    @Test func checkpointRequestConnectorHandlesCheckpointRequests() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in channel }
+        let connector = TestCheckpointRequestConnector()
+        let db = openDatabase(mockClient)
+
+        try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests))
+        await waitForStatus(db.currentStatus) { $0.connected }
+
+        let checkpoint = try await db.requestCheckpoint()
+        // The connect-time seed (ID 1) and the explicit request (ID 2) both go to the connector.
+        try #require(connector.postedCheckpointRequests == [1, 2])
+        // The service endpoint is never used with a custom checkpoint request connector.
+        try #require(mockClient.checkpointRequestIds.isEmpty)
+
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(
+            last_op_id: "0",
+            buckets: [BucketChecksum(bucket: "a", checksum: 0)],
+            writeCheckpoint: "2"
+        )))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
+
+        try await checkpoint.waitForSync(timeout: 1)
+        try #require(checkpoint.isSynced)
+    }
+
+    @Test func checkpointRequestConnectorReaffirmsRequestOnReconnect() async throws {
+        let channels = Mutex<[AsyncThrowingChannel<PowerSync.SyncLine, any Error>]>([])
+        let mockClient = MockHttpClient { _ in
+            let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+            channels.withLock { $0.append(channel) }
+            return channel
+        }
+        let connector = TestCheckpointRequestConnector()
+        let db = openDatabase(mockClient)
+
+        try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests))
+        await waitForStatus(db.currentStatus) { $0.connected }
+        _ = try await db.requestCheckpoint()
+        try #require(connector.postedCheckpointRequests == [1, 2])
+
+        try await db.disconnect()
+        try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests))
+        // The reconnect seed re-affirms the persisted request with the custom backend.
+        try await waitUntil { connector.postedCheckpointRequests == [1, 2, 2] }
+        try await db.disconnect()
+    }
+
+    @Test func checkpointRequestConnectorUploadsUseConnectorCheckpoints() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in channel }
+        let connector = TestCheckpointRequestConnector()
+        let db = openDatabase(mockClient)
+
+        try await db.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["local write"])
+        try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests))
+
+        var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
+        try #require(try await query.next() == ["local write"])
+
+        // The upload's write checkpoint (ID 2, after the seed consumed ID 1) is posted to the
+        // connector instead of the service.
+        try await waitUntil { connector.postedCheckpointRequests == [1, 2] }
+        try #require(mockClient.checkpointRequestIds.isEmpty)
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
+        try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
+            checksum: 0,
+            op_id: "1",
+            object_id: "1",
+            object_type: "users",
+            op: .put,
+            data: #"{"id": "test1", "name": "from server"}"#,
+        )])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        try #require(try await query.next() == ["from server"])
+    }
+
+    @Test func checkpointRequestConnectorSeedsStateFromBackend() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let mockClient = MockHttpClient { request in channel }
+        let connector = TestCheckpointRequestConnector()
+        // The backend has requests recorded for this client, e.g. from before a local clear.
+        connector.stateResponse = 9
+        let db = openDatabase(mockClient)
+
+        try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests))
+        await waitForStatus(db.currentStatus) { $0.connected }
+        try await waitUntilAsync {
+            try await lastRequestedCheckpointRequestId(db) == 9
+        }
+
+        // The local counter is seeded from the backend state, so new requests don't collide.
+        _ = try await db.requestCheckpoint()
+        try #require(connector.postedCheckpointRequests == [1, 10])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 10)
+    }
+
+    @Test func checkpointRequestConnectorWarnsInLegacyMode() async throws {
+        let logger = WarningCapturingLogger()
+        let db = openDatabase(
+            MockHttpClient { _ in AsyncThrowingChannel<PowerSync.SyncLine, any Error>() },
+            logger: logger
+        )
+
+        try await db.connect(
+            connector: TestCheckpointRequestConnector(),
+            options: ConnectOptions(checkpointMode: .legacy)
+        )
+
+        let warning = try #require(logger.warnings.first { $0.contains("CustomCheckpointRequestConnector") })
+        try #require(warning.contains(".requests"))
+        try await db.disconnect()
     }
 
     @Test func readsSyncLinesBeforeCheckpointRequestStateIsReady() async throws {
@@ -752,7 +871,7 @@ class InMemorySyncIntegrationTests {
 
         await finishSeed.complete()
         try await waitUntilAsync {
-            try await lastRequestedCheckpointRequestId(db) == 0
+            try await lastRequestedCheckpointRequestId(db) == 1
         }
         try await db.disconnect()
     }
@@ -777,7 +896,7 @@ class InMemorySyncIntegrationTests {
 
         await didConnect.await()
         await didUpload.await()
-        try await waitUntil { mockClient.checkpointRequestIds == [0, 10] }
+        try await waitUntil { mockClient.checkpointRequestIds == [1, 10] }
         try #require(try await lastRequestedCheckpointRequestId(db) == 10)
         try #require(try await localTargetOp(db) == 10)
     }
@@ -1483,6 +1602,68 @@ private final class TestConnector: PowerSyncBackendConnectorProtocol {
 
     func uploadData(database: any PowerSync.PowerSyncDatabaseProtocol) async throws {
         try await self.uploadDataCallback(database)
+    }
+}
+
+/// A connector that handles checkpoint requests itself instead of the service endpoint.
+private final class TestCheckpointRequestConnector: CustomCheckpointRequestConnector {
+    private let _postedCheckpointRequests = Mutex<[Int64]>([])
+    private let _stateResponse = Mutex<Int64?>(nil)
+    private let uploadDataCallback: @Sendable (_ database: any PowerSyncDatabaseProtocol) async throws -> ()
+
+    init(
+        uploadDataCallback: @Sendable @escaping (_: any PowerSyncDatabaseProtocol) async throws -> Void = { db in
+            let tx = try await db.getNextCrudTransaction()
+            try await tx?.complete()
+    }) {
+        self.uploadDataCallback = uploadDataCallback
+    }
+
+    var postedCheckpointRequests: [Int64] {
+        _postedCheckpointRequests.withLock { $0 }
+    }
+
+    /// A one-shot state response for the next post, simulating a backend whose recorded
+    /// request state is newer than the posted ID.
+    var stateResponse: Int64? {
+        get { _stateResponse.withLock { $0 } }
+        set { _stateResponse.withLock { $0 = newValue } }
+    }
+
+    func fetchCredentials() async throws -> PowerSyncCredentials? {
+        return testCredentials
+    }
+
+    func uploadData(database: any PowerSync.PowerSyncDatabaseProtocol) async throws {
+        try await self.uploadDataCallback(database)
+    }
+
+    func postCheckpointRequest(_ checkpointRequestId: Int64) async throws -> Int64 {
+        _postedCheckpointRequests.withLock { $0.append(checkpointRequestId) }
+        let stateResponse = _stateResponse.withLock { state -> Int64? in
+            let value = state
+            state = nil
+            return value
+        }
+        return stateResponse ?? checkpointRequestId
+    }
+}
+
+/// A logger recording warning messages so tests can assert on them.
+private final class WarningCapturingLogger: LoggerProtocol {
+    private let _warnings = Mutex<[String]>([])
+
+    var warnings: [String] {
+        _warnings.withLock { $0 }
+    }
+
+    func debug(_ message: String, tag: String?) {}
+    func info(_ message: String, tag: String?) {}
+    func error(_ message: String, tag: String?) {}
+    func fault(_ message: String, tag: String?) {}
+
+    func warning(_ message: String, tag: String?) {
+        _warnings.withLock { $0.append(message) }
     }
 }
 

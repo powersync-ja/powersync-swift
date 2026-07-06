@@ -1,6 +1,8 @@
 import Foundation
 
 /// Errors thrown while creating a checkpoint request.
+///
+/// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
 public enum CheckpointRequestError: Error, LocalizedError {
     /// The target PowerSync service does not support checkpoint requests.
     /// Update the PowerSync service to use this API.
@@ -43,6 +45,8 @@ public enum CheckpointRequestError: Error, LocalizedError {
 }
 
 /// Errors thrown while waiting for a checkpoint request to sync.
+///
+/// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
 public enum CheckpointWaitError: Error, LocalizedError {
     /// The checkpoint request was not synced before the timeout elapsed.
     case timeout
@@ -78,6 +82,8 @@ public enum CheckpointWaitError: Error, LocalizedError {
 /// persisted by the core extension, so this value stays usable across disconnect/reconnect
 /// cycles. A wait interrupted by a disconnect throws ``CheckpointWaitError/disconnected``,
 /// but the same request can be awaited again once a new connection is established.
+///
+/// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
 public protocol CheckpointRequest: Sendable {
     /// Whether this checkpoint has already been synced locally.
     ///
