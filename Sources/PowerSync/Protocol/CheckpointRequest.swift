@@ -53,9 +53,6 @@ public enum CheckpointWaitError: Error, LocalizedError {
     /// extension, so ``CheckpointRequest/waitForSync()`` can be called again after reconnecting.
     case disconnected
 
-    /// The sync status stream ended before the checkpoint request was synced.
-    case syncStatusClosed
-
     /// The sync client reported a download or upload error while waiting.
     case errorDetected(message: String)
 
@@ -65,8 +62,6 @@ public enum CheckpointWaitError: Error, LocalizedError {
             return "The checkpoint request was not synced before the timeout elapsed."
         case .disconnected:
             return "The sync client disconnected before the checkpoint request was synced."
-        case .syncStatusClosed:
-            return "The sync status stream ended before the checkpoint request was synced."
         case .errorDetected(let message):
             return "The sync client reported an error while waiting for the checkpoint request: \(message)"
         }
@@ -96,9 +91,9 @@ public protocol CheckpointRequest: Sendable {
     ///
     /// This method observes sync-loop checkpoint application events for an already-created
     /// checkpoint request, using the currently active sync client.
-    /// - Throws: ``CheckpointWaitError`` when no sync client is active, when the sync status
-    ///   stream closes before the checkpoint is reached, or when a sync error is present or
-    ///   reached while waiting. Throws ``CheckpointRequestError/checkpointRequestsNotEnabled``
+    /// - Throws: ``CheckpointWaitError`` when no sync client is active, when the sync client
+    ///   disconnects before the checkpoint is reached, or when a sync error is present or reached
+    ///   while waiting. Throws ``CheckpointRequestError/checkpointRequestsNotEnabled``
     ///   when the active connection was not configured with ``CheckpointMode/requests``.
     func waitForSync() async throws
 

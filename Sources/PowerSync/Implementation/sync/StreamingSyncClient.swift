@@ -222,7 +222,8 @@ The next upload iteration will be delayed.
             }
         }
 
-        throw CheckpointWaitError.syncStatusClosed
+        try Task.checkCancellation()
+        throw CheckpointWaitError.disconnected
     }
 
     /// Sends or affirms a checkpoint request and returns the effective id accepted by the service.
@@ -257,7 +258,7 @@ The next upload iteration will be delayed.
     fileprivate func seedCheckpointRequestState(lastCheckpointRequestId: Int64?) async throws {
         guard checkpointMode == .requests else {
             // legacy mode does not require tracking local state
-            signals.markCheckpointRequestsReady()
+            signals.markCheckpointsReady()
             return
         }
 
@@ -294,7 +295,7 @@ The next upload iteration will be delayed.
                 }
             }
 
-            signals.markCheckpointRequestsReady()
+            signals.markCheckpointsReady()
         } catch CheckpointRequestError.instanceNotSupported {
             signals.failCheckpointRequests(CheckpointRequestError.instanceNotSupported)
             throw CheckpointRequestError.instanceNotSupported

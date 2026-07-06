@@ -84,8 +84,8 @@ final class SyncSignals: Sendable {
         }
     }
 
-    /// Marks checkpoint request allocation as safe and resumes callers waiting to create request IDs.
-    func markCheckpointRequestsReady() {
+    /// Marks checkpoint processing as safe and resumes callers waiting to create request IDs.
+    func markCheckpointsReady() {
         let waiters = checkpointRequests.withLock { state in
             if state.isReady {
                 return [] as [CheckpointRequestReadinessWaiter]

@@ -399,6 +399,30 @@ class InMemorySyncIntegrationTests {
         await waiter.value
     }
 
+    @Test func waitForSyncFailsWhenClosing() async throws {
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpClient { request in channel })
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
+        await waitForStatus(db.currentStatus) { $0.connected }
+
+        let checkpoint = try await db.requestCheckpoint()
+        try #require(!checkpoint.isSynced)
+
+        let waiter = Task {
+            do {
+                try await checkpoint.waitForSync()
+                Issue.record("Expected waitForSync() to throw after close")
+            } catch CheckpointWaitError.disconnected {
+            } catch {
+                Issue.record("Expected CheckpointWaitError.disconnected, got \(error)")
+            }
+        }
+
+        try await db.close()
+        await waiter.value
+    }
+
     @Test func checkpointRequestRemainsUsableAcrossReconnects() async throws {
         let channels = Mutex<[AsyncThrowingChannel<PowerSync.SyncLine, any Error>]>([])
         let mockClient = MockHttpClient { _ in
