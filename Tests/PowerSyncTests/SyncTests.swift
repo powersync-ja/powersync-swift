@@ -307,9 +307,9 @@ class InMemorySyncIntegrationTests {
     
     @Test @MainActor func uploadsOfflineWrites() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        var allowConnection = false
-        let mockClient = MockHttpClient { @MainActor request in
-            if allowConnection {
+        let allowConnection = Mutex(false)
+        let mockClient = MockHttpClient { _ in
+            if allowConnection.withLock({ $0 }) {
                 return channel
             }
             throw PowerSyncError.operationFailed(message: "Fake IO error for test", underlyingError: nil)
@@ -324,8 +324,7 @@ class InMemorySyncIntegrationTests {
         var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
         try #require(try await query.next() == ["local write"])
         
-        allowConnection = true
-        try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
+        allowConnection.withLock { $0 = true }
         try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
@@ -1197,6 +1196,10 @@ class InMemorySyncIntegrationTests {
 
     @Test func subscriptionsUpdateWhileOffline() async throws {
         let db = openDatabase(PlatformHttpClient.shared)
+        // Make sure the database is initialized
+        try await db.readLock { _ in }
+        var statusUpdates = db.currentStatus.asFlow().makeAsyncIterator()
+        let _ = try #require(await statusUpdates.next()) // Initial snapshot
 
         // Subscribing while offline should add the stream to subscriptions reported in the status.
         let subscription = try await db.syncStream(name: "a", params: nil).subscribe()

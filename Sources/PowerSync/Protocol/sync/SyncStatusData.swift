@@ -63,6 +63,10 @@ public protocol SyncStatus: SyncStatusData, Sendable {
     /// Provides a flow of synchronization status updates.
     /// - Returns: An `AsyncStream` that emits updates whenever the synchronization status changes.
     func asFlow() -> AsyncStream<SyncStatusData>
+    
+    /// An observable alternative to `asFlow()` that updates when the sync status changes.
+    @available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *)
+    @MainActor var observable: ObservableSyncStatus {get}
 }
 
 /// Current information about a ``SyncStreamSubscription``.
@@ -86,4 +90,58 @@ public struct SyncStreamStatus: Sendable {
         // Parse from same decoder (it's [flatten]ed in Rust)
         self.subscription = try SyncSubscriptionDescription(from: decoder)
     }
+}
+
+/// An observable version of ``SyncStatusData``.
+///
+/// In SwiftUI views and other reactive frameworks, this can be used as an alternative to ``SyncStatus/asFlow()`` to auto-update observers
+/// when the PowerSync status changes.
+@available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *)
+@MainActor
+@Observable()
+public final class ObservableSyncStatus {
+    internal var status: any SyncStatusData
+    @ObservationIgnored
+    private var observationTask: Task<(), Never>?
+
+    internal init(status: any SyncStatusData) {
+        self.status = status
+    }
+
+    deinit {
+        self.observationTask?.cancel()
+        self.observationTask = nil
+    }
+    
+    internal func trackUpdates(from stream: BroadcastStream<any SyncStatusData>) {
+        // Create iterator synchronously to make sure a listener is installed before we return, ensuring that
+        // all updates are eventually dispatched to the task.
+        let subscription = stream.subscribe()
+
+        self.observationTask = Task { [weak self] in
+            var iterator = subscription.makeAsyncIterator()
+            while let snapshot = await iterator.next() {
+                self?.status = snapshot
+            }
+        }
+    }
+
+    // This currently updates all listeners for every change, since status is the only observed field.
+    // That matches asFlow(), in the future we might want to extract these values into separate fields and
+    // only update them in trackUpdates when they've actually changed.
+
+    public var connected: Bool { status.connected }
+    public var connecting: Bool { status.connecting }
+    public var downloading: Bool { status.downloading }
+    public var downloadProgress: (any SyncDownloadProgress)? { status.downloadProgress }
+    public var uploading: Bool { status.uploading }
+    public var lastSyncedAt: Date? { status.lastSyncedAt }
+    public var hasSynced: Bool? { status.hasSynced }
+    public var uploadError: Any? { status.uploadError }
+    public var downloadError: Any? { status.downloadError }
+    public var anyError: Any? { status.anyError }
+    public var priorityStatusEntries: [PriorityStatusEntry] { status.priorityStatusEntries }
+    public var syncStreams: [SyncStreamStatus]? { status.syncStreams }
+    public func statusForPriority(_ priority: BucketPriority) -> PriorityStatusEntry { status.statusForPriority(priority) }
+    public func forStream(stream: any SyncStreamDescription) -> SyncStreamStatus? { status.forStream(stream: stream) }
 }
