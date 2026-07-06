@@ -642,6 +642,49 @@ class InMemorySyncIntegrationTests {
         try await db.disconnect()
     }
 
+    @Test func existingPendingCheckpointRequestDoesNotSkipDownloadRetryDelay() async throws {
+        let signals = SyncSignals()
+
+        let firstDelay = Task {
+            try await signals.waitForRetryDelayOrPendingCheckpointRequest(seconds: 0.2)
+        }
+        try await sleepForSeconds(seconds: 0.01)
+
+        let pendingRequest = Task {
+            try await signals.waitForCheckpointRequestsReady()
+        }
+        defer {
+            pendingRequest.cancel()
+        }
+
+        try await firstDelay.value
+
+        let start = Date()
+        try await signals.waitForRetryDelayOrPendingCheckpointRequest(seconds: 0.05)
+        #expect(Date().timeIntervalSince(start) >= 0.04)
+
+        signals.failPendingCheckpointRequests(CheckpointRequestError.notConnected)
+        do {
+            try await pendingRequest.value
+            Issue.record("Expected pending request to fail")
+        } catch CheckpointRequestError.notConnected {
+        } catch is CancellationError {
+        } catch {
+            Issue.record("Expected notConnected, got \(error)")
+        }
+    }
+
+    @Test func appliedCheckpointRequestUsesLatestCoreValue() {
+        let signals = SyncSignals()
+
+        signals.markCheckpointRequestApplied(10)
+        #expect(signals.isCheckpointRequestApplied(10))
+
+        signals.markCheckpointRequestApplied(7)
+        #expect(signals.isCheckpointRequestApplied(7))
+        #expect(!signals.isCheckpointRequestApplied(10))
+    }
+
     @Test func usesSeededCheckpointRequestCounterOnConnect() async throws {
         let didConnect = Signal()
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()

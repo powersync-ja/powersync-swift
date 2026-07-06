@@ -2,44 +2,50 @@ import Foundation
 
 /// Shared coordination state for the sync client.
 ///
-/// This bridges upload and download task notifications, tracks when checkpoint requests are safe
-/// to allocate after connect-time validation, and resolves explicit checkpoint request waiters when
-/// core reports that the requested checkpoint has been applied locally.
+/// This bridges upload and download task notifications, tracks when pending checkpoint requests are
+/// safe to allocate after connect-time validation, and resolves explicit checkpoint request waiters
+/// when core reports that the requested checkpoint has been applied locally.
+///
+/// There are two distinct checkpoint request waits here:
+/// - Pending checkpoint requests wait before ID allocation, until the active connection has seeded
+///   or affirmed request state with the service.
+/// - Existing checkpoint requests wait after ID allocation, until core reports that the requested
+///   checkpoint request ID has been applied locally.
 final class SyncSignals: Sendable {
-    /// A pending waiter blocked before creating new checkpoint request IDs.
-    private struct CheckpointRequestReadinessWaiter {
+    /// A pending `requestCheckpoint()` caller blocked before creating a checkpoint request ID.
+    private struct PendingCheckpointRequestWaiter {
         let id: Int64
         let continuation: AsyncThrowingStream<Void, any Error>.Continuation
     }
 
-    /// Tracks connect-time validation for checkpoint request state.
+    /// Tracks connect-time validation for pending checkpoint request creation.
     ///
     /// Request ID allocation waits on this state so `next_checkpoint_request_id` only runs after
     /// the service has affirmed or seeded the local counter for the active connection.
-    private struct CheckpointRequestsState {
+    private struct PendingCheckpointRequestsState {
         var isReady = false
-        /// Terminal readiness failure replayed to checkpoint request callers.
+        /// Terminal readiness failure replayed to pending checkpoint request callers.
         ///
         /// This is set when checkpoint requests are not supported by the service (for example, a
         /// 404 from the seed/affirm route), or when the sync client shuts down. Other connect-time
         /// failures surface through the normal sync download error path instead.
         var failure: (any Error)?
         var nextWaiterId: Int64 = 0
-        /// Waiters blocked before creating new checkpoint request IDs.
+        /// Pending checkpoint requests blocked before creating request IDs.
         ///
         /// These resume once connect-time checkpoint request state has been seeded or affirmed
         /// against the service.
-        var waiters: [CheckpointRequestReadinessWaiter] = []
+        var waiters: [PendingCheckpointRequestWaiter] = []
     }
 
-    /// A pending waiter for an explicit checkpoint request to be applied locally.
+    /// A waiter for an existing checkpoint request to be applied locally.
     private struct CheckpointRequestApplicationWaiter {
         let id: Int64
         let requestId: Int64
         let continuation: AsyncThrowingStream<Void, any Error>.Continuation
     }
 
-    /// Tracks the latest applied checkpoint request and waiters for future applied IDs.
+    /// Tracks the latest applied checkpoint request and waiters for already-created requests.
     ///
     /// Core emits `CheckpointRequestApplied` when a checkpoint has been applied. We keep the
     /// latest ID here so requests can resolve immediately when they are already satisfied.
@@ -58,8 +64,8 @@ final class SyncSignals: Sendable {
 
     let signalCrudUpload = BroadcastStream<Void>()
     let signalCrudUploadComplete = BroadcastStream<Void>()
-    private let signalCheckpointRequestWaitingForReady = BroadcastStream<Void>()
-    private let checkpointRequests = Mutex(CheckpointRequestsState())
+    private let signalPendingCheckpointRequestWaitingForReady = BroadcastStream<Void>()
+    private let pendingCheckpointRequests = Mutex(PendingCheckpointRequestsState())
     private let checkpointRequestApplications = Mutex(CheckpointRequestApplicationState())
 
     /// Requests that the upload loop starts a CRUD upload attempt soon.
@@ -74,21 +80,21 @@ final class SyncSignals: Sendable {
         self.signalCrudUploadComplete.dispatch(event: ())
     }
 
-    /// Marks checkpoint request allocation as blocked until the next connect-time validation completes.
-    func invalidateCheckpointRequests() {
-        checkpointRequests.withLock { state in
+    /// Marks checkpoint request allocation as blocked until the next connect-time affirmation completes.
+    func markPendingCheckpointRequestsRequiringAffirmation() {
+        pendingCheckpointRequests.withLock { state in
             state.isReady = false
-            // A previous failure (such as an unsupported service) is revalidated by the next
+            // A previous failure (such as an unsupported service) is checked again by the next
             // iteration, so it should not be replayed to new callers in the meantime.
             state.failure = nil
         }
     }
 
-    /// Marks checkpoint processing as safe and resumes callers waiting to create request IDs.
+    /// Marks checkpoint processing as safe and resumes pending callers waiting to create request IDs.
     func markCheckpointsReady() {
-        let waiters = checkpointRequests.withLock { state in
+        let waiters = pendingCheckpointRequests.withLock { state in
             if state.isReady {
-                return [] as [CheckpointRequestReadinessWaiter]
+                return [] as [PendingCheckpointRequestWaiter]
             }
 
             state.isReady = true
@@ -103,9 +109,9 @@ final class SyncSignals: Sendable {
         }
     }
 
-    /// Fails checkpoint request readiness and resumes waiting callers by throwing `error`.
-    func failCheckpointRequests(_ error: any Error) {
-        let waiters = checkpointRequests.withLock { state in
+    /// Fails pending checkpoint requests and resumes callers blocked before ID allocation.
+    func failPendingCheckpointRequests(_ error: any Error) {
+        let waiters = pendingCheckpointRequests.withLock { state in
             state.isReady = false
             state.failure = error
             let waiters = state.waiters
@@ -123,7 +129,7 @@ final class SyncSignals: Sendable {
     /// Without this, a `requestCheckpoint()` or `waitForSync()` caller racing a `disconnect()`
     /// would suspend forever: no further sync iteration exists to resume its waiter.
     func tearDown() {
-        failCheckpointRequests(CheckpointRequestError.notConnected)
+        failPendingCheckpointRequests(CheckpointRequestError.notConnected)
 
         let applicationWaiters = checkpointRequestApplications.withLock { state in
             state.isTornDown = true
@@ -137,12 +143,12 @@ final class SyncSignals: Sendable {
         }
     }
 
-    /// Waits until checkpoint request IDs can be safely allocated for the active connection.
+    /// Waits until pending checkpoint requests can safely allocate IDs for the active connection.
     ///
     /// Registering a waiter here also wakes the download loop from its retry delay so connect-time
     /// validation can run promptly after a failed connection attempt.
     func waitForCheckpointRequestsReady() async throws {
-        let initialState = checkpointRequests.withLock { state in
+        let initialState = pendingCheckpointRequests.withLock { state in
             (isReady: state.isReady, failure: state.failure)
         }
         if let failure = initialState.failure {
@@ -161,7 +167,7 @@ final class SyncSignals: Sendable {
 
         var didRegisterWaiter = false
         let stream = AsyncThrowingStream<Void, any Error> { continuation in
-            let immediateResult = checkpointRequests.withLock { state -> ImmediateResult in
+            let immediateResult = pendingCheckpointRequests.withLock { state -> ImmediateResult in
                 if let failure = state.failure {
                     return .failed(failure)
                 }
@@ -171,7 +177,7 @@ final class SyncSignals: Sendable {
 
                 state.nextWaiterId += 1
                 let waiterId = state.nextWaiterId
-                state.waiters.append(CheckpointRequestReadinessWaiter(id: waiterId, continuation: continuation))
+                state.waiters.append(PendingCheckpointRequestWaiter(id: waiterId, continuation: continuation))
                 return .registered(waiterId: waiterId)
             }
 
@@ -183,7 +189,7 @@ final class SyncSignals: Sendable {
             case .registered(let waiterId):
                 didRegisterWaiter = true
                 continuation.onTermination = { @Sendable _ in
-                    self.checkpointRequests.withLock { state in
+                    self.pendingCheckpointRequests.withLock { state in
                         state.waiters.removeAll { $0.id == waiterId }
                     }
                 }
@@ -192,8 +198,8 @@ final class SyncSignals: Sendable {
 
         if didRegisterWaiter {
             // Wake the download loop only after the waiter is registered, so
-            // `waitForRetryDelayOrCheckpointRequest` observes it when re-checking.
-            signalCheckpointRequestWaitingForReady.dispatch(event: ())
+            // `waitForRetryDelayOrPendingCheckpointRequest` observes it when re-checking.
+            signalPendingCheckpointRequestWaitingForReady.dispatch(event: ())
         }
 
         for try await _ in stream {
@@ -216,12 +222,11 @@ final class SyncSignals: Sendable {
     /// Records an applied checkpoint request ID and resumes waiters satisfied by that ID.
     func markCheckpointRequestApplied(_ requestId: Int64) {
         let waiters = checkpointRequestApplications.withLock { state -> [AsyncThrowingStream<Void, any Error>.Continuation] in
-            let latestAppliedRequestId = max(state.latestAppliedRequestId ?? requestId, requestId)
-            state.latestAppliedRequestId = latestAppliedRequestId
+            state.latestAppliedRequestId = requestId
 
             var readyWaiters: [AsyncThrowingStream<Void, any Error>.Continuation] = []
             state.waiters.removeAll { waiter in
-                if latestAppliedRequestId >= waiter.requestId {
+                if requestId >= waiter.requestId {
                     readyWaiters.append(waiter.continuation)
                     return true
                 }
@@ -289,18 +294,17 @@ final class SyncSignals: Sendable {
         try Task.checkCancellation()
     }
 
-    /// Waits for the normal retry delay, unless a checkpoint request is waiting for readiness.
+    /// Waits for the normal retry delay, unless a new checkpoint request starts waiting for readiness.
     ///
     /// This lets an explicit checkpoint request wake the download loop immediately instead of
-    /// waiting for the configured retry delay to elapse.
-    func waitForRetryDelayOrCheckpointRequest(seconds: TimeInterval) async throws {
+    /// waiting for the configured retry delay to elapse. Existing pending requests do not skip
+    /// the delay: they already had an opportunity to wake the loop when they registered.
+    func waitForRetryDelayOrPendingCheckpointRequest(seconds: TimeInterval) async throws {
         guard seconds > 0 else {
             return
         }
 
-        if hasBlockedCheckpointRequestWaiters() {
-            return
-        }
+        let initialWaiterId = pendingCheckpointRequests.withLock { $0.nextWaiterId }
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
@@ -308,9 +312,9 @@ final class SyncSignals: Sendable {
             }
 
             group.addTask {
-                let stream = self.signalCheckpointRequestWaitingForReady.subscribe(bufferingPolicy: .bufferingNewest(1))
-                // A waiter may have registered between the caller's check and this subscription.
-                if self.hasBlockedCheckpointRequestWaiters() {
+                let stream = self.signalPendingCheckpointRequestWaitingForReady.subscribe(bufferingPolicy: .bufferingNewest(1))
+                // A waiter may have registered between the initial snapshot and this subscription.
+                if self.pendingCheckpointRequests.withLock({ $0.nextWaiterId > initialWaiterId }) {
                     return
                 }
 
@@ -321,12 +325,6 @@ final class SyncSignals: Sendable {
             let _ = try await group.next()
             group.cancelAll()
             try Task.checkCancellation()
-        }
-    }
-
-    private func hasBlockedCheckpointRequestWaiters() -> Bool {
-        checkpointRequests.withLock { state in
-            !state.isReady && !state.waiters.isEmpty
         }
     }
 }

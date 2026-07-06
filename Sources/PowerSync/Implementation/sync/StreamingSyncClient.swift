@@ -297,7 +297,7 @@ The next upload iteration will be delayed.
 
             signals.markCheckpointsReady()
         } catch CheckpointRequestError.instanceNotSupported {
-            signals.failCheckpointRequests(CheckpointRequestError.instanceNotSupported)
+            signals.failPendingCheckpointRequests(CheckpointRequestError.instanceNotSupported)
             throw CheckpointRequestError.instanceNotSupported
         }
     }
@@ -357,7 +357,7 @@ The next upload iteration will be delayed.
             
             if !result.hideDisconnect {
                 do {
-                    try await signals.waitForRetryDelayOrCheckpointRequest(seconds: options.retryDelay)
+                    try await signals.waitForRetryDelayOrPendingCheckpointRequest(seconds: options.retryDelay)
                 } catch {
                     // Cancelled
                     break
@@ -441,10 +441,10 @@ private struct ActiveSyncIteration: Sendable {
     
     func run(group: inout ThrowingTaskGroup<Void, any Error>?) async throws -> SyncIterationResult {
         defer {
-            // Checkpoint requests must be revalidated against service state after each iteration.
+            // Checkpoint requests must be reaffirmed against service state after each iteration.
             // This caters for a very rare, but possible, edge case where a BackendConnector might
             // change user sessions between iterations.
-            signals.invalidateCheckpointRequests()
+            signals.markPendingCheckpointRequestsRequiringAffirmation()
         }
 
         // Notify the core extension for changed Sync Stream subscriptions, as we might have to reconnect.
