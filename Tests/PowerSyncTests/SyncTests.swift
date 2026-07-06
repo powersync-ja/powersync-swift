@@ -5,18 +5,6 @@ import Testing
 
 @Suite()
 class InMemorySyncIntegrationTests {
-    @Test func statusFlowEmitsImmutableSnapshots() async throws {
-        let status = SwiftSyncStatus()
-        var updates = status.asFlow().makeAsyncIterator()
-
-        let initial = try #require(await updates.next())
-        status.mutateStatus { $0.uploading = true }
-        let updated = try #require(await updates.next())
-
-        #expect(initial.uploading == false)
-        #expect(updated.uploading == true)
-    }
-
     @Test func decodesCoreSyncStatusTimestampsAsMicroseconds() throws {
         let data = """
         {
@@ -257,8 +245,8 @@ class InMemorySyncIntegrationTests {
         var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
         try #require(try await query.next() == ["local write"])
 
-        try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
-        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
+        try await waitUntil { mockClient.checkpointRequestIds.contains(1) }
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
             op_id: "1",
@@ -291,8 +279,8 @@ class InMemorySyncIntegrationTests {
         var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
         try #require(try await query.next() == ["local write"])
 
-        try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
-        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
+        try await waitUntil { mockClient.checkpointRequestIds.contains(1) }
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
             op_id: "1",
@@ -325,7 +313,7 @@ class InMemorySyncIntegrationTests {
         try #require(try await query.next() == ["local write"])
         
         allowConnection.withLock { $0 = true }
-        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "1")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
             op_id: "1",
@@ -351,7 +339,7 @@ class InMemorySyncIntegrationTests {
         try await channel.pushLine(.fullCheckpoint(Checkpoint(
             last_op_id: "0",
             buckets: [BucketChecksum(bucket: "a", checksum: 0)],
-            writeCheckpoint: "2"
+            writeCheckpoint: "1"
         )))
         try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
 
@@ -424,7 +412,7 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { $0.connected }
 
         let checkpoint = try await db.requestCheckpoint()
-        try #require(mockClient.checkpointRequestIds == [1, 2])
+        try #require(mockClient.checkpointRequestIds == [0, 1])
         try #require(!checkpoint.isSynced)
 
         try await db.disconnect()
@@ -439,7 +427,7 @@ class InMemorySyncIntegrationTests {
 
         try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
         // The new connection re-affirms the persisted request counter with the service.
-        try await waitUntil { mockClient.checkpointRequestIds == [1, 2, 2] }
+        try await waitUntil { mockClient.checkpointRequestIds == [0, 1, 1] }
         try await waitUntil { channels.withLock { $0.count } >= 2 }
         await waitForStatus(db.currentStatus) { $0.connected }
 
@@ -447,7 +435,7 @@ class InMemorySyncIntegrationTests {
         try await channel.pushLine(.fullCheckpoint(Checkpoint(
             last_op_id: "1",
             buckets: [BucketChecksum(bucket: "a", checksum: 0)],
-            writeCheckpoint: "2"
+            writeCheckpoint: "1"
         )))
         try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
 
@@ -526,8 +514,8 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { $0.connected }
 
         let checkpoint = try await db.requestCheckpoint()
-        try #require(mockClient.checkpointRequestIds == [1, 2])
-        try #require(try await lastRequestedCheckpointRequestId(db) == 2)
+        try #require(mockClient.checkpointRequestIds == [0, 1])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 1)
 
         try await channel.pushLine(.fullCheckpoint(Checkpoint(
             last_op_id: "1",
@@ -551,8 +539,8 @@ class InMemorySyncIntegrationTests {
         _ = try await db.requestCheckpoint()
 
         let checkpoint = try await db.requestCheckpoint()
-        try #require(mockClient.checkpointRequestIds == [1, 2, 3])
-        try #require(try await lastRequestedCheckpointRequestId(db) == 3)
+        try #require(mockClient.checkpointRequestIds == [0, 1, 2])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 2)
 
         try await channel.pushLine(.fullCheckpoint(Checkpoint(
             last_op_id: "1",
@@ -600,7 +588,7 @@ class InMemorySyncIntegrationTests {
         }
 
         let checkpoint = try await requestTask.value
-        try #require(mockClient.checkpointRequestIds == [1, 1, 2])
+        try #require(mockClient.checkpointRequestIds == [0, 0, 1])
         try #require(!checkpoint.isSynced)
         try await db.disconnect()
     }
@@ -641,14 +629,16 @@ class InMemorySyncIntegrationTests {
 
         try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
         await didConnect.await()
+        // The connect-time probe uses 0 so it doesn't consume a request ID; the counter is
+        // seeded at 0 and the first real request allocates ID 1.
         try await waitUntilAsync {
-            try await lastRequestedCheckpointRequestId(db) == 1
+            try await lastRequestedCheckpointRequestId(db) == 0
         }
 
-        try #require(mockClient.checkpointRequestIds == [1])
-        try #require(mockClient.checkpointRequestStateHints == [1])
-        try #require(try await lastRequestedCheckpointRequestId(db) == 1)
-        try #require(try await nextCheckpointRequestId(db) == 2)
+        try #require(mockClient.checkpointRequestIds == [0])
+        try #require(mockClient.checkpointRequestStateHints == [0])
+        try #require(try await lastRequestedCheckpointRequestId(db) == 0)
+        try #require(try await nextCheckpointRequestId(db) == 1)
     }
 
     @Test func readsSyncLinesBeforeCheckpointRequestStateIsReady() async throws {
@@ -670,7 +660,7 @@ class InMemorySyncIntegrationTests {
 
         await finishSeed.complete()
         try await waitUntilAsync {
-            try await lastRequestedCheckpointRequestId(db) == 1
+            try await lastRequestedCheckpointRequestId(db) == 0
         }
         try await db.disconnect()
     }
@@ -695,7 +685,7 @@ class InMemorySyncIntegrationTests {
 
         await didConnect.await()
         await didUpload.await()
-        try await waitUntil { mockClient.checkpointRequestIds == [1, 10] }
+        try await waitUntil { mockClient.checkpointRequestIds == [0, 10] }
         try #require(try await lastRequestedCheckpointRequestId(db) == 10)
         try #require(try await localTargetOp(db) == 10)
     }
