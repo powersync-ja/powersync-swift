@@ -129,7 +129,7 @@ final class SyncSignals: Sendable {
     /// Without this, a `requestCheckpoint()` or `waitForSync()` caller racing a `disconnect()`
     /// would suspend forever: no further sync iteration exists to resume its waiter.
     func tearDown() {
-        failPendingCheckpointRequests(CheckpointRequestError.notConnected)
+        failPendingCheckpointRequests(CheckpointRequestError.notConnecting)
 
         let applicationWaiters = checkpointRequestApplications.withLock { state in
             state.isTornDown = true

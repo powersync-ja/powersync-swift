@@ -363,15 +363,15 @@ class InMemorySyncIntegrationTests {
         }
     }
 
-    @Test func requestCheckpointRequiresConnection() async throws {
+    @Test func requestCheckpointRequiresActiveOrConnectingSync() async throws {
         let db = openDatabase(MockHttpClient { _ in AsyncThrowingChannel<PowerSync.SyncLine, any Error>() })
 
         do {
             _ = try await db.requestCheckpoint()
-            Issue.record("Expected requestCheckpoint() to throw when not connected")
-        } catch CheckpointRequestError.notConnected {
+            Issue.record("Expected requestCheckpoint() to throw without an active or connecting sync client")
+        } catch CheckpointRequestError.notConnecting {
         } catch {
-            Issue.record("Expected notConnected, got \(error)")
+            Issue.record("Expected notConnecting, got \(error)")
         }
     }
 
@@ -486,9 +486,9 @@ class InMemorySyncIntegrationTests {
             do {
                 _ = try await db.requestCheckpoint()
                 Issue.record("Expected requestCheckpoint() to throw after disconnect")
-            } catch CheckpointRequestError.notConnected {
+            } catch CheckpointRequestError.notConnecting {
             } catch {
-                Issue.record("Expected notConnected, got \(error)")
+                Issue.record("Expected notConnecting, got \(error)")
             }
         }
 
@@ -663,14 +663,14 @@ class InMemorySyncIntegrationTests {
         try await signals.waitForRetryDelayOrPendingCheckpointRequest(seconds: 0.05)
         #expect(Date().timeIntervalSince(start) >= 0.04)
 
-        signals.failPendingCheckpointRequests(CheckpointRequestError.notConnected)
+        signals.failPendingCheckpointRequests(CheckpointRequestError.notConnecting)
         do {
             try await pendingRequest.value
             Issue.record("Expected pending request to fail")
-        } catch CheckpointRequestError.notConnected {
+        } catch CheckpointRequestError.notConnecting {
         } catch is CancellationError {
         } catch {
-            Issue.record("Expected notConnected, got \(error)")
+            Issue.record("Expected notConnecting, got \(error)")
         }
     }
 

@@ -8,9 +8,9 @@ public enum CheckpointRequestError: Error, LocalizedError {
 
     /// Checkpoint requests require an active or connecting sync client.
     ///
-    /// A request made while disconnected would not be delivered to the PowerSync service,
-    /// so it could never be observed in the sync stream.
-    case notConnected
+    /// A request made without an active or connecting sync client would not be delivered to the
+    /// PowerSync service, so it could never be observed in the sync stream.
+    case notConnecting
 
     /// The active connection was not configured to use checkpoint requests.
     ///
@@ -25,7 +25,7 @@ public enum CheckpointRequestError: Error, LocalizedError {
         switch self {
         case .instanceNotSupported:
             return "The PowerSync service does not support checkpoint requests. Update the PowerSync service to use this API."
-        case .notConnected:
+        case .notConnecting:
             return "Checkpoint requests require an active or connecting sync client."
         case .checkpointRequestsNotEnabled:
             return "The active connection was not configured to use checkpoint requests. Connect with checkpointMode set to .requests."
