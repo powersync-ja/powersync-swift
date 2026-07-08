@@ -2,26 +2,26 @@
 /// it was created from.
 ///
 /// Checkpoint request IDs are persisted by the core extension and are monotonic across
-/// connections, and every new sync client re-seeds the last applied request ID on connect.
+/// connections, and every new sync client re-seeds the last requested request ID on connect.
 /// Resolving the active client through the group's ``SyncCoordinator`` on each call therefore
 /// keeps this object usable across disconnect/reconnect cycles instead of pinning a client
-/// whose signals are torn down on disconnect.
+/// from an earlier connection.
 final class CheckpointRequestImpl: CheckpointRequest {
     private let requestId: Int64
-    private let group: ActiveDatabaseGroup
+    private let db: PowerSyncDatabaseImpl
     /// A checkpoint request stays applied once core has applied it locally, so `hasSynced`
     /// remains true even while disconnected.
     private let wasSynced = Mutex(false)
 
-    init(requestId: Int64, group: ActiveDatabaseGroup) {
+    init(requestId: Int64, db: PowerSyncDatabaseImpl) {
         self.requestId = requestId
-        self.group = group
+        self.db = db
     }
 
     var hasSynced: Bool {
         wasSynced.withLock { synced in
             if !synced {
-                synced = group.syncCoordinator.syncClient?.isCheckpointRequestApplied(requestId) ?? false
+                synced = db.syncStatus.isCheckpointRequestApplied(requestId)
             }
             return synced
         }
@@ -32,7 +32,7 @@ final class CheckpointRequestImpl: CheckpointRequest {
             return
         }
 
-        try await group.syncCoordinator.guardNotConnected(
+        try await db.group.syncCoordinator.guardNotConnected(
             inner: {
                 throw CheckpointWaitError.disconnected
             },
@@ -40,9 +40,38 @@ final class CheckpointRequestImpl: CheckpointRequest {
                 guard client.checkpointMode == .requests else {
                     throw CheckpointRequestError.checkpointRequestsNotEnabled
                 }
-                try await client.waitForCheckpointRequest(requestId)
             }
         )
+
+        try await waitForCheckpointRequest()
         wasSynced.withLock { $0 = true }
+    }
+
+    /// Waits until sync status reports that this checkpoint request has been applied.
+    private func waitForCheckpointRequest() async throws {
+        if db.syncStatus.isCheckpointRequestApplied(requestId) {
+            return
+        }
+
+        for await update in db.syncStatus.asFlow() {
+            if db.syncStatus.isCheckpointRequestApplied(requestId) {
+                return
+            }
+
+            if let error = update.anyError {
+                // `asFlow()` emits the current status first. We intentionally fail fast if the
+                // sync client is already in an error state when the caller starts waiting.
+                throw CheckpointWaitError.errorDetected(message: String(describing: error))
+            }
+
+            if !update.connected && !update.connecting {
+                throw CheckpointWaitError.disconnected
+            }
+
+            try Task.checkCancellation()
+        }
+
+        try Task.checkCancellation()
+        throw CheckpointWaitError.disconnected
     }
 }

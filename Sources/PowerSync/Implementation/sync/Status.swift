@@ -106,6 +106,10 @@ fileprivate struct SyncStatusDataImpl: SyncStatusData {
         
         return nil
     }
+
+    var internalLastAppliedCheckpointRequestId: Int64? {
+        core.internalLastAppliedCheckpointRequestId
+    }
 }
 
 fileprivate struct SyncStatusContainer: ~Copyable {
@@ -138,7 +142,7 @@ final class SwiftSyncStatus: SyncStatus {
     internal func mutateStatus(update: (_ status: inout MutableSyncStatus) -> Void) {
         maybeMutateStatus(shouldUpdate: { _ in true }, apply: update)
     }
-    
+
     internal func maybeMutateStatus(
         shouldUpdate: (_ status: borrowing MutableSyncStatus) -> Bool,
         apply: (_ status: inout MutableSyncStatus) -> Void
@@ -180,6 +184,17 @@ final class SwiftSyncStatus: SyncStatus {
             if predicate(self) {
                 return
             }
+        }
+    }
+
+    /// Returns whether core has already applied this checkpoint request ID or a newer one.
+    internal func isCheckpointRequestApplied(_ requestId: Int64) -> Bool {
+        self.readStatus { current in
+            guard let appliedRequestId = current.internalLastAppliedCheckpointRequestId else {
+                return false
+            }
+
+            return appliedRequestId >= requestId
         }
     }
 

@@ -46,6 +46,46 @@ class InMemorySyncIntegrationTests {
         #expect(stream.subscription.expiresAt == TimeInterval(1_740_826_800))
     }
 
+    @Test func decodesInternalLastAppliedCheckpointRequestIdOnSyncStatus() throws {
+        let data = """
+        {
+          "connected": true,
+          "connecting": false,
+          "priority_status": [],
+          "downloading": null,
+          "streams": [],
+          "internal_last_applied_checkpoint_request_id": 7
+        }
+        """.data(using: .utf8)!
+
+        let status = try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: data)
+        #expect(status.internalLastAppliedCheckpointRequestId == 7)
+
+        let instructionData = """
+        [
+          {
+            "UpdateSyncStatus": {
+              "status": {
+                "connected": true,
+                "connecting": false,
+                "priority_status": [],
+                "downloading": null,
+                "streams": [],
+                "internal_last_applied_checkpoint_request_id": 7
+              }
+            }
+          }
+        ]
+        """.data(using: .utf8)!
+
+        let instructions = try StreamingSyncClient.jsonDecoder.decode([Instruction].self, from: instructionData)
+        guard case .updateSyncStatus(status: let decodedStatus) = try #require(instructions.first) else {
+            Issue.record("Expected UpdateSyncStatus with an internal last applied checkpoint request id")
+            return
+        }
+        #expect(decodedStatus.internalLastAppliedCheckpointRequestId == 7)
+    }
+
     @Test func decodesAppliedCheckpointRequestIdOnDidCompleteSync() throws {
         let data = """
         [
@@ -69,6 +109,26 @@ class InMemorySyncIntegrationTests {
             Issue.record("Expected DidCompleteSync without an applied checkpoint request id")
             return
         }
+    }
+
+    @Test func syncStatusTracksInternalLastAppliedCheckpointRequestId() throws {
+        let syncStatus = SwiftSyncStatus()
+        let data = """
+        {
+          "connected": true,
+          "connecting": false,
+          "priority_status": [],
+          "downloading": null,
+          "streams": [],
+          "internal_last_applied_checkpoint_request_id": 7
+        }
+        """.data(using: .utf8)!
+        let status = try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: data)
+
+        #expect(!syncStatus.isCheckpointRequestApplied(7))
+
+        syncStatus.mutateStatus { $0.core = status }
+        #expect(syncStatus.isCheckpointRequestApplied(7))
     }
 
     @Test func setsHeaders() async throws {
@@ -340,6 +400,7 @@ class InMemorySyncIntegrationTests {
     @Test func requestCheckpointWaitsUntilApplied() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let db = openDatabase(MockHttpClient { request in channel })
+        let dbImpl = try #require(db as? PowerSyncDatabaseImpl)
 
         try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests))
         await waitForStatus(db.currentStatus) { $0.connected }
@@ -356,6 +417,11 @@ class InMemorySyncIntegrationTests {
         try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
 
         try await checkpoint.waitForSync(timeout: 1)
+        try #require(checkpoint.hasSynced)
+        try #require(dbImpl.syncStatus.isCheckpointRequestApplied(2))
+
+        try await db.disconnect()
+        try #require(!dbImpl.syncStatus.isCheckpointRequestApplied(2))
         try #require(checkpoint.hasSynced)
     }
 
@@ -690,15 +756,32 @@ class InMemorySyncIntegrationTests {
         }
     }
 
-    @Test func appliedCheckpointRequestUsesLatestCoreValue() {
-        let signals = SyncSignals()
+    @Test func appliedCheckpointRequestUsesLatestSyncStatusValue() throws {
+        let syncStatus = SwiftSyncStatus()
 
-        signals.markCheckpointRequestApplied(10)
-        #expect(signals.isCheckpointRequestApplied(10))
+        func status(appliedRequestId: Int64) throws -> CoreDownloadSyncStatus {
+            let data = """
+            {
+              "connected": true,
+              "connecting": false,
+              "priority_status": [],
+              "downloading": null,
+              "streams": [],
+              "internal_last_applied_checkpoint_request_id": \(appliedRequestId)
+            }
+            """.data(using: .utf8)!
 
-        signals.markCheckpointRequestApplied(7)
-        #expect(signals.isCheckpointRequestApplied(7))
-        #expect(!signals.isCheckpointRequestApplied(10))
+            return try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: data)
+        }
+
+        let status10 = try status(appliedRequestId: 10)
+        syncStatus.mutateStatus { $0.core = status10 }
+        #expect(syncStatus.isCheckpointRequestApplied(10))
+
+        let status7 = try status(appliedRequestId: 7)
+        syncStatus.mutateStatus { $0.core = status7 }
+        #expect(syncStatus.isCheckpointRequestApplied(7))
+        #expect(!syncStatus.isCheckpointRequestApplied(10))
     }
 
     @Test func usesSeededCheckpointRequestCounterOnConnect() async throws {

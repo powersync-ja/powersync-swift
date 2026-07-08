@@ -176,57 +176,7 @@ The next upload iteration will be delayed.
         // Allocate the request ID locally before reporting it to the service.
         let requestId = try await nextCheckpointRequestId()
         let effectiveRequestId = try await requestCheckpointFromService(requestId: requestId)
-        return CheckpointRequestImpl(requestId: effectiveRequestId, group: db.group)
-    }
-
-    func isCheckpointRequestApplied(_ requestId: Int64) -> Bool {
-        signals.isCheckpointRequestApplied(requestId)
-    }
-
-    /// Waits until core reports a completed sync that applied `requestId` or a newer request.
-    ///
-    /// Sync status is still observed for errors so callers fail quickly when the active sync loop
-    /// reports a download or upload failure, but status no longer drives the success condition.
-    func waitForCheckpointRequest(_ requestId: Int64) async throws {
-        if isCheckpointRequestApplied(requestId) {
-            db.logger.debug("Checkpoint request id \(requestId) already applied", tag: tag)
-            return
-        }
-
-        db.logger.debug("Waiting for checkpoint request id \(requestId) to be applied", tag: tag)
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            defer {
-                group.cancelAll()
-            }
-
-            group.addTask {
-                try await self.signals.waitForCheckpointRequestApplied(requestId)
-            }
-
-            group.addTask {
-                try await self.throwOnSyncError(untilCheckpointRequestApplied: requestId)
-            }
-
-            _ = try await group.next()
-        }
-        db.logger.debug("Finished waiting for checkpoint request id \(requestId)", tag: tag)
-    }
-
-    private func throwOnSyncError(untilCheckpointRequestApplied requestId: Int64) async throws {
-        for await update in db.currentStatus.asFlow() {
-            if isCheckpointRequestApplied(requestId) {
-                return
-            }
-
-            if let error = update.anyError {
-                // `asFlow()` emits the current status first. We intentionally fail fast if the
-                // sync client is already in an error state when the caller starts waiting.
-                throw CheckpointWaitError.errorDetected(message: String(describing: error))
-            }
-        }
-
-        try Task.checkCancellation()
-        throw CheckpointWaitError.disconnected
+        return CheckpointRequestImpl(requestId: effectiveRequestId, db: db)
     }
 
     /// Sends or affirms a checkpoint request and returns the effective id accepted remotely.
@@ -601,9 +551,7 @@ private struct ActiveSyncIteration: Sendable {
             }
             break;
         case .updateSyncStatus(status: let status):
-            syncClient.db.syncStatus.mutateStatus {
-                $0.core = status
-            }
+            syncClient.db.syncStatus.mutateStatus { $0.core = status }
         case .establishSyncStream(request: _, lastCheckpointRequestId: _):
             throw PowerSyncError.operationFailed(message: "There can only be one establishSyncStream instruction per sync iteration")
         case .closeSyncStream(hideDisconnect: _):
@@ -626,10 +574,6 @@ private struct ActiveSyncIteration: Sendable {
             // Noop on native platforms.
             break;
         case .didCompleteSync(appliedCheckpointRequestId: let appliedCheckpointRequestId):
-            if let appliedCheckpointRequestId {
-                syncClient.db.logger.debug("Applied checkpoint request id \(appliedCheckpointRequestId)", tag: tag)
-                signals.markCheckpointRequestApplied(appliedCheckpointRequestId)
-            }
             syncClient.db.syncStatus.mutateStatus {
                 $0.internalDownloadError = nil
             }
