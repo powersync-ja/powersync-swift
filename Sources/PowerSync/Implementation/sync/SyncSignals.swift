@@ -47,7 +47,7 @@ final class SyncSignals: Sendable {
 
     /// Tracks the latest applied checkpoint request and waiters for already-created requests.
     ///
-    /// Core emits `CheckpointRequestApplied` when a checkpoint has been applied. We keep the
+    /// Core reports the applied checkpoint request ID on `DidCompleteSync`. We keep the
     /// latest ID here so requests can resolve immediately when they are already satisfied.
     private struct CheckpointRequestApplicationState {
         var latestAppliedRequestId: Int64?
@@ -57,7 +57,7 @@ final class SyncSignals: Sendable {
         var isTornDown = false
         /// Waiters blocked after a checkpoint request has been created.
         ///
-        /// These resume once core emits `CheckpointRequestApplied` with the requested ID or a
+        /// These resume once core reports a completed sync that applied the requested ID or a
         /// newer one.
         var waiters: [CheckpointRequestApplicationWaiter] = []
     }

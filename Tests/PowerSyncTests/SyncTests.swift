@@ -46,20 +46,27 @@ class InMemorySyncIntegrationTests {
         #expect(stream.subscription.expiresAt == TimeInterval(1_740_826_800))
     }
 
-    @Test func decodesCheckpointRequestAppliedInstruction() throws {
+    @Test func decodesAppliedCheckpointRequestIdOnDidCompleteSync() throws {
         let data = """
         [
           {
-            "CheckpointRequestApplied": {
-              "request_id": 7
+            "DidCompleteSync": {
+              "applied_checkpoint_request_id": 7
             }
+          },
+          {
+            "DidCompleteSync": {}
           }
         ]
         """.data(using: .utf8)!
 
         let instructions = try StreamingSyncClient.jsonDecoder.decode([Instruction].self, from: data)
-        guard case .checkpointRequestApplied(requestId: 7) = try #require(instructions.first) else {
-            Issue.record("Expected CheckpointRequestApplied instruction")
+        guard case .didCompleteSync(appliedCheckpointRequestId: 7) = try #require(instructions.first) else {
+            Issue.record("Expected DidCompleteSync with an applied checkpoint request id")
+            return
+        }
+        guard case .didCompleteSync(appliedCheckpointRequestId: nil) = try #require(instructions.last) else {
+            Issue.record("Expected DidCompleteSync without an applied checkpoint request id")
             return
         }
     }
@@ -304,6 +311,7 @@ class InMemorySyncIntegrationTests {
             }
             throw PowerSyncError.operationFailed(message: "Fake IO error for test", underlyingError: nil)
         }
+        mockClient.checkpointRequestResponse = 1
         let db = openDatabase(mockClient)
 
         // Connect but simulate an IO error from an offline device.
@@ -337,7 +345,7 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { $0.connected }
 
         let checkpoint = try await db.requestCheckpoint()
-        try #require(!checkpoint.isSynced)
+        try #require(!checkpoint.hasSynced)
 
         // The connect-time seed consumes request ID 1, so this request is ID 2.
         try await channel.pushLine(.fullCheckpoint(Checkpoint(
@@ -348,7 +356,7 @@ class InMemorySyncIntegrationTests {
         try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
 
         try await checkpoint.waitForSync(timeout: 1)
-        try #require(checkpoint.isSynced)
+        try #require(checkpoint.hasSynced)
     }
 
     @Test func requestCheckpointRequiresCheckpointRequestMode() async throws {
@@ -387,7 +395,7 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { $0.connected }
 
         let checkpoint = try await db.requestCheckpoint()
-        try #require(!checkpoint.isSynced)
+        try #require(!checkpoint.hasSynced)
 
         let waiter = Task {
             do {
@@ -411,7 +419,7 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { $0.connected }
 
         let checkpoint = try await db.requestCheckpoint()
-        try #require(!checkpoint.isSynced)
+        try #require(!checkpoint.hasSynced)
 
         let waiter = Task {
             do {
@@ -442,10 +450,10 @@ class InMemorySyncIntegrationTests {
         let checkpoint = try await db.requestCheckpoint()
         // The connect-time seed consumes request ID 1, so the explicit request is ID 2.
         try #require(mockClient.checkpointRequestIds == [1, 2])
-        try #require(!checkpoint.isSynced)
+        try #require(!checkpoint.hasSynced)
 
         try await db.disconnect()
-        try #require(!checkpoint.isSynced)
+        try #require(!checkpoint.hasSynced)
         do {
             try await checkpoint.waitForSync()
             Issue.record("Expected waitForSync() to throw while disconnected")
@@ -470,11 +478,11 @@ class InMemorySyncIntegrationTests {
 
         // The request created on the first connection is satisfied by the second one.
         try await checkpoint.waitForSync(timeout: 1)
-        try #require(checkpoint.isSynced)
+        try #require(checkpoint.hasSynced)
 
         // Once applied, the checkpoint request stays synced even without a connection.
         try await db.disconnect()
-        try #require(checkpoint.isSynced)
+        try #require(checkpoint.hasSynced)
     }
 
     @Test func requestCheckpointFailsWhenDisconnectedBeforeReady() async throws {
@@ -579,7 +587,7 @@ class InMemorySyncIntegrationTests {
         try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
 
         try await checkpoint.waitForSync(timeout: 1)
-        try #require(checkpoint.isSynced)
+        try #require(checkpoint.hasSynced)
     }
 
     @Test func requestCheckpointAllowsLowerEffectiveCheckpointId() async throws {
@@ -604,7 +612,7 @@ class InMemorySyncIntegrationTests {
         try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
 
         try await checkpoint.waitForSync(timeout: 1)
-        try #require(checkpoint.isSynced)
+        try #require(checkpoint.hasSynced)
     }
 
     @Test func requestCheckpointSkipsDownloadRetryDelay() async throws {
@@ -642,8 +650,11 @@ class InMemorySyncIntegrationTests {
         }
 
         let checkpoint = try await requestTask.value
-        try #require(mockClient.checkpointRequestIds == [1, 1, 2])
-        try #require(!checkpoint.isSynced)
+        // The failed first iteration cancels its seed task, so whether that seed's request
+        // reaches the service before cancellation is a scheduling race. The successful
+        // iteration always re-affirms ID 1 before the explicit request allocates ID 2.
+        try #require(mockClient.checkpointRequestIds.suffix(2) == [1, 2])
+        try #require(!checkpoint.hasSynced)
         try await db.disconnect()
     }
 
@@ -763,7 +774,7 @@ class InMemorySyncIntegrationTests {
         try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
 
         try await checkpoint.waitForSync(timeout: 1)
-        try #require(checkpoint.isSynced)
+        try #require(checkpoint.hasSynced)
     }
 
     @Test func checkpointRequestConnectorPropagatesCheckpointRequestErrors() async throws {
@@ -1291,26 +1302,28 @@ class InMemorySyncIntegrationTests {
         let db = openDatabase(MockHttpClient { request in channel })
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
         await waitForStatus(db.currentStatus) { $0.connected }
+        var status = db.currentStatus.asFlow().makeAsyncIterator()
+        let _ = await status.next() // Skip initial
 
         // Send checkpoint with 10 ops, progress should be 0/10
         try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "10", buckets: [BucketChecksum(bucket: "a", checksum: 0, count: 10)])))
-        await waitForProgress(db.currentStatus, total: (0, 10))
+        try (try #require(await status.next())).expectProgress(total: (0, 10))
 
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: (0..<10).map { i in
             .init(checksum: 0, op_id: String(i+1), object_id: String(i), object_type: "a", op: .put, data: "{}")
         })))
-        await waitForProgress(db.currentStatus, total: (10, 10))
+        try (try #require(await status.next())).expectProgress(total: (10, 10))
 
         // Emit new data, progress should be 0/2 instead of 2/2
         try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "12", buckets: [
             BucketChecksum(bucket: "a", checksum: 0, count: 12),
         ])))
-        await waitForProgress(db.currentStatus, total: (10, 12))
+        try (try #require(await status.next())).expectProgress(total: (10, 12))
 
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: (10..<12).map { i in
             .init(checksum: 0, op_id: String(i+1), object_id: String(i), object_type: "a", op: .put, data: "{}")
         })))
-        await waitForProgress(db.currentStatus, total: (12, 12))
+        try (try #require(await status.next())).expectProgress(total: (12, 12))
     }
 
     @Test func requestLogger() async throws {
@@ -1382,6 +1395,8 @@ class InMemorySyncIntegrationTests {
         let b = try await db.syncStream(name: "stream", params: ["foo": .string("b")]).subscribe(ttl: nil, priority: .init(1))
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
         await waitForStatus(db.currentStatus) { $0.connected }
+        var statusUpdates = db.currentStatus.asFlow().makeAsyncIterator()
+        let _ = await statusUpdates.next() // Skip initial
 
         // Without an initial checkpoint, sync streams should not be marked as active
         try #require(db.currentStatus.forStream(stream: a)?.subscription.hasSynced == false)
@@ -1403,34 +1418,21 @@ class InMemorySyncIntegrationTests {
         ], streams: [StreamDescription(name: "stream", is_default: false)])))
 
         // Subscriptions should be active now, but not marked as synced
-        await waitForStatus(db.currentStatus) { status in
-            [a, b].allSatisfy { subscription in
-                guard let stream = status.forStream(stream: subscription) else {
-                    return false
-                }
-
-                return stream.subscription.active
-                    && stream.subscription.lastSyncedAt == nil
-                    && stream.subscription.hasExplicitSubscription
-            }
-        }
         do {
+            let status = try #require(await statusUpdates.next())
             for subscription in [a, b] {
-                let stream = try #require(db.currentStatus.forStream(stream: subscription))
-                try #require(stream.subscription.active)
-                try #require(stream.subscription.lastSyncedAt == nil)
-                try #require(stream.subscription.hasExplicitSubscription)
+                let status = try #require(status.forStream(stream: subscription))
+                try #require(status.subscription.active)
+                try #require(status.subscription.lastSyncedAt == nil)
+                try #require(status.subscription.hasExplicitSubscription)
             }
         }
 
         try await channel.pushLine(.checkpointPartiallyComplete(lastOpId: "0", priority: BucketPriority(1)))
-        await waitForStatus(db.currentStatus) { status in
-            status.forStream(stream: a)?.subscription.lastSyncedAt == nil
-                && status.forStream(stream: b)?.subscription.lastSyncedAt != nil
-        }
         do {
-            try #require(db.currentStatus.forStream(stream: a)!.subscription.lastSyncedAt == nil)
-            try #require(db.currentStatus.forStream(stream: b)!.subscription.lastSyncedAt != nil)
+            let status = try #require(await statusUpdates.next())
+            try #require(status.forStream(stream: a)!.subscription.lastSyncedAt == nil)
+            try #require(status.forStream(stream: b)!.subscription.lastSyncedAt != nil)
             try await b.waitForFirstSync()
         }
 
@@ -1485,12 +1487,12 @@ class InMemorySyncIntegrationTests {
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
 
         await waitForStatus(db.currentStatus) { $0.connected }
+        var statusUpdates = db.currentStatus.asFlow().makeAsyncIterator()
+        let _ = await statusUpdates.next() // Skip initial
         try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "0", buckets: [], streams: [StreamDescription(name: "default_stream", is_default: true)])))
 
-        await waitForStatus(db.currentStatus) { status in
-            status.syncStreams?.contains { $0.subscription.name == "default_stream" } == true
-        }
-        let stream = try #require(db.currentStatus.syncStreams?.first { $0.subscription.name == "default_stream" })
+        let status = try #require(await statusUpdates.next())
+        let stream = try #require(status.syncStreams?.first)
         try #require(stream.subscription.name == "default_stream")
         try #require(stream.subscription.parameters == nil)
         try #require(stream.subscription.isDefault)
@@ -1811,12 +1813,12 @@ func waitUntilAsync(_ predicate: @escaping () async throws -> Bool) async throws
     try #require(try await predicate())
 }
 
-func waitForProgress(_ status: SyncStatus, total: (Int32, Int32)) async {
-    await waitForStatus(status) { status in
-        guard status.downloading, let progress = status.downloadProgress else {
-            return false
-        }
+private extension SyncStatusData {
+    func expectProgress(total: (Int32, Int32)) throws {
+        let progress = try #require(self.downloadProgress)
+        try #require(self.downloading)
 
-        return progress.downloadedOperations == total.0 && progress.totalOperations == total.1
+        try #require(progress.downloadedOperations == total.0)
+        try #require(progress.totalOperations == total.1)
     }
 }

@@ -11,8 +11,6 @@ enum PowerSyncControlArguments {
     case connectionEstablished
     case responseStreamEnd
     case updateSubscriptions(streams: [StreamKey])
-    case nextCheckpointRequestId
-    case localTargetOp(targetOp: Int64?)
     case seedCheckpointRequestId(requestId: Int64?)
     
     func execute(_ context: ConnectionContext) throws -> String {
@@ -47,12 +45,6 @@ enum PowerSyncControlArguments {
         case .updateSubscriptions(streams: let streams):
             op = "update_subscriptions"
             param = String(data: try StreamingSyncClient.jsonEncoder.encode(streams), encoding: .utf8)
-        case .nextCheckpointRequestId:
-            op = "next_checkpoint_request_id"
-            param = nil
-        case .localTargetOp(targetOp: let targetOp):
-            op = "local_target_op"
-            param = targetOp
         case .seedCheckpointRequestId(requestId: let requestId):
             op = "seed_checkpoint_request_id"
             param = requestId

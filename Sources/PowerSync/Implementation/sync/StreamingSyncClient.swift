@@ -183,7 +183,7 @@ The next upload iteration will be delayed.
         signals.isCheckpointRequestApplied(requestId)
     }
 
-    /// Waits until core emits `CheckpointRequestApplied` for `requestId` or a newer request.
+    /// Waits until core reports a completed sync that applied `requestId` or a newer request.
     ///
     /// Sync status is still observed for errors so callers fail quickly when the active sync loop
     /// reports a download or upload failure, but status no longer drives the success condition.
@@ -522,6 +522,7 @@ private struct ActiveSyncIteration: Sendable {
                     )
                 } catch {
                     let streamError = error
+                    checkpointRequestStateSeed.cancel()
                     do {
                         try await checkpointRequestStateSeed.value
                     } catch {
@@ -605,13 +606,6 @@ private struct ActiveSyncIteration: Sendable {
             }
         case .establishSyncStream(request: _, lastCheckpointRequestId: _):
             throw PowerSyncError.operationFailed(message: "There can only be one establishSyncStream instruction per sync iteration")
-        case .checkpointRequestId(requestId: _):
-            throw PowerSyncError.operationFailed(message: "CheckpointRequestId must be handled by its caller")
-        case .checkpointRequestApplied(requestId: let requestId):
-            syncClient.db.logger.debug("Applied checkpoint request id \(requestId)", tag: tag)
-            signals.markCheckpointRequestApplied(requestId)
-        case .localTargetOp(targetOp: _):
-            throw PowerSyncError.operationFailed(message: "LocalTargetOp must be handled by its caller")
         case .closeSyncStream(hideDisconnect: _):
             throw PowerSyncError.operationFailed(message: "CloseSyncStream must be handled in run() loop")
         case .fetchCredentials(didExpire: let didExpire):
@@ -631,7 +625,11 @@ private struct ActiveSyncIteration: Sendable {
         case .flushFileSystem:
             // Noop on native platforms.
             break;
-        case .didCompleteSync:
+        case .didCompleteSync(appliedCheckpointRequestId: let appliedCheckpointRequestId):
+            if let appliedCheckpointRequestId {
+                syncClient.db.logger.debug("Applied checkpoint request id \(appliedCheckpointRequestId)", tag: tag)
+                signals.markCheckpointRequestApplied(appliedCheckpointRequestId)
+            }
             syncClient.db.syncStatus.mutateStatus {
                 $0.internalDownloadError = nil
             }
@@ -740,15 +738,15 @@ struct WriteCheckpointData: Codable {
     let write_checkpoint: String
 }
 
-private struct CheckpointRequestResponse: Codable {
+struct CheckpointRequestResponse: Codable {
     let data: CheckpointRequestResponseData
 }
 
-private struct CheckpointRequestResponseData: Codable {
+struct CheckpointRequestResponseData: Codable {
     let checkpoint_request_id: String
 }
 
-private struct CheckpointRequestPayload: Encodable {
+struct CheckpointRequestPayload: Codable {
     let client_id: String
     let checkpoint_request_id: String
 }

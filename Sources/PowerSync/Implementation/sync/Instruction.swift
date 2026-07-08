@@ -10,12 +10,9 @@ enum Instruction {
     case updateSyncStatus(status: CoreDownloadSyncStatus)
     case establishSyncStream(request: JsonParam, lastCheckpointRequestId: Int64?)
     case fetchCredentials(didExpire: Bool)
-    case checkpointRequestId(requestId: Int64)
-    case checkpointRequestApplied(requestId: Int64)
-    case localTargetOp(targetOp: Int64?)
     case closeSyncStream(hideDisconnect: Bool)
     case flushFileSystem
-    case didCompleteSync
+    case didCompleteSync(appliedCheckpointRequestId: Int64?)
     case handleDiagnostics
 }
 
@@ -25,9 +22,6 @@ extension Instruction: Decodable {
         case updateSyncStatus = "UpdateSyncStatus"
         case establishSyncStream = "EstablishSyncStream"
         case fetchCredentials = "FetchCredentials"
-        case checkpointRequestId = "CheckpointRequestId"
-        case checkpointRequestApplied = "CheckpointRequestApplied"
-        case localTargetOp = "LocalTargetOp"
         case closeSyncStream = "CloseSyncStream"
         case flushFileSystem = "FlushFileSystem"
         case didCompleteSync = "DidCompleteSync"
@@ -52,18 +46,6 @@ extension Instruction: Decodable {
         case didExpire = "did_expire"
     }
 
-    enum CheckpointRequestIdCodingKeys: String, CodingKey {
-        case requestId = "request_id"
-    }
-
-    enum CheckpointRequestAppliedCodingKeys: String, CodingKey {
-        case requestId = "request_id"
-    }
-
-    enum LocalTargetOpCodingKeys: String, CodingKey {
-        case targetOp = "target_op"
-    }
-    
     enum CloseSyncStreamCodingKeys: String, CodingKey {
         case hideDisconnect = "hide_disconnect"
     }
@@ -71,7 +53,8 @@ extension Instruction: Decodable {
     enum FlushFileSystemCodingKeys: CodingKey {
     }
     
-    enum DidCompleteSyncCodingKeys: CodingKey {
+    enum DidCompleteSyncCodingKeys: String, CodingKey {
+        case appliedCheckpointRequestId = "applied_checkpoint_request_id"
     }
     
     init(from decoder: any Decoder) throws {
@@ -103,22 +86,16 @@ extension Instruction: Decodable {
         case .fetchCredentials:
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.FetchCredentialsCodingKeys.self, forKey: .fetchCredentials)
             self = Instruction.fetchCredentials(didExpire: try nestedContainer.decode(Bool.self, forKey: Instruction.FetchCredentialsCodingKeys.didExpire))
-        case .checkpointRequestId:
-            let nestedContainer = try container.nestedContainer(keyedBy: Instruction.CheckpointRequestIdCodingKeys.self, forKey: .checkpointRequestId)
-            self = Instruction.checkpointRequestId(requestId: try nestedContainer.decode(Int64.self, forKey: Instruction.CheckpointRequestIdCodingKeys.requestId))
-        case .checkpointRequestApplied:
-            let nestedContainer = try container.nestedContainer(keyedBy: Instruction.CheckpointRequestAppliedCodingKeys.self, forKey: .checkpointRequestApplied)
-            self = Instruction.checkpointRequestApplied(requestId: try nestedContainer.decode(Int64.self, forKey: Instruction.CheckpointRequestAppliedCodingKeys.requestId))
-        case .localTargetOp:
-            let nestedContainer = try container.nestedContainer(keyedBy: Instruction.LocalTargetOpCodingKeys.self, forKey: .localTargetOp)
-            self = Instruction.localTargetOp(targetOp: try nestedContainer.decodeIfPresent(Int64.self, forKey: Instruction.LocalTargetOpCodingKeys.targetOp))
         case .closeSyncStream:
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.CloseSyncStreamCodingKeys.self, forKey: .closeSyncStream)
             self = Instruction.closeSyncStream(hideDisconnect: try nestedContainer.decode(Bool.self, forKey: Instruction.CloseSyncStreamCodingKeys.hideDisconnect))
         case .flushFileSystem:
             self = Instruction.flushFileSystem
         case .didCompleteSync:
-            self = Instruction.didCompleteSync
+            let nestedContainer = try container.nestedContainer(keyedBy: Instruction.DidCompleteSyncCodingKeys.self, forKey: .didCompleteSync)
+            self = Instruction.didCompleteSync(
+                appliedCheckpointRequestId: try nestedContainer.decodeIfPresent(Int64.self, forKey: Instruction.DidCompleteSyncCodingKeys.appliedCheckpointRequestId)
+            )
         case .handleDiagnostics:
             self = Instruction.handleDiagnostics
         }

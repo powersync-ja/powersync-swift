@@ -13,6 +13,7 @@ let defaultPowerSyncUrl = "http://localhost:8080"
 let powerSyncUrl = environment["POWERSYNC_URL"] ?? defaultPowerSyncUrl
 let defaultUserId = "00000000-0000-4000-8000-000000000001"
 let userId = resolveUserId(environment["USER_ID"], defaultUserId: defaultUserId)
+// Use stdout so debug logs are visible when running this command-line demo.
 let logger = DefaultLogger(minSeverity: .debug, writers: [StdoutLogWriter()])
 
 let db = PowerSyncDatabase(

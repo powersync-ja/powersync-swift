@@ -9,7 +9,7 @@
 final class CheckpointRequestImpl: CheckpointRequest {
     private let requestId: Int64
     private let group: ActiveDatabaseGroup
-    /// A checkpoint request stays applied once core has applied it locally, so `isSynced`
+    /// A checkpoint request stays applied once core has applied it locally, so `hasSynced`
     /// remains true even while disconnected.
     private let wasSynced = Mutex(false)
 
@@ -18,7 +18,7 @@ final class CheckpointRequestImpl: CheckpointRequest {
         self.group = group
     }
 
-    var isSynced: Bool {
+    var hasSynced: Bool {
         wasSynced.withLock { synced in
             if !synced {
                 synced = group.syncCoordinator.syncClient?.isCheckpointRequestApplied(requestId) ?? false
@@ -28,7 +28,7 @@ final class CheckpointRequestImpl: CheckpointRequest {
     }
 
     func waitForSync() async throws {
-        if isSynced {
+        if hasSynced {
             return
         }
 

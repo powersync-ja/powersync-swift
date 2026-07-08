@@ -111,7 +111,7 @@ final class MockHttpClient: HttpClient {
             #expect(contentType.hasPrefix("application/json"))
 
             let data = try #require(request.httpBody)
-            let body = try StreamingSyncClient.jsonDecoder.decode(CheckpointRequestBody.self, from: data)
+            let body = try StreamingSyncClient.jsonDecoder.decode(CheckpointRequestPayload.self, from: data)
             #expect(!body.client_id.isEmpty)
             let requestId = try #require(Int64(body.checkpoint_request_id))
             #expect(requestId > 0)
@@ -169,19 +169,6 @@ final class MockHttpClient: HttpClient {
         )
         return try StreamingSyncClient.jsonEncoder.encode(response)
     }
-}
-
-private struct CheckpointRequestBody: Decodable {
-    let client_id: String
-    let checkpoint_request_id: String
-}
-
-private struct CheckpointRequestResponse: Codable {
-    let data: CheckpointRequestResponseData
-}
-
-private struct CheckpointRequestResponseData: Codable {
-    let checkpoint_request_id: String
 }
 
 private struct MockSyncLineResponse: SyncLineResponse {

@@ -83,15 +83,16 @@ public enum CheckpointWaitError: Error, LocalizedError {
 /// cycles. A wait interrupted by a disconnect throws ``CheckpointWaitError/disconnected``,
 /// but the same request can be awaited again once a new connection is established.
 ///
+/// Requests do not survive ``PowerSyncDatabaseProtocol/disconnectAndClear(clearLocal:soft:)``:
+/// clearing the database resets the request counter, so instances created before a clear
+/// should be discarded and requested again.
+///
 /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
 public protocol CheckpointRequest: Sendable {
-    /// Whether this checkpoint has already been synced locally.
+    /// Whether this checkpoint request has synced before.
     ///
-    /// This is a snapshot of checkpoint request events observed by the sync client, and stays
-    /// true once the checkpoint has been applied. While disconnected, a checkpoint that was
-    /// not yet applied reports false until a new connection observes its application.
     /// Use ``waitForSync()`` or ``waitForSync(timeout:)`` to suspend until the checkpoint is reached.
-    var isSynced: Bool { get }
+    var hasSynced: Bool { get }
 
     /// Waits until this checkpoint has been synced locally.
     ///
@@ -113,7 +114,7 @@ public protocol CheckpointRequest: Sendable {
 
 public extension CheckpointRequest {
     func waitForSync(timeout: TimeInterval) async throws {
-        if isSynced {
+        if hasSynced {
             return
         }
 

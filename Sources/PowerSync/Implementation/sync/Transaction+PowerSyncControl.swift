@@ -14,25 +14,24 @@ extension Transaction {
     }
 
     /// Allocates and persists the next local checkpoint request id.
+    ///
+    /// Unlike instruction-based control operations, core returns the allocated id directly as
+    /// the function result.
     func powersyncNextCheckpointRequestId() throws -> Int64 {
-        let instructions = try powersyncControl(.nextCheckpointRequestId)
-        guard instructions.count == 1, case let .checkpointRequestId(requestId) = instructions[0] else {
-            throw PowerSyncError.operationFailed(message: "Expected a CheckpointRequestId instruction")
+        try get(sql: "SELECT powersync_control('next_checkpoint_request_id', NULL)", parameters: []) { cursor in
+            try cursor.getInt64(index: 0)
         }
-
-        return requestId
     }
 
     /// Reads the current local target op, or updates it when a target op is supplied.
     ///
+    /// Unlike instruction-based control operations, core returns the previous target directly as
+    /// the function result, or `NULL` when no target is set.
     /// - Returns: The target op observed *before* the optional update was applied.
     func powersyncLocalTargetOp(_ targetOp: Int64? = nil) throws -> Int64? {
-        let instructions = try powersyncControl(.localTargetOp(targetOp: targetOp))
-        guard instructions.count == 1, case let .localTargetOp(observedTargetOp) = instructions[0] else {
-            throw PowerSyncError.operationFailed(message: "Expected a LocalTargetOp instruction")
+        try get(sql: "SELECT powersync_control('local_target_op', ?)", parameters: [targetOp]) { cursor in
+            cursor.getInt64Optional(index: 0)
         }
-
-        return observedTargetOp
     }
 
     /// Seeds the local checkpoint request counter from service state before opening the sync stream.

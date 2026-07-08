@@ -22,6 +22,8 @@
   as-is so the database can live in an App Group container shared with app extensions.
   Plain filenames keep the existing behavior. The SDK coordinates opening the database to
   avoid conflicts and can share update notifications across the main app and extensions.
+* Sync status timestamps (`PriorityStatusEntry.lastSyncedAt`, `SyncSubscriptionDescription.lastSyncedAt`,
+  and `SyncSubscriptionDescription.expiresAt`) now have microsecond resolution.
 * Fix `SyncStatus.asFlow()` emitting the same object, causing SwiftUI to miss updates.
 * Add the `ObservableSyncStatus` utility, which can be used to track Sync Status updates through an `@Observable` class.
 
