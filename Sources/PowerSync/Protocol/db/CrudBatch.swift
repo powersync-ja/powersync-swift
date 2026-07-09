@@ -25,7 +25,7 @@ public struct CrudBatch: Sendable {
     }
 }
 
-/// Removes uploaded CRUD items and updates the local target marker.
+/// Removes uploaded CRUD items and updates the checkpoint request apply gate.
 ///
 /// If a custom write checkpoint is supplied and no CRUD items remain, that checkpoint becomes
 /// the target. Otherwise, the target is reset to ``PowerSyncDatabaseImpl/maxOpId`` so the sync
@@ -41,10 +41,10 @@ internal func completeCrudItems(_ db: any PowerSyncDatabaseProtocol, _ lastItemI
                 }
                 // Setting a concrete target here prevents the sync client from replacing it
                 // with a standard write checkpoint after upload completion.
-                _ = try tx.powersyncLocalTargetOp(checkpointId)
+                _ = try tx.powersyncTargetCheckpointRequestId(checkpointId)
                 return
             }
         }
-        _ = try tx.powersyncLocalTargetOp(PowerSyncDatabaseImpl.maxOpId)
+        _ = try tx.powersyncTargetCheckpointRequestId(PowerSyncDatabaseImpl.maxOpId)
     }
 }

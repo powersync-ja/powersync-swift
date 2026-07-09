@@ -862,7 +862,7 @@ class InMemorySyncIntegrationTests {
         }
         mockClient.checkpointRequestStateResponse = 7
         let db = openDatabase(mockClient)
-        try await setLocalTargetOp(db, 7)
+        try await setTargetCheckpointRequestId(db, 7)
         try await setLastRequestedCheckpointRequestId(db, 4)
 
         try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests()))
@@ -874,7 +874,7 @@ class InMemorySyncIntegrationTests {
         try #require(mockClient.checkpointRequestIds == [7])
         try #require(mockClient.checkpointRequestStateHints == [7])
         try #require(try await lastRequestedCheckpointRequestId(db) == 7)
-        try #require(try await localTargetOp(db) == 7)
+        try #require(try await targetCheckpointRequestId(db) == 7)
         try #require(try await nextCheckpointRequestId(db) == 8)
     }
 
@@ -1128,7 +1128,7 @@ class InMemorySyncIntegrationTests {
         try await db.disconnect()
     }
 
-    @Test func uploadLocalTargetUsesSeededCheckpointRequestId() async throws {
+    @Test func uploadTargetCheckpointRequestUsesSeededCheckpointRequestId() async throws {
         let didUpload = Signal()
         let didConnect = Signal()
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
@@ -1150,7 +1150,7 @@ class InMemorySyncIntegrationTests {
         await didUpload.await()
         try await waitUntil { mockClient.checkpointRequestIds == [1, 10] }
         try #require(try await lastRequestedCheckpointRequestId(db) == 10)
-        try #require(try await localTargetOp(db) == 10)
+        try #require(try await targetCheckpointRequestId(db) == 10)
     }
 
     @Test func seedsConcreteLocalTargetWithoutLastRequestedCheckpointRequestIdOnConnect() async throws {
@@ -1161,7 +1161,7 @@ class InMemorySyncIntegrationTests {
             return channel
         }
         let db = openDatabase(mockClient)
-        try await setLocalTargetOp(db, 4)
+        try await setTargetCheckpointRequestId(db, 4)
         try await clearLastRequestedCheckpointRequestId(db)
 
         try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests()))
@@ -1173,7 +1173,7 @@ class InMemorySyncIntegrationTests {
         try #require(mockClient.checkpointRequestIds == [4])
         try #require(mockClient.checkpointRequestStateHints == [4])
         try #require(try await lastRequestedCheckpointRequestId(db) == 4)
-        try #require(try await localTargetOp(db) == 4)
+        try #require(try await targetCheckpointRequestId(db) == 4)
         try #require(try await nextCheckpointRequestId(db) == 5)
     }
 
@@ -1199,7 +1199,7 @@ class InMemorySyncIntegrationTests {
         }
         mockClient.checkpointRequestStateResponses = [4, 9]
         let db = openDatabase(mockClient)
-        try await setLocalTargetOp(db, 4)
+        try await setTargetCheckpointRequestId(db, 4)
 
         try await db.connect(connector: TestConnector(), options: ConnectOptions(retryDelay: 0.05, checkpointMode: .requests()))
         await firstConnect.await()
@@ -1209,7 +1209,7 @@ class InMemorySyncIntegrationTests {
         try #require(mockClient.checkpointRequestIds == [4])
         try #require(mockClient.checkpointRequestStateHints == [4])
 
-        try await setLocalTargetOp(db, 9)
+        try await setTargetCheckpointRequestId(db, 9)
         firstChannel.finish()
         await secondConnect.await()
         try await waitUntilAsync {
@@ -1785,16 +1785,16 @@ private func openDatabase(_ client: any HttpClient, schema: Schema = defaultSche
     )
 }
 
-private func setLocalTargetOp(_ db: any PowerSyncDatabaseProtocol, _ opId: Int64) async throws {
+private func setTargetCheckpointRequestId(_ db: any PowerSyncDatabaseProtocol, _ requestId: Int64) async throws {
     try await db.execute(
-        sql: "INSERT OR REPLACE INTO ps_kv(key, value) VALUES('local_target_op', ?)",
-        parameters: [opId]
+        sql: "INSERT OR REPLACE INTO ps_kv(key, value) VALUES('target_checkpoint_request_id', ?)",
+        parameters: [requestId]
     )
 }
 
-private func localTargetOp(_ db: any PowerSyncDatabaseProtocol) async throws -> Int64? {
+private func targetCheckpointRequestId(_ db: any PowerSyncDatabaseProtocol) async throws -> Int64? {
     try await db.getOptional(
-        sql: "SELECT CAST(value AS INTEGER) FROM ps_kv WHERE key = 'local_target_op'",
+        sql: "SELECT CAST(value AS INTEGER) FROM ps_kv WHERE key = 'target_checkpoint_request_id'",
         parameters: []
     ) { cursor in
         try cursor.getInt64(index: 0)

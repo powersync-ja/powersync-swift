@@ -30,13 +30,13 @@ extension Transaction {
         }
     }
 
-    /// Reads the current local target op, or updates it when a target op is supplied.
+    /// Reads the current target checkpoint request id, or updates it when a target is supplied.
     ///
     /// Unlike instruction-based control operations, core returns the previous target directly as
     /// the function result, or `NULL` when no target is set.
-    /// - Returns: The target op observed *before* the optional update was applied.
-    func powersyncLocalTargetOp(_ targetOp: Int64? = nil) throws -> Int64? {
-        try get(sql: "SELECT powersync_control('local_target_op', ?)", parameters: [targetOp]) { cursor in
+    /// - Returns: The target checkpoint request id observed *before* the optional update was applied.
+    func powersyncTargetCheckpointRequestId(_ targetCheckpointRequestId: Int64? = nil) throws -> Int64? {
+        try get(sql: "SELECT powersync_control('target_checkpoint_request_id', ?)", parameters: [targetCheckpointRequestId]) { cursor in
             cursor.getInt64Optional(index: 0)
         }
     }

@@ -330,10 +330,10 @@ final class CrudTests: XCTestCase {
         let tx = try await database.getNextCrudTransaction()!
         try await tx.complete(writeCheckpoint: "123")
 
-        let targetOp = try await database.writeTransaction { tx in
-            try tx.powersyncLocalTargetOp()
+        let targetCheckpointRequestId = try await database.writeTransaction { tx in
+            try tx.powersyncTargetCheckpointRequestId()
         }
-        XCTAssertEqual(targetOp, 123)
+        XCTAssertEqual(targetCheckpointRequestId, 123)
 
         try await database.execute(
             sql: "INSERT INTO users (id, name) VALUES (uuid(), 'a')",
@@ -341,9 +341,9 @@ final class CrudTests: XCTestCase {
         )
         let batch = try await database.getCrudBatch()!
         try await batch.complete(writeCheckpoint: "124")
-        let newTargetOp = try await database.writeTransaction { tx in
-            try tx.powersyncLocalTargetOp()
+        let newTargetCheckpointRequestId = try await database.writeTransaction { tx in
+            try tx.powersyncTargetCheckpointRequestId()
         }
-        XCTAssertEqual(newTargetOp, 124)
+        XCTAssertEqual(newTargetCheckpointRequestId, 124)
     }
 }

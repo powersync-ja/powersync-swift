@@ -106,7 +106,7 @@ The next upload iteration will be delayed.
                     try await connector.uploadData(database: db)
                 } else {
                     // Uploading is completed
-                    try await self.uploadLocalTarget()
+                    try await self.uploadTargetCheckpointRequest()
                     break
                 }
             } catch {
@@ -130,20 +130,20 @@ The next upload iteration will be delayed.
         }
     }
 
-    /// Updates the local target once all currently queued CRUD items have been uploaded.
+    /// Updates the apply gate once all currently queued CRUD items have been uploaded.
     ///
-    /// When using checkpoint requests, this stores the generated request ID as the local target.
+    /// When using checkpoint requests, this stores the generated request ID as the target.
     /// The sync stream later reports the same ID once the corresponding checkpoint has been
     /// applied locally.
-    private func uploadLocalTarget() async throws {
+    private func uploadTargetCheckpointRequest() async throws {
         let currentTarget: Int64? = try await db.writeTransaction { tx in
-            try tx.powersyncLocalTargetOp()
+            try tx.powersyncTargetCheckpointRequestId()
         }
 
         if currentTarget != PowerSyncDatabaseImpl.maxOpId {
-            // We should only update the target if it is currently at the max value
-            // This is set after having completed a CRUD Batch/Transaction
-            // This avoid overwriting a custom write checkpoint - which would have been set in the .complete handler
+            // We should only update the target if it is currently at the max value.
+            // This is set after having completed a CRUD Batch/Transaction.
+            // This avoids overwriting a custom write checkpoint set in the .complete handler.
             return
         }
         
@@ -169,8 +169,8 @@ The next upload iteration will be delayed.
                 return
             }
             
-            // Update the target op
-            _ = try tx.powersyncLocalTargetOp(opId)
+            // Update the target checkpoint request id.
+            _ = try tx.powersyncTargetCheckpointRequestId(opId)
         }
     }
 
@@ -184,7 +184,7 @@ The next upload iteration will be delayed.
     ///
     /// The request ID is persisted by the core extension before it is sent to the service, so
     /// later sync-loop events can report when the same checkpoint request has been applied.
-    /// This does not update the local target op: explicit checkpoint requests are wait markers,
+    /// This does not update the target checkpoint request id: explicit checkpoint requests are wait markers,
     /// not local upload gates.
     func requestCheckpoint() async throws -> any CheckpointRequest {
         guard case .requests = checkpointMode else {
@@ -253,18 +253,18 @@ The next upload iteration will be delayed.
         }
 
         do {
-            // If a concrete target_op is active, checkpoint request ids must start at or above it.
-            let concreteLocalTarget = try await db.writeTransaction { tx -> Int64? in
-                let localTarget = try tx.powersyncLocalTargetOp()
-                guard let localTarget, localTarget > 0, localTarget != PowerSyncDatabaseImpl.maxOpId else {
+            // If a concrete target checkpoint request id is active, checkpoint request ids must start at or above it.
+            let concreteTarget = try await db.writeTransaction { tx -> Int64? in
+                let target = try tx.powersyncTargetCheckpointRequestId()
+                guard let target, target > 0, target != PowerSyncDatabaseImpl.maxOpId else {
                     return nil
                 }
 
-                return localTarget
+                return target
             }
 
             // Start from the largest value known locally. On normal reconnects, this is the core
-            // hint. The concrete local target fallback mainly guards legacy-to-request-mode
+            // hint. The concrete target fallback mainly guards legacy-to-request-mode
             // transitions or unusual migrated state where core has a target but no request hint.
             // In most legacy-to-request transitions the service should already have the concrete
             // checkpoint record and return it when we affirm the current request state, so this
@@ -274,7 +274,7 @@ The next upload iteration will be delayed.
             // ID must not be reused by a later real request, since a checkpoint created between
             // the affirmation and that request would wrongly satisfy it. Real requests on a
             // fresh database therefore start at 2.
-            let startingRequestId = max(lastCheckpointRequestId ?? 0, concreteLocalTarget ?? 0)
+            let startingRequestId = max(lastCheckpointRequestId ?? 0, concreteTarget ?? 0)
             let seed = try await requestCheckpointFromService(requestId: startingRequestId > 0 ? startingRequestId : 1)
 
             // Seed only when the service returns a different value, such as after disconnectAndClear.
@@ -291,7 +291,7 @@ The next upload iteration will be delayed.
         }
     }
 
-    /// Returns the checkpoint identifier to store as the local target after uploads complete.
+    /// Returns the checkpoint identifier to store as the target after uploads complete.
     ///
     /// With checkpoint requests this allocates and posts a request ID. The caller stores that
     /// concrete ID only after the service accepts it and the CRUD queue is still empty.
@@ -359,10 +359,19 @@ The next upload iteration will be delayed.
                 // It's safe if this request races with a new one. The service will reject it.
                 db.logger.debug("Retrying checkpoint request id \(requestId)", tag: tag)
                 _ = try await requestCheckpointFromService(requestId: requestId)
+            } catch CheckpointRequestError.instanceNotSupported {
+                return
             } catch is CancellationError {
                 return
             } catch {
                 db.logger.warning("Error retrying checkpoint request: \(error)", tag: tag)
+                do {
+                    // Some failures happen before the loop reaches its scheduled retry sleep,
+                    // so back off here too instead of spinning until the next successful readiness check.
+                    try await sleepForSeconds(seconds: checkpointRequestRetryDelay)
+                } catch {
+                    return
+                }
             }
         }
     }
