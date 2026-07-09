@@ -42,10 +42,13 @@ extension Transaction {
     }
 
     /// Seeds the local checkpoint request counter from service state before opening the sync stream.
-    func powersyncSeedCheckpointRequestId(_ requestId: Int64?) throws {
-        let instructions = try powersyncControl(.seedCheckpointRequestId(requestId: requestId))
-        guard instructions.isEmpty else {
-            throw PowerSyncError.operationFailed(message: "Expected seed_checkpoint_request_id to return no instructions")
+    ///
+    /// Unlike instruction-based control operations, core returns the previous checkpoint
+    /// request id directly, or `NULL` when no previous value was set.
+    @discardableResult
+    func powersyncSeedCheckpointRequestId(_ requestId: Int64?) throws -> Int64? {
+        try get(sql: "SELECT powersync_control('seed_checkpoint_request_id', ?)", parameters: [requestId]) { cursor in
+            cursor.getInt64Optional(index: 0)
         }
     }
 }

@@ -112,7 +112,7 @@ final class SystemManager {
                     }
                 ),
                 // This enables the requestCheckpoint method
-                checkpointMode: .requests
+                checkpointMode: .requests()
             )
         )
         try await attachments?.startSync()

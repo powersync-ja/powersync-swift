@@ -292,7 +292,7 @@ The next upload iteration will be delayed.
 
             // Seed only when the service returns a different value, such as after disconnectAndClear.
             if lastCheckpointRequestId != seed {
-                try await db.writeTransaction { tx in
+                _ = try await db.writeTransaction { tx in
                     try tx.powersyncSeedCheckpointRequestId(seed)
                 }
             }

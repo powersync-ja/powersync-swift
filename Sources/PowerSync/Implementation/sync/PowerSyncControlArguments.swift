@@ -11,7 +11,6 @@ enum PowerSyncControlArguments {
     case connectionEstablished
     case responseStreamEnd
     case updateSubscriptions(streams: [StreamKey])
-    case seedCheckpointRequestId(requestId: Int64?)
     
     func execute(_ context: ConnectionContext) throws -> String {
         let op: String
@@ -45,9 +44,6 @@ enum PowerSyncControlArguments {
         case .updateSubscriptions(streams: let streams):
             op = "update_subscriptions"
             param = String(data: try StreamingSyncClient.jsonEncoder.encode(streams), encoding: .utf8)
-        case .seedCheckpointRequestId(requestId: let requestId):
-            op = "seed_checkpoint_request_id"
-            param = requestId
         }
         
         return try context.get(sql: "SELECT powersync_control(?, ?)", parameters: [op, param]) { cursor in
