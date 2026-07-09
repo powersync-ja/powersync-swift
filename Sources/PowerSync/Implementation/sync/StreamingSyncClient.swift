@@ -104,11 +104,13 @@ The next upload iteration will be delayed.
                     lastUploadItem = nextItem
                     db.syncStatus.mutateStatus { $0.uploading = true }
                     try await connector.uploadData(database: db)
-                    clearUploadError()
                 } else {
                     // Uploading is completed
                     try await self.uploadTargetCheckpointRequest()
-                    clearUploadError()
+                    db.syncStatus.maybeMutateStatus(
+                        shouldUpdate: { $0.internalUploadError != nil },
+                        apply: { $0.internalUploadError = nil }
+                    )
                     break
                 }
             } catch {
@@ -130,13 +132,6 @@ The next upload iteration will be delayed.
                 }
             }
         }
-    }
-
-    private func clearUploadError() {
-        db.syncStatus.maybeMutateStatus(
-            shouldUpdate: { $0.internalUploadError != nil },
-            apply: { $0.internalUploadError = nil }
-        )
     }
 
     /// Updates the apply gate once all currently queued CRUD items have been uploaded.

@@ -26,6 +26,7 @@
   and `SyncSubscriptionDescription.expiresAt`) now have microsecond resolution.
 * Fix `SyncStatus.asFlow()` emitting the same object, causing SwiftUI to miss updates.
 * Add the `ObservableSyncStatus` utility, which can be used to track Sync Status updates through an `@Observable` class.
+* Clear `SyncStatus.uploadError` after a successful upload.
 
 ## 1.14.4
 
