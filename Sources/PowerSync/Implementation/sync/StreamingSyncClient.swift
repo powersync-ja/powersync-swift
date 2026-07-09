@@ -76,13 +76,13 @@ The next upload iteration will be delayed.
                     lastUploadItem = nextItem
                     db.syncStatus.mutateStatus { $0.uploading = true }
                     try await connector.uploadData(database: db)
+                } else {
+                    // Uploading is completed
+                    try await self.uploadLocalTarget()
                     db.syncStatus.maybeMutateStatus(
                         shouldUpdate: { $0.internalUploadError != nil },
                         apply: { $0.internalUploadError = nil }
                     )
-                } else {
-                    // Uploading is completed
-                    try await self.uploadLocalTarget()
                     break
                 }
             } catch {
