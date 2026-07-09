@@ -78,4 +78,21 @@ final class ConnectTests: XCTestCase {
             options: testOptions.connectOptions
         )
     }
+
+    func testCheckpointRequestRetryDelayIsResolvedFromCheckpointModeOnStreamingSyncClient() {
+        XCTAssertEqual(
+            StreamingSyncClient.resolveCheckpointRequestRetryDelay(for: .requests()),
+            StreamingSyncClient.defaultCheckpointRequestRetryDelay
+        )
+
+        XCTAssertEqual(
+            StreamingSyncClient.resolveCheckpointRequestRetryDelay(for: .requests(checkpointRequestRetryDelay: 0)),
+            StreamingSyncClient.minimumCheckpointRequestRetryDelay
+        )
+
+        XCTAssertEqual(
+            StreamingSyncClient.resolveCheckpointRequestRetryDelay(for: .requests(checkpointRequestRetryDelay: 20)),
+            20
+        )
+    }
 }

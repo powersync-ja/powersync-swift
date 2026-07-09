@@ -137,9 +137,9 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         try await initialize()
 
         let options = options ?? ConnectOptions()
-        if connector is CustomCheckpointRequestConnector, options.checkpointMode == .legacy {
+        if connector is CustomCheckpointRequestConnector, case .legacy = options.checkpointMode {
             logger.warning(
-                "The connector implements CustomCheckpointRequestConnector, but the connection uses CheckpointMode.legacy and will not post checkpoint requests to it. Connect with checkpointMode set to .requests to use the connector's checkpoint requests.",
+                "The connector implements CustomCheckpointRequestConnector, but the connection uses CheckpointMode.legacy and will not post checkpoint requests to it. Connect with checkpointMode set to .requests() to use the connector's checkpoint requests.",
                 tag: "PowerSyncDatabase"
             )
         }

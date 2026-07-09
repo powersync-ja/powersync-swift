@@ -32,7 +32,10 @@ public enum CheckpointMode: Sendable {
     /// Requests are sent to the service's `/sync/checkpoint-request` endpoint, or to the
     /// connector when it implements ``CustomCheckpointRequestConnector``.
     /// This mode is required for ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
-    case requests
+    ///
+    /// - Parameter checkpointRequestRetryDelay: Optional delay in seconds before retrying
+    ///   the latest checkpoint request when it has not been applied yet.
+    case requests(checkpointRequestRetryDelay: TimeInterval? = nil)
 }
 
 /// Options for configuring a PowerSync connection.
@@ -105,7 +108,7 @@ public struct ConnectOptions: Sendable {
 
     /// Selects the service checkpoint mechanism for this connection.
     ///
-    /// Use ``CheckpointMode/requests`` to enable ``PowerSyncDatabaseProtocol/requestCheckpoint()``
+    /// Use `.requests()` to enable ``PowerSyncDatabaseProtocol/requestCheckpoint()``
     /// and connectors implementing ``CustomCheckpointRequestConnector``.
     /// Defaults to ``CheckpointMode/legacy`` for backwards-compatible write checkpoints.
     ///
@@ -164,6 +167,7 @@ public struct ConnectOptions: Sendable {
         self.includeDefaultStreams = includeDefaultStreams
         self.checkpointMode = checkpointMode
     }
+
 }
 
 /// A PowerSync managed database.
@@ -262,7 +266,7 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// The returned request can be awaited to confirm that the local database has applied
     /// server-side changes up to the checkpoint. This method requires an active or connecting
     /// sync client connected with ``ConnectOptions/checkpointMode`` set to
-    /// ``CheckpointMode/requests``. It can throw for connection, mode, authentication, or service
+    /// `.requests()`. It can throw for connection, mode, authentication, or service
     /// request failures.
     ///
     /// Creating the request has no timeout of its own: while the sync client keeps retrying a

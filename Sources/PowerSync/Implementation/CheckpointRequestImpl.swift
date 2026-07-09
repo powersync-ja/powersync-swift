@@ -37,7 +37,7 @@ final class CheckpointRequestImpl: CheckpointRequest {
                 throw CheckpointWaitError.disconnected
             },
             ifConnected: { client in
-                guard client.checkpointMode == .requests else {
+                guard case .requests = client.checkpointMode else {
                     throw CheckpointRequestError.checkpointRequestsNotEnabled
                 }
             }

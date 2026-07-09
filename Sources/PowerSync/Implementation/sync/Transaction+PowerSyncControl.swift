@@ -23,6 +23,13 @@ extension Transaction {
         }
     }
 
+    /// Reads the current local checkpoint request id without allocating a new one.
+    func powersyncCurrentCheckpointRequestId() throws -> Int64? {
+        try get(sql: "SELECT powersync_control('current_checkpoint_request_id', NULL)", parameters: []) { cursor in
+            cursor.getInt64Optional(index: 0)
+        }
+    }
+
     /// Reads the current local target op, or updates it when a target op is supplied.
     ///
     /// Unlike instruction-based control operations, core returns the previous target directly as

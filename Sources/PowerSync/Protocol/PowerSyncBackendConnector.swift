@@ -37,7 +37,7 @@ public protocol PowerSyncBackendConnectorProtocol: Sendable {
 /// backend, which is responsible for creating a matching checkpoint once the uploads preceding
 /// the request have been processed.
 ///
-/// Connect with ``CheckpointMode/requests`` to use this connector's checkpoint requests.
+/// Connect with `.requests()` to use this connector's checkpoint requests.
 /// In ``CheckpointMode/legacy`` mode this protocol is ignored and a warning is logged.
 ///
 /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.

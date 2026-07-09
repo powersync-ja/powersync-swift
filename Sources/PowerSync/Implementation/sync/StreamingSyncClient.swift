@@ -4,12 +4,16 @@ import Foundation
 fileprivate let tag = "StreamingSyncClient"
 
 final class StreamingSyncClient: Sendable {
+    internal static let defaultCheckpointRequestRetryDelay: TimeInterval = 10
+    internal static let minimumCheckpointRequestRetryDelay: TimeInterval = 10
+
     let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
     let connector: CachingCredentialsConnector
     let httpClient: any HttpClient
 
     let checkpointMode: CheckpointMode
+    private let checkpointRequestRetryDelay: TimeInterval
     /// Set when the connector posts checkpoint requests to a custom backend itself.
     private let customCheckpointRequestConnector: (any CustomCheckpointRequestConnector)?
     private let signals = SyncSignals()
@@ -25,9 +29,22 @@ final class StreamingSyncClient: Sendable {
         self.httpClient = httpClient
         self.options = options
         self.checkpointMode = options.checkpointMode
+        self.checkpointRequestRetryDelay = Self.resolveCheckpointRequestRetryDelay(for: options.checkpointMode)
         self.customCheckpointRequestConnector = connector as? any CustomCheckpointRequestConnector
     }
-    
+
+    internal static func resolveCheckpointRequestRetryDelay(for checkpointMode: CheckpointMode) -> TimeInterval {
+        let retryDelay: TimeInterval?
+        switch checkpointMode {
+        case .requests(checkpointRequestRetryDelay: let configuredRetryDelay):
+            retryDelay = configuredRetryDelay
+        case .legacy:
+            retryDelay = nil
+        }
+
+        return max(retryDelay ?? defaultCheckpointRequestRetryDelay, minimumCheckpointRequestRetryDelay)
+    }
+
     /// Starts a task driving uploads and downloads by repeatedly connecting to the PowerSync service,
     /// managing tokens and CRUD uploads.
     ///
@@ -41,8 +58,9 @@ final class StreamingSyncClient: Sendable {
 
             async let download: () = downloadLoop(signals: signals)
             async let upload: () = uploadLoop(signals: signals)
+            async let checkpointRequestRetry: () = checkpointRequestRetryLoop(signals: signals)
 
-            let _ = try await (download, upload)
+            let _ = try await (download, upload, checkpointRequestRetry)
         }
     }
 
@@ -169,13 +187,12 @@ The next upload iteration will be delayed.
     /// This does not update the local target op: explicit checkpoint requests are wait markers,
     /// not local upload gates.
     func requestCheckpoint() async throws -> any CheckpointRequest {
-        guard checkpointMode == .requests else {
+        guard case .requests = checkpointMode else {
             throw CheckpointRequestError.checkpointRequestsNotEnabled
         }
 
         // Allocate the request ID locally before reporting it to the service.
-        let requestId = try await nextCheckpointRequestId()
-        let effectiveRequestId = try await requestCheckpointFromService(requestId: requestId)
+        let effectiveRequestId = try await requestNextCheckpointFromService()
         return CheckpointRequestImpl(requestId: effectiveRequestId, db: db)
     }
 
@@ -229,7 +246,7 @@ The next upload iteration will be delayed.
 
     /// Ensures the core checkpoint request counter has been seeded for the current stream.
     fileprivate func seedCheckpointRequestState(lastCheckpointRequestId: Int64?) async throws {
-        guard checkpointMode == .requests else {
+        guard case .requests = checkpointMode else {
             // legacy mode does not require tracking local state
             signals.markCheckpointsReady()
             return
@@ -281,10 +298,15 @@ The next upload iteration will be delayed.
     private func getWriteCheckpoint() async throws -> Int64 {
         switch checkpointMode {
         case .requests:
-            return try await requestCheckpointFromService(requestId: try await nextCheckpointRequestId())
+            return try await requestNextCheckpointFromService()
         case .legacy:
             return try await getLegacyWriteCheckpoint()
         }
+    }
+
+    private func requestNextCheckpointFromService() async throws -> Int64 {
+        let requestId = try await nextCheckpointRequestId()
+        return try await requestCheckpointFromService(requestId: requestId)
     }
 
     private func nextCheckpointRequestId() async throws -> Int64 {
@@ -292,6 +314,56 @@ The next upload iteration will be delayed.
 
         return try await db.writeTransaction { ctx in
             try ctx.powersyncNextCheckpointRequestId()
+        }
+    }
+
+    private func currentCheckpointRequestId() async throws -> Int64? {
+        try await db.writeTransaction { ctx in
+            try ctx.powersyncCurrentCheckpointRequestId()
+        }
+    }
+
+    private func checkpointRequestRetryLoop(signals: SyncSignals) async {
+        guard case .requests = checkpointMode else {
+            return
+        }
+
+        while !Task.isCancelled {
+            do {
+                // Make sure the system is seeded and ready
+                try await signals.waitForCheckpointRequestsReady(wakeDownloadLoop: false)
+
+                // Get the current checkpoint_request_id
+                guard let requestId = try await currentCheckpointRequestId(), requestId > 0 else {
+                    // This should not be reached. For completeness sake - wait a bit.
+                    try await sleepForSeconds(seconds: checkpointRequestRetryDelay)
+                    continue
+                }
+
+                // Give the request some time to sync
+                try await sleepForSeconds(seconds: checkpointRequestRetryDelay)
+
+                // If a new request was made, we should wait again before retrying
+                guard try await currentCheckpointRequestId() == requestId else {
+                    continue
+                }
+
+                // If the request was applied, we don't need to retry
+                guard !db.syncStatus.isCheckpointRequestApplied(requestId) else {
+                    continue
+                }
+
+                // Make sure we are online and ready before making the request
+                try await signals.waitForCheckpointRequestsReady(wakeDownloadLoop: false)
+
+                // It's safe if this request races with a new one. The service will reject it.
+                db.logger.debug("Retrying checkpoint request id \(requestId)", tag: tag)
+                _ = try await requestCheckpointFromService(requestId: requestId)
+            } catch is CancellationError {
+                return
+            } catch {
+                db.logger.warning("Error retrying checkpoint request: \(error)", tag: tag)
+            }
         }
     }
 
@@ -450,6 +522,9 @@ private struct ActiveSyncIteration: Sendable {
                 // don't block line processing on it. Operations that allocate checkpoint
                 // requests wait for the validation signal themselves.
                 // Keeping this as a separate task also lets stream-establishment errors stay primary.
+                // We do this on every connect attempt to cater for:
+                //   - retries: if the user is offline initially
+                //   - rare edge cases where the user_id might have changed between connect invocations 
                 let checkpointRequestStateSeed = Task {
                     try await syncClient.seedCheckpointRequestState(lastCheckpointRequestId: lastCheckpointRequestId)
                 }
@@ -573,7 +648,7 @@ private struct ActiveSyncIteration: Sendable {
         case .flushFileSystem:
             // Noop on native platforms.
             break;
-        case .didCompleteSync(appliedCheckpointRequestId: let appliedCheckpointRequestId):
+        case .didCompleteSync(appliedCheckpointRequestId: _):
             syncClient.db.syncStatus.mutateStatus {
                 $0.internalDownloadError = nil
             }

@@ -16,7 +16,7 @@ public enum CheckpointRequestError: Error, LocalizedError {
 
     /// The active connection was not configured to use checkpoint requests.
     ///
-    /// Reconnect with ``ConnectOptions/checkpointMode`` set to ``CheckpointMode/requests`` before
+    /// Reconnect with ``ConnectOptions/checkpointMode`` set to `.requests()` before
     /// calling ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
     case checkpointRequestsNotEnabled
 
@@ -30,7 +30,7 @@ public enum CheckpointRequestError: Error, LocalizedError {
         case .notConnecting:
             return "Checkpoint requests require an active or connecting sync client."
         case .checkpointRequestsNotEnabled:
-            return "The active connection was not configured to use checkpoint requests. Connect with checkpointMode set to .requests."
+            return "The active connection was not configured to use checkpoint requests. Connect with checkpointMode set to .requests()."
         case .operationFailed(let message, let underlyingError):
             var description = "The checkpoint request could not be completed."
             if let message {
@@ -101,7 +101,7 @@ public protocol CheckpointRequest: Sendable {
     /// - Throws: ``CheckpointWaitError`` when no sync client is active, when the sync client
     ///   disconnects before the checkpoint is reached, or when a sync error is present or reached
     ///   while waiting. Throws ``CheckpointRequestError/checkpointRequestsNotEnabled``
-    ///   when the active connection was not configured with ``CheckpointMode/requests``.
+    ///   when the active connection was not configured with `.requests()`.
     func waitForSync() async throws
 
     /// Waits until this checkpoint has been synced locally, or until a timeout elapses.

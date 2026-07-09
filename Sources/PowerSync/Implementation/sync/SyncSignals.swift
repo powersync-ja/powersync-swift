@@ -24,6 +24,7 @@ final class SyncSignals: Sendable {
         /// failures surface through the normal sync download error path instead.
         var failure: (any Error)?
         var nextWaiterId: Int64 = 0
+        var downloadRetryWakeGeneration: Int64 = 0
         /// Pending checkpoint requests blocked before creating request IDs.
         ///
         /// These resume once connect-time checkpoint request state has been seeded or affirmed
@@ -104,7 +105,7 @@ final class SyncSignals: Sendable {
     ///
     /// Registering a waiter here also wakes the download loop from its retry delay so connect-time
     /// validation can run promptly after a failed connection attempt.
-    func waitForCheckpointRequestsReady() async throws {
+    func waitForCheckpointRequestsReady(wakeDownloadLoop: Bool = true) async throws {
         let initialState = pendingCheckpointRequests.withLock { state in
             (isReady: state.isReady, failure: state.failure)
         }
@@ -119,10 +120,10 @@ final class SyncSignals: Sendable {
         enum ImmediateResult {
             case ready
             case failed(any Error)
-            case registered(waiterId: Int64)
+            case registered(waiterId: Int64, shouldWakeDownloadLoop: Bool)
         }
 
-        var didRegisterWaiter = false
+        var shouldSignalDownloadLoop = false
         // This is a one-shot wait; `AsyncThrowingStream` is a convenience because `onTermination`
         // lets us remove the registered waiter when the waiting task is cancelled.
         let stream = AsyncThrowingStream<Void, any Error> { continuation in
@@ -136,8 +137,11 @@ final class SyncSignals: Sendable {
 
                 state.nextWaiterId += 1
                 let waiterId = state.nextWaiterId
+                if wakeDownloadLoop {
+                    state.downloadRetryWakeGeneration += 1
+                }
                 state.waiters.append(PendingCheckpointRequestWaiter(id: waiterId, continuation: continuation))
-                return .registered(waiterId: waiterId)
+                return .registered(waiterId: waiterId, shouldWakeDownloadLoop: wakeDownloadLoop)
             }
 
             switch immediateResult {
@@ -145,8 +149,8 @@ final class SyncSignals: Sendable {
                 continuation.finish()
             case .failed(let error):
                 continuation.finish(throwing: error)
-            case .registered(let waiterId):
-                didRegisterWaiter = true
+            case .registered(let waiterId, let shouldWakeDownloadLoop):
+                shouldSignalDownloadLoop = shouldWakeDownloadLoop
                 continuation.onTermination = { @Sendable _ in
                     self.pendingCheckpointRequests.withLock { state in
                         state.waiters.removeAll { $0.id == waiterId }
@@ -155,7 +159,7 @@ final class SyncSignals: Sendable {
             }
         }
 
-        if didRegisterWaiter {
+        if shouldSignalDownloadLoop {
             // Wake the download loop only after the waiter is registered, so
             // `waitForRetryDelayOrPendingCheckpointRequest` observes it when re-checking.
             signalPendingCheckpointRequestWaitingForReady.dispatch(event: ())
@@ -177,7 +181,7 @@ final class SyncSignals: Sendable {
             return
         }
 
-        let initialWaiterId = pendingCheckpointRequests.withLock { $0.nextWaiterId }
+        let initialWakeGeneration = pendingCheckpointRequests.withLock { $0.downloadRetryWakeGeneration }
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
@@ -187,7 +191,7 @@ final class SyncSignals: Sendable {
             group.addTask {
                 let stream = self.signalPendingCheckpointRequestWaitingForReady.subscribe(bufferingPolicy: .bufferingNewest(1))
                 // A waiter may have registered between the initial snapshot and this subscription.
-                if self.pendingCheckpointRequests.withLock({ $0.nextWaiterId > initialWaiterId }) {
+                if self.pendingCheckpointRequests.withLock({ $0.downloadRetryWakeGeneration > initialWakeGeneration }) {
                     return
                 }
 
