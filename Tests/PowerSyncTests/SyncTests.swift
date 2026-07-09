@@ -349,6 +349,7 @@ class InMemorySyncIntegrationTests {
 
         // The connect-time seed consumes request ID 1, so the upload's write checkpoint is 2.
         try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
+        try #require(db.currentStatus.uploadError == nil)
         try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
         try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
             checksum: 0,
