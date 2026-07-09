@@ -308,7 +308,11 @@ class InMemorySyncIntegrationTests {
 
     @Test func uploadsWritesMadeBeforeConnecting() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { request in channel }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { request in channel },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
 
         try await useDatabase(mockClient) { db in
             try await db.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["local write"])
@@ -318,7 +322,7 @@ class InMemorySyncIntegrationTests {
             try #require(try await query.next() == ["local write"])
 
             // The connect-time seed consumes request ID 1, so the upload's write checkpoint is 2.
-            try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
+            try await waitUntil { checkpointRequests.contains(2) }
             try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
             try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
                 checksum: 0,
@@ -335,7 +339,11 @@ class InMemorySyncIntegrationTests {
     
     @Test @MainActor func recoversFromUploadErrors() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { request in channel }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { request in channel },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
         var isFirstUpload = true
 
         try await useDatabaseOnMainActor(mockClient) { db in
@@ -354,7 +362,7 @@ class InMemorySyncIntegrationTests {
             try #require(try await query.next() == ["local write"])
 
             // The connect-time seed consumes request ID 1, so the upload's write checkpoint is 2.
-            try await waitUntil { mockClient.checkpointRequestIds.contains(2) }
+            try await waitUntil { checkpointRequests.contains(2) }
             try #require(db.currentStatus.uploadError == nil)
             try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
             try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
@@ -376,13 +384,15 @@ class InMemorySyncIntegrationTests {
     @Test @MainActor func uploadsOfflineWrites() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let allowConnection = Mutex(false)
-        let mockClient = MockHttpClient { _ in
-            if allowConnection.withLock({ $0 }) {
-                return channel
-            }
-            throw PowerSyncError.operationFailed(message: "Fake IO error for test", underlyingError: nil)
-        }
-        mockClient.checkpointRequestResponse = 1
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in
+                if allowConnection.withLock({ $0 }) {
+                    return channel
+                }
+                throw PowerSyncError.operationFailed(message: "Fake IO error for test", underlyingError: nil)
+            },
+            checkpointRequestHook: { _ in .checkpointRequestId(1) }
+        )
 
         try await useDatabaseOnMainActor(mockClient) { db in
             // Connect but simulate an IO error from an offline device.
@@ -459,7 +469,11 @@ class InMemorySyncIntegrationTests {
 
     @Test func retriesCurrentCheckpointRequestUntilApplied() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { _ in channel }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in channel },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
         try await withFastCheckpointRequestRetries {
             try await useDatabase(mockClient) { db in
                 try await db.connect(
@@ -472,7 +486,7 @@ class InMemorySyncIntegrationTests {
 
                 // The connect-time seed consumes request ID 1, so this request is ID 2.
                 try await waitUntil(attempts: 5) {
-                    mockClient.checkpointRequestIds.filter { $0 == 2 }.count >= 2
+                    checkpointRequests.count(of: 2) >= 2
                 }
 
                 try await channel.pushLine(.fullCheckpoint(Checkpoint(
@@ -490,7 +504,11 @@ class InMemorySyncIntegrationTests {
 
     @Test func checkpointRequestRetryWaitsAgainAfterNewRequest() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { _ in channel }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in channel },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
         try await withFastCheckpointRequestRetries {
             try await useDatabase(mockClient) { db in
                 try await db.connect(
@@ -506,16 +524,20 @@ class InMemorySyncIntegrationTests {
                 // The second request advances the current sequence to 3. The retry interval should restart
                 // from that newer request instead of retrying request 2 first.
                 try await waitUntil(attempts: 500) {
-                    mockClient.checkpointRequestIds.filter { $0 == 3 }.count >= 2
+                    checkpointRequests.count(of: 3) >= 2
                 }
-                try #require(mockClient.checkpointRequestIds.filter { $0 == 2 }.count == 1)
+                try #require(checkpointRequests.count(of: 2) == 1)
             }
         }
     }
 
     @Test func disconnectStopsCheckpointRequestRetryLoop() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { _ in channel }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in channel },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
         try await withFastCheckpointRequestRetries {
             try await useDatabase(mockClient) { db in
                 try await db.connect(
@@ -526,20 +548,24 @@ class InMemorySyncIntegrationTests {
 
                 _ = try await db.requestCheckpoint()
                 try await waitUntil(attempts: 500) {
-                    mockClient.checkpointRequestIds.filter { $0 == 2 }.count >= 2
+                    checkpointRequests.count(of: 2) >= 2
                 }
 
                 try await db.disconnect()
-                let requestIdsAfterDisconnect = mockClient.checkpointRequestIds
+                let requestIdsAfterDisconnect = checkpointRequests.ids
                 try await sleepForSeconds(seconds: 0.15)
-                try #require(mockClient.checkpointRequestIds == requestIdsAfterDisconnect)
+                try #require(checkpointRequests.ids == requestIdsAfterDisconnect)
             }
         }
     }
 
     @Test func disconnectCancelsDefaultCheckpointRequestRetryDelay() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { _ in channel }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in channel },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
 
         try await useDatabase(mockClient) { db in
             try await db.connect(
@@ -549,7 +575,7 @@ class InMemorySyncIntegrationTests {
             await waitForStatus(db.currentStatus) { $0.connected }
 
             _ = try await db.requestCheckpoint()
-            try #require(mockClient.checkpointRequestIds == [1, 2])
+            try #require(checkpointRequests.ids == [1, 2])
 
             try await sleepForSeconds(seconds: 0.05)
             let start = Date()
@@ -638,11 +664,15 @@ class InMemorySyncIntegrationTests {
 
     @Test func checkpointRequestRemainsUsableAcrossReconnects() async throws {
         let channels = Mutex<[AsyncThrowingChannel<PowerSync.SyncLine, any Error>]>([])
-        let mockClient = MockHttpClient { _ in
-            let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-            channels.withLock { $0.append(channel) }
-            return channel
-        }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in
+                let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+                channels.withLock { $0.append(channel) }
+                return channel
+            },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
 
         try await useDatabase(mockClient) { db in
             try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests()))
@@ -650,7 +680,7 @@ class InMemorySyncIntegrationTests {
 
             let checkpoint = try await db.requestCheckpoint()
             // The connect-time seed consumes request ID 1, so the explicit request is ID 2.
-            try #require(mockClient.checkpointRequestIds == [1, 2])
+            try #require(checkpointRequests.ids == [1, 2])
             try #require(!checkpoint.hasSynced)
 
             try await db.disconnect()
@@ -665,7 +695,7 @@ class InMemorySyncIntegrationTests {
 
             try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests()))
             // The new connection re-affirms the persisted request counter with the service.
-            try await waitUntil { mockClient.checkpointRequestIds == [1, 2, 2] }
+            try await waitUntil { checkpointRequests.ids == [1, 2, 2] }
             try await waitUntil { channels.withLock { $0.count } >= 2 }
             await waitForStatus(db.currentStatus) { $0.connected }
 
@@ -689,10 +719,15 @@ class InMemorySyncIntegrationTests {
 
     @Test func requestCheckpointFailsWhenDisconnectedBeforeReady() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient(handleSyncLines: { _ in channel }, checkpointRequestHook: { _ in
-            // Block the connect-time seed request so checkpoint requests never become ready.
-            try? await Task.sleep(nanoseconds: 60_000_000_000)
-        })
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in channel },
+            checkpointRequestHook: checkpointRequests.handler { request in
+                // Block the connect-time seed request so checkpoint requests never become ready.
+                try? await Task.sleep(nanoseconds: 60_000_000_000)
+                return .checkpointRequestId(request.requestId)
+            }
+        )
 
         try await useDatabase(mockClient) { db in
             try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests()))
@@ -708,18 +743,19 @@ class InMemorySyncIntegrationTests {
             }
 
             // Wait for the blocked seed request to arrive so the client is mid-validation.
-            try await waitUntil { mockClient.checkpointRequestIds.count >= 1 }
+            try await waitUntil { checkpointRequests.ids.count >= 1 }
             try await db.disconnect()
             await request.value
         }
     }
 
     @Test func requestCheckpointThrowsInstanceNotSupportedWhenServiceDoesNotSupportEndpoint() async throws {
-        let mockClient = MockHttpClient { _ in AsyncThrowingChannel<PowerSync.SyncLine, any Error>() }
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in AsyncThrowingChannel<PowerSync.SyncLine, any Error>() },
+            checkpointRequestHook: { _ in .statusCode(404) }
+        )
         // The endpoint is missing on this service, so every request fails. A new sync iteration
         // revalidates checkpoint request support, so the failure must be persistent.
-        mockClient.checkpointRequestFailuresRemaining = .max
-        mockClient.checkpointRequestFailureStatusCode = 404
 
         try await useDatabase(mockClient) { db in
             try await db.connect(
@@ -746,11 +782,12 @@ class InMemorySyncIntegrationTests {
 
     @Test func streamErrorIsPreferredWhenCheckpointRequestValidationAlsoFails() async throws {
         let streamErrorMessage = "Fake stream error for test"
-        let mockClient = MockHttpClient { _ in
-            throw PowerSyncError.operationFailed(message: streamErrorMessage)
-        }
-        mockClient.checkpointRequestFailuresRemaining = .max
-        mockClient.checkpointRequestFailureStatusCode = 404
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in
+                throw PowerSyncError.operationFailed(message: streamErrorMessage)
+            },
+            checkpointRequestHook: { _ in .statusCode(404) }
+        )
 
         try await useDatabase(mockClient) { db in
             try await db.connect(
@@ -770,16 +807,25 @@ class InMemorySyncIntegrationTests {
 
     @Test func requestCheckpointUsesEffectiveCheckpointId() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { request in channel }
-        mockClient.checkpointRequestStateResponses = [nil]
-        mockClient.checkpointRequestResponse = 5
+        let checkpointResponses = Mutex<[Int64?]>([nil, 5])
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { request in channel },
+            checkpointRequestHook: checkpointRequests.handler { request in
+                let response = checkpointResponses.withLock { responses in
+                    responses.isEmpty ? nil : responses.removeFirst()
+                }
+
+                return .checkpointRequestId(response ?? request.requestId)
+            }
+        )
 
         try await useDatabase(mockClient) { db in
             try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests()))
             await waitForStatus(db.currentStatus) { $0.connected }
 
             let checkpoint = try await db.requestCheckpoint()
-            try #require(mockClient.checkpointRequestIds == [1, 2])
+            try #require(checkpointRequests.ids == [1, 2])
             try #require(try await lastRequestedCheckpointRequestId(db) == 2)
 
             try await channel.pushLine(.fullCheckpoint(Checkpoint(
@@ -796,8 +842,11 @@ class InMemorySyncIntegrationTests {
 
     @Test func requestCheckpointAllowsLowerEffectiveCheckpointId() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { request in channel }
-        mockClient.checkpointRequestResponse = 1
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { request in channel },
+            checkpointRequestHook: checkpointRequests.handler { _ in .checkpointRequestId(1) }
+        )
 
         try await useDatabase(mockClient) { db in
             try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests()))
@@ -805,7 +854,7 @@ class InMemorySyncIntegrationTests {
             _ = try await db.requestCheckpoint()
 
             let checkpoint = try await db.requestCheckpoint()
-            try #require(mockClient.checkpointRequestIds == [1, 2, 3])
+            try #require(checkpointRequests.ids == [1, 2, 3])
             try #require(try await lastRequestedCheckpointRequestId(db) == 3)
 
             try await channel.pushLine(.fullCheckpoint(Checkpoint(
@@ -824,19 +873,23 @@ class InMemorySyncIntegrationTests {
         let firstAttempt = Signal()
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let connectionCount = Mutex(0)
-        let mockClient = MockHttpClient { _ in
-            let count = connectionCount.withLock {
-                $0 += 1
-                return $0
-            }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in
+                let count = connectionCount.withLock {
+                    $0 += 1
+                    return $0
+                }
 
-            if count == 1 {
-                await firstAttempt.complete()
-                throw PowerSyncError.operationFailed(message: "Fake IO error for test")
-            }
+                if count == 1 {
+                    await firstAttempt.complete()
+                    throw PowerSyncError.operationFailed(message: "Fake IO error for test")
+                }
 
-            return channel
-        }
+                return channel
+            },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
 
         try await useDatabase(mockClient) { db in
             try await db.connect(connector: TestConnector(), options: ConnectOptions(retryDelay: 60, checkpointMode: .requests()))
@@ -858,7 +911,7 @@ class InMemorySyncIntegrationTests {
             // The failed first iteration cancels its seed task, so whether that seed's request
             // reaches the service before cancellation is a scheduling race. The successful
             // iteration always re-affirms ID 1 before the explicit request allocates ID 2.
-            try #require(mockClient.checkpointRequestIds.suffix(2) == [1, 2])
+            try #require(checkpointRequests.ids.suffix(2) == [1, 2])
             try #require(!checkpoint.hasSynced)
         }
     }
@@ -926,11 +979,14 @@ class InMemorySyncIntegrationTests {
     @Test func usesSeededCheckpointRequestCounterOnConnect() async throws {
         let didConnect = Signal()
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { request in
-            await didConnect.complete()
-            return channel
-        }
-        mockClient.checkpointRequestStateResponse = 7
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { request in
+                await didConnect.complete()
+                return channel
+            },
+            checkpointRequestHook: checkpointRequests.handler { _ in .checkpointRequestId(7) }
+        )
 
         try await useDatabase(mockClient) { db in
             try await setTargetCheckpointRequestId(db, 7)
@@ -942,8 +998,7 @@ class InMemorySyncIntegrationTests {
                 try await lastRequestedCheckpointRequestId(db) == 7
             }
 
-            try #require(mockClient.checkpointRequestIds == [7])
-            try #require(mockClient.checkpointRequestStateHints == [7])
+            try #require(checkpointRequests.ids == [7])
             try #require(try await lastRequestedCheckpointRequestId(db) == 7)
             try #require(try await targetCheckpointRequestId(db) == 7)
             try #require(try await nextCheckpointRequestId(db) == 8)
@@ -953,10 +1008,14 @@ class InMemorySyncIntegrationTests {
     @Test func seedsEmptyCheckpointRequestCounterOnConnect() async throws {
         let didConnect = Signal()
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { request in
-            await didConnect.complete()
-            return channel
-        }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { request in
+                await didConnect.complete()
+                return channel
+            },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
 
         try await useDatabase(mockClient) { db in
             try await db.connect(connector: TestConnector(), options: ConnectOptions(checkpointMode: .requests()))
@@ -967,8 +1026,7 @@ class InMemorySyncIntegrationTests {
                 try await lastRequestedCheckpointRequestId(db) == 1
             }
 
-            try #require(mockClient.checkpointRequestIds == [1])
-            try #require(mockClient.checkpointRequestStateHints == [1])
+            try #require(checkpointRequests.ids == [1])
             try #require(try await lastRequestedCheckpointRequestId(db) == 1)
             try #require(try await nextCheckpointRequestId(db) == 2)
         }
@@ -976,7 +1034,11 @@ class InMemorySyncIntegrationTests {
 
     @Test func checkpointRequestConnectorHandlesCheckpointRequests() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { request in channel }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { request in channel },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
         let connector = TestCheckpointRequestConnector()
 
         try await useDatabase(mockClient) { db in
@@ -989,7 +1051,7 @@ class InMemorySyncIntegrationTests {
             let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
             try #require(connector.postedCheckpointClientIds == [clientId, clientId])
             // The service endpoint is never used with a custom checkpoint request connector.
-            try #require(mockClient.checkpointRequestIds.isEmpty)
+            try #require(checkpointRequests.ids.isEmpty)
 
             try await channel.pushLine(.fullCheckpoint(Checkpoint(
                 last_op_id: "0",
@@ -1112,7 +1174,11 @@ class InMemorySyncIntegrationTests {
 
     @Test func checkpointRequestConnectorUploadsUseConnectorCheckpoints() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { request in channel }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { request in channel },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
         let connector = TestCheckpointRequestConnector()
 
         try await useDatabase(mockClient) { db in
@@ -1125,7 +1191,7 @@ class InMemorySyncIntegrationTests {
             // The upload's write checkpoint (ID 2, after the seed consumed ID 1) is posted to the
             // connector instead of the service.
             try await waitUntil { connector.postedCheckpointRequests == [1, 2] }
-            try #require(mockClient.checkpointRequestIds.isEmpty)
+            try #require(checkpointRequests.ids.isEmpty)
             try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
             try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
                 checksum: 0,
@@ -1184,9 +1250,10 @@ class InMemorySyncIntegrationTests {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let mockClient = MockHttpClient(
             handleSyncLines: { _ in channel },
-            checkpointRequestHook: { _ in
+            checkpointRequestHook: { request in
                 await seedStarted.complete()
                 await finishSeed.await()
+                return .checkpointRequestId(request.requestId)
             }
         )
 
@@ -1206,11 +1273,21 @@ class InMemorySyncIntegrationTests {
         let didUpload = Signal()
         let didConnect = Signal()
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { _ in
-            await didConnect.complete()
-            return channel
-        }
-        mockClient.checkpointRequestStateResponse = 9
+        let checkpointResponses = Mutex<[Int64]>([9])
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { _ in
+                await didConnect.complete()
+                return channel
+            },
+            checkpointRequestHook: checkpointRequests.handler { request in
+                let response = checkpointResponses.withLock { responses in
+                    responses.isEmpty ? request.requestId : responses.removeFirst()
+                }
+
+                return .checkpointRequestId(response)
+            }
+        )
 
         try await useDatabase(mockClient) { db in
             try await db.execute(sql: "INSERT INTO users (id, name) VALUES (uuid(), ?)", parameters: ["local write"])
@@ -1222,7 +1299,7 @@ class InMemorySyncIntegrationTests {
 
             await didConnect.await()
             await didUpload.await()
-            try await waitUntil { mockClient.checkpointRequestIds == [1, 10] }
+            try await waitUntil { checkpointRequests.ids == [1, 10] }
             try #require(try await lastRequestedCheckpointRequestId(db) == 10)
             try #require(try await targetCheckpointRequestId(db) == 10)
         }
@@ -1231,10 +1308,14 @@ class InMemorySyncIntegrationTests {
     @Test func seedsConcreteLocalTargetWithoutLastRequestedCheckpointRequestIdOnConnect() async throws {
         let didConnect = Signal()
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
-        let mockClient = MockHttpClient { request in
-            await didConnect.complete()
-            return channel
-        }
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { request in
+                await didConnect.complete()
+                return channel
+            },
+            checkpointRequestHook: checkpointRequests.handler()
+        )
 
         try await useDatabase(mockClient) { db in
             try await setTargetCheckpointRequestId(db, 4)
@@ -1246,8 +1327,7 @@ class InMemorySyncIntegrationTests {
                 try await lastRequestedCheckpointRequestId(db) == 4
             }
 
-            try #require(mockClient.checkpointRequestIds == [4])
-            try #require(mockClient.checkpointRequestStateHints == [4])
+            try #require(checkpointRequests.ids == [4])
             try #require(try await lastRequestedCheckpointRequestId(db) == 4)
             try #require(try await targetCheckpointRequestId(db) == 4)
             try #require(try await nextCheckpointRequestId(db) == 5)
@@ -1260,21 +1340,31 @@ class InMemorySyncIntegrationTests {
         let firstChannel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let secondChannel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let connectionCount = Mutex(0)
-        let mockClient = MockHttpClient { request in
-            let count = connectionCount.withLock {
-                $0 += 1
-                return $0
-            }
+        let checkpointResponses = Mutex<[Int64]>([4, 9])
+        let checkpointRequests = CheckpointRequestRecorder()
+        let mockClient = MockHttpClient(
+            handleSyncLines: { request in
+                let count = connectionCount.withLock {
+                    $0 += 1
+                    return $0
+                }
 
-            if count == 1 {
-                await firstConnect.complete()
-                return firstChannel
-            } else {
-                await secondConnect.complete()
-                return secondChannel
+                if count == 1 {
+                    await firstConnect.complete()
+                    return firstChannel
+                } else {
+                    await secondConnect.complete()
+                    return secondChannel
+                }
+            },
+            checkpointRequestHook: checkpointRequests.handler { request in
+                let response = checkpointResponses.withLock { responses in
+                    responses.isEmpty ? request.requestId : responses.removeFirst()
+                }
+
+                return .checkpointRequestId(response)
             }
-        }
-        mockClient.checkpointRequestStateResponses = [4, 9]
+        )
 
         try await useDatabase(mockClient) { db in
             try await setTargetCheckpointRequestId(db, 4)
@@ -1284,8 +1374,7 @@ class InMemorySyncIntegrationTests {
             try await waitUntilAsync {
                 try await lastRequestedCheckpointRequestId(db) == 4
             }
-            try #require(mockClient.checkpointRequestIds == [4])
-            try #require(mockClient.checkpointRequestStateHints == [4])
+            try #require(checkpointRequests.ids == [4])
 
             try await setTargetCheckpointRequestId(db, 9)
             firstChannel.finish()
@@ -1293,15 +1382,10 @@ class InMemorySyncIntegrationTests {
             try await waitUntilAsync {
                 try await lastRequestedCheckpointRequestId(db) == 9
             }
-            let requestIds = mockClient.checkpointRequestIds
+            let requestIds = checkpointRequests.ids
             let firstSeedIndex = try #require(requestIds.firstIndex(of: 4))
             let secondSeedIndex = try #require(requestIds.firstIndex(of: 9))
             try #require(firstSeedIndex < secondSeedIndex)
-
-            let stateHints = mockClient.checkpointRequestStateHints
-            let firstHintIndex = try #require(stateHints.firstIndex(of: 4))
-            let secondHintIndex = try #require(stateHints.firstIndex(of: 9))
-            try #require(firstHintIndex < secondHintIndex)
         }
     }
 
@@ -1936,6 +2020,33 @@ private func withFastCheckpointRequestRetries<T>(_ operation: () async throws ->
     defer { StreamingSyncClient.minimumCheckpointRequestRetryDelay = previousMinimum }
 
     return try await operation()
+}
+
+private final class CheckpointRequestRecorder: @unchecked Sendable {
+    private let requestIds = Mutex<[Int64]>([])
+
+    var ids: [Int64] {
+        requestIds.withLock { $0 }
+    }
+
+    func contains(_ requestId: Int64) -> Bool {
+        requestIds.withLock { $0.contains(requestId) }
+    }
+
+    func count(of requestId: Int64) -> Int {
+        requestIds.withLock { $0.filter { $0 == requestId }.count }
+    }
+
+    func handler(
+        response: @Sendable @escaping (MockCheckpointRequest) async throws -> MockCheckpointRequestResponse = { request in
+            .checkpointRequestId(request.requestId)
+        }
+    ) -> @Sendable (MockCheckpointRequest) async throws -> MockCheckpointRequestResponse {
+        { request in
+            self.requestIds.withLock { $0.append(request.requestId) }
+            return try await response(request)
+        }
+    }
 }
 
 private func setTargetCheckpointRequestId(_ db: any PowerSyncDatabaseProtocol, _ requestId: Int64) async throws {

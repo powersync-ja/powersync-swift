@@ -5,15 +5,11 @@ import Testing
 
 final class MockHttpClient: HttpClient {
     private let _writeCheckpoint = PowerSync.Mutex(1000)
-    private let _checkpointRequestIds = PowerSync.Mutex<[Int64]>([])
-    private let _checkpointRequestResponse = PowerSync.Mutex<Int64?>(nil)
-    private let _checkpointRequestStateResponses = PowerSync.Mutex<[Int64?]>([])
-    private let _checkpointRequestStateHints = PowerSync.Mutex<[Int64?]>([])
-    private let _checkpointRequestFailuresRemaining = PowerSync.Mutex(0)
-    private let _checkpointRequestFailureStatusCode = PowerSync.Mutex(500)
+    /// Request paths observed by the mock, useful when tests need to assert call order.
     private let _requestPaths = PowerSync.Mutex<[String]>([])
     let handleSyncLines: @Sendable (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>
-    let checkpointRequestHook: (@Sendable (_ requestId: Int64) async -> Void)?
+    /// Handles `/sync/checkpoint-request` after the mock decodes and validates the request body.
+    let checkpointRequestHook: @Sendable (_ request: MockCheckpointRequest) async throws -> MockCheckpointRequestResponse
     
     var writeCheckpoint: Int {
         get {
@@ -24,66 +20,15 @@ final class MockHttpClient: HttpClient {
         }
     }
 
-    var checkpointRequestIds: [Int64] {
-        _checkpointRequestIds.withLock { $0 }
-    }
-
-    var checkpointRequestResponse: Int64? {
-        get {
-            _checkpointRequestResponse.withLock { $0 }
-        }
-        set {
-            _checkpointRequestResponse.withLock { $0 = newValue }
-        }
-    }
-
-    var checkpointRequestStateResponse: Int64? {
-        get {
-            _checkpointRequestStateResponses.withLock { $0.first ?? nil }
-        }
-        set {
-            _checkpointRequestStateResponses.withLock { $0 = [newValue] }
-        }
-    }
-
-    var checkpointRequestStateResponses: [Int64?] {
-        get {
-            _checkpointRequestStateResponses.withLock { $0 }
-        }
-        set {
-            _checkpointRequestStateResponses.withLock { $0 = newValue }
-        }
-    }
-
-    var checkpointRequestStateHints: [Int64?] {
-        _checkpointRequestStateHints.withLock { $0 }
-    }
-
-    var checkpointRequestFailuresRemaining: Int {
-        get {
-            _checkpointRequestFailuresRemaining.withLock { $0 }
-        }
-        set {
-            _checkpointRequestFailuresRemaining.withLock { $0 = newValue }
-        }
-    }
-
-    var checkpointRequestFailureStatusCode: Int {
-        get {
-            _checkpointRequestFailureStatusCode.withLock { $0 }
-        }
-        set {
-            _checkpointRequestFailureStatusCode.withLock { $0 = newValue }
-        }
-    }
-
     var requestPaths: [String] {
         _requestPaths.withLock { $0 }
     }
     
     init(
         handleSyncLines: @Sendable @escaping (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>,
-        checkpointRequestHook: (@Sendable (_ requestId: Int64) async -> Void)? = nil
+        checkpointRequestHook: @Sendable @escaping (_ request: MockCheckpointRequest) async throws -> MockCheckpointRequestResponse = { request in
+            .checkpointRequestId(request.requestId)
+        }
     ) {
         self.handleSyncLines = handleSyncLines
         self.checkpointRequestHook = checkpointRequestHook
@@ -115,36 +60,17 @@ final class MockHttpClient: HttpClient {
             #expect(!body.client_id.isEmpty)
             let requestId = try #require(Int64(body.checkpoint_request_id))
             #expect(requestId > 0)
-            _checkpointRequestIds.withLock { $0.append(requestId) }
-            _checkpointRequestStateHints.withLock { $0.append(requestId) }
-            await checkpointRequestHook?(requestId)
+            let checkpointRequest = MockCheckpointRequest(clientId: body.client_id, requestId: requestId)
 
-            let shouldFail = _checkpointRequestFailuresRemaining.withLock { failures in
-                if failures > 0 {
-                    failures -= 1
-                    return true
-                }
-
-                return false
-            }
-            if shouldFail {
-                let statusCode = _checkpointRequestFailureStatusCode.withLock { $0 }
+            switch try await checkpointRequestHook(checkpointRequest) {
+            case .checkpointRequestId(let checkpointRequestId):
+                let responseData = try encodeCheckpointRequestResponse(checkpointRequestId)
+                let response = HTTPURLResponse(url: request.url!, mimeType: "application/json", expectedContentLength: responseData.count, textEncodingName: "utf-8")
+                return (response, responseData)
+            case .statusCode(let statusCode):
                 let response = HTTPURLResponse(url: request.url!, statusCode: statusCode, httpVersion: nil, headerFields: nil)!
                 return (response, Data())
             }
-
-            let configuredStateResponse = _checkpointRequestStateResponses.withLock { responses -> Int64?? in
-                responses.isEmpty ? nil : .some(responses.removeFirst())
-            }
-            let checkpoint: Int64
-            if let configuredStateResponse {
-                checkpoint = configuredStateResponse ?? requestId
-            } else {
-                checkpoint = checkpointRequestResponse ?? requestId
-            }
-            let responseData = try encodeCheckpointRequestResponse(checkpoint)
-            let response = HTTPURLResponse(url: request.url!, mimeType: "application/json", expectedContentLength: responseData.count, textEncodingName: "utf-8")
-            return (response, responseData)
 
         case "/write-checkpoint2.json":
             let checkpoint = writeCheckpoint
@@ -169,6 +95,16 @@ final class MockHttpClient: HttpClient {
         )
         return try StreamingSyncClient.jsonEncoder.encode(response)
     }
+}
+
+struct MockCheckpointRequest: Sendable {
+    let clientId: String
+    let requestId: Int64
+}
+
+enum MockCheckpointRequestResponse: Sendable {
+    case checkpointRequestId(Int64)
+    case statusCode(Int)
 }
 
 private struct MockSyncLineResponse: SyncLineResponse {
