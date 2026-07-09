@@ -5,7 +5,16 @@ fileprivate let tag = "StreamingSyncClient"
 
 final class StreamingSyncClient: Sendable {
     internal static let defaultCheckpointRequestRetryDelay: TimeInterval = 10
-    internal static let minimumCheckpointRequestRetryDelay: TimeInterval = 10
+    private static let minimumCheckpointRequestRetryDelayMutex = Mutex<TimeInterval>(10)
+    /// Mutable so tests can lower the retry floor; production code should keep the default.
+    internal static var minimumCheckpointRequestRetryDelay: TimeInterval {
+        get {
+            minimumCheckpointRequestRetryDelayMutex.withLock { $0 }
+        }
+        set {
+            minimumCheckpointRequestRetryDelayMutex.withLock { $0 = newValue }
+        }
+    }
 
     let db: PowerSyncDatabaseImpl
     let options: ConnectOptions

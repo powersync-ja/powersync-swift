@@ -452,10 +452,7 @@ class InMemorySyncIntegrationTests {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let mockClient = MockHttpClient { _ in channel }
         let db = openDatabase(mockClient)
-        try await db.connect(
-            connector: TestConnector(),
-            options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 0.1))
-        )
+        try await connectWithFastCheckpointRequestRetries(db)
         await waitForStatus(db.currentStatus) { $0.connected }
 
         let checkpoint = try await db.requestCheckpoint()
@@ -480,10 +477,7 @@ class InMemorySyncIntegrationTests {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let mockClient = MockHttpClient { _ in channel }
         let db = openDatabase(mockClient)
-        try await db.connect(
-            connector: TestConnector(),
-            options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 0.1))
-        )
+        try await connectWithFastCheckpointRequestRetries(db)
         await waitForStatus(db.currentStatus) { $0.connected }
 
         _ = try await db.requestCheckpoint()
@@ -1786,6 +1780,17 @@ private func openDatabase(_ client: any HttpClient, schema: Schema = defaultSche
         pool: AsyncConnectionPool(location: .inMemory, logger: DefaultLogger()),
         httpClient: client,
         schema: schema,
+    )
+}
+
+private func connectWithFastCheckpointRequestRetries(_ db: any PowerSyncDatabaseProtocol) async throws {
+    let previousMinimum = StreamingSyncClient.minimumCheckpointRequestRetryDelay
+    StreamingSyncClient.minimumCheckpointRequestRetryDelay = 0
+    defer { StreamingSyncClient.minimumCheckpointRequestRetryDelay = previousMinimum }
+
+    try await db.connect(
+        connector: TestConnector(),
+        options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 0.1))
     )
 }
 

@@ -17,6 +17,7 @@ struct TransactionImpl: Transaction {
         return try self.inner.get(sql: sql, parameters: parameters, mapper: mapper)
     }
     
+    @discardableResult
     static func run<R>(conn: any ConnectionContext, callback: @Sendable (any Transaction) throws -> R) throws -> R {
         let _ = try conn.execute(sql: "BEGIN IMMEDIATE", parameters: nil)
         
