@@ -8,6 +8,7 @@
   avoid conflicts and can share update notifications across the main app and extensions.
 * Fix `SyncStatus.asFlow()` emitting the same object, causing SwiftUI to miss updates.
 * Add the `ObservableSyncStatus` utility, which can be used to track Sync Status updates through an `@Observable` class.
+* Clear `SyncStatus.uploadError` after a successful upload.
 
 ## 1.14.4
 

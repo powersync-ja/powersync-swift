@@ -232,6 +232,9 @@ class InMemorySyncIntegrationTests {
         )])))
         try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
         try #require(try await query.next() == ["from server"])
+
+        // The error should have been cleared after the successful upload
+        await waitForStatus(db.currentStatus) { $0.uploadError == nil && !$0.uploading }
     }
     
     @Test @MainActor func uploadsOfflineWrites() async throws {
