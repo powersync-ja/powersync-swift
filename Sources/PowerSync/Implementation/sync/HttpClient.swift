@@ -79,8 +79,6 @@ struct PlatformHttpClient: HttpClient {
         let (data, response) = try await session.data(for: request)
         return (response as! HTTPURLResponse, data)
     }
-    
-    static let shared = PlatformHttpClient(session: .shared)
 }
 
 /// A wrapper around a ``HttpClient`` emitting log events for responses and sync lines.

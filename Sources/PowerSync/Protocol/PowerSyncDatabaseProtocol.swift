@@ -13,10 +13,21 @@ public struct SyncClientConfiguration: Sendable {
     /// - SeeAlso: `SyncRequestLoggerConfiguration` for configuration options
     public let requestLogger: SyncRequestLoggerConfiguration?
 
+    /// The URL session to use when connecting to the PowerSync service.
+    /// 
+    /// Customizing this may be convenient to add additional headers or to otherwise alter requests
+    /// sent by the PowerSync Swift SDK.
+    public var urlSession: URLSession
+
     /// Creates a new sync client configuration.
     /// - Parameter requestLogger: Optional network logger configuration
-    public init(requestLogger: SyncRequestLoggerConfiguration? = nil) {
+    /// - Parameter urlSession: Optional custom URL session to use for network requests.
+    public init(
+        requestLogger: SyncRequestLoggerConfiguration? = nil,
+        urlSession: URLSession = .shared,
+    ) {
         self.requestLogger = requestLogger
+        self.urlSession = urlSession
     }
 }
 
@@ -101,7 +112,7 @@ public struct ConnectOptions: Sendable {
         params: JsonParam = [:],
         clientConfiguration: SyncClientConfiguration? = nil,
         appMetadata: [String: String] = [:],
-        includeDefaultStreams: Bool = true
+        includeDefaultStreams: Bool = true,
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay

@@ -70,7 +70,7 @@ final class SqlCursorTests: XCTestCase {
             activeInstanceStore: DatabaseGroupCollection(),
             logger: DefaultLogger(),
             pool: AsyncConnectionPool(location: .inMemory, logger: DefaultLogger()),
-            httpClient: PlatformHttpClient.shared,
+            customHttpClient: nil,
             schema: schema,
         )
         try await database.disconnectAndClear()

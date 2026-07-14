@@ -6,7 +6,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     let group: ActiveDatabaseGroup
     let syncStatus = SwiftSyncStatus()
     private let dbFilename: String?
-    private let httpClient: HttpClient
+    private let customHttpClient: HttpClient?
     private let initializer = DatabaseInitializationAction()
     let pool: any SQLiteConnectionPoolProtocol
     let schema: AsyncMutex<Schema>
@@ -17,13 +17,13 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         activeInstanceStore: DatabaseGroupCollection = .shared,
         logger: any LoggerProtocol,
         pool: any SQLiteConnectionPoolProtocol,
-        httpClient: HttpClient,
+        customHttpClient: HttpClient?,
         schema: Schema
     ) {
         self.dbFilename = dbFilename
         self.logger = logger
         self.schema = AsyncMutex(schema)
-        self.httpClient = httpClient
+        self.customHttpClient = customHttpClient
         self.pool = pool
         self.group = activeInstanceStore.referenceGroup(identifier: identifier, logger: logger)
     }
@@ -133,7 +133,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
 
     func connect(connector: any PowerSyncBackendConnectorProtocol, options: ConnectOptions?) async throws {
         try await initialize()
-        await group.syncCoordinator.connect(db: self, connector: connector, options: options ?? ConnectOptions(), client: httpClient)
+        await group.syncCoordinator.connect(db: self, connector: connector, options: options ?? ConnectOptions(), client: customHttpClient)
     }
 
     func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws {
