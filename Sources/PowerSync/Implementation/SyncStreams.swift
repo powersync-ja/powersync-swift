@@ -6,9 +6,9 @@ final class StreamTracker: Sendable {
     /// Returns a snapshot of currently active streams, and a stream that will emit an event for all subsequent
     /// updates to the list of active streams.
     func observeActiveStreams() -> ([StreamKey], AsyncStream<[StreamKey]>) {
-        groups.withLock { groups in
-            let subscription = groups.streamsChanged.subscribe()
-            return (groups.activeStreams, subscription)
+        groups.withLock { state in
+            let subscription = state.streamsChanged.subscribe()
+            return (state.activeStreams, subscription)
         }
     }
 
