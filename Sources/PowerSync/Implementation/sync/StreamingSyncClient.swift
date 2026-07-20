@@ -254,7 +254,8 @@ private struct ActiveSyncIteration: Sendable {
     
     func run(group: inout ThrowingTaskGroup<Void, any Error>?) async throws -> SyncIterationResult {
         // Notify the core extension for changed Sync Stream subscriptions, as we might have to reconnect.
-        async let _ = watchSyncStreams()
+        let (currentStreams, streamChanges) = syncClient.db.group.syncCoordinator.streams.observeActiveStreams()
+        async let _ = watchSyncStreams(changes: streamChanges)
         // Notify the core extension for completed crud uploads, as we might want to retry applying a
         // checkpoint in that case.
         async let _ = watchCompletedCrudUploads()
@@ -263,7 +264,7 @@ private struct ActiveSyncIteration: Sendable {
             parameters: syncClient.options.params,
             schema: await syncClient.db.schema.inner,
             includeDefaults: syncClient.options.includeDefaultStreams,
-            activeStreams: syncClient.db.group.syncCoordinator.streams.currentStreams,
+            activeStreams: currentStreams,
             appMetadata: syncClient.options.appMetadata,
         )))
 
@@ -376,8 +377,7 @@ private struct ActiveSyncIteration: Sendable {
         }
     }
     
-    private func watchSyncStreams() async throws {
-        let changes = syncClient.db.group.syncCoordinator.streams.streamsChanged.subscribe()
+    private func watchSyncStreams(changes: AsyncStream<[StreamKey]>) async throws {
         for await change in changes {
             self.localEvents.dispatch(event: .updateSubscriptions(streams: change))
         }
