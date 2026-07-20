@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.15.0
 
 * `PowerSyncDatabase(dbFilename:)` now accepts an absolute path (starting with `/`), used
   as-is so the database can live in an App Group container shared with app extensions.
