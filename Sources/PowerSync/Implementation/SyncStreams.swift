@@ -1,7 +1,6 @@
 import Foundation
 
 final class StreamTracker: Sendable {
-    // For each active stream key, how many StreamSubscription instances are active in that key.
     private let groups: Mutex<ActiveStreamsState> = Mutex(ActiveStreamsState())
 
     /// Returns a snapshot of currently active streams, and a stream that will emit an event for all subsequent
@@ -50,6 +49,7 @@ final class StreamTracker: Sendable {
 }
 
 fileprivate class ActiveStreamsState {
+    // For each active stream key, how many StreamSubscription instances are active in that key.
     var groups: Dictionary<StreamKey, Int> = [:]
     let streamsChanged = BroadcastStream<[StreamKey]>()
 
