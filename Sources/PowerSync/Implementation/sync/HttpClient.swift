@@ -53,26 +53,56 @@ struct PlatformHttpClient: HttpClient {
             )
         }
 
-        struct PlatformSyncLineResponse<Base>: SyncLineResponse where Base : AsyncSequence, Base.Element == UInt8, Base: Sendable {
-            let lines: AsyncLineSequence<Base>
+        struct PlatformSyncLineResponse: SyncLineResponse {
+            let lines: URLSession.AsyncBytes
 
             func makeAsyncIterator() -> some SyncLineResponseIterator {
-                return PlatformSyncLineResponseIterator<Base>(inner: lines.makeAsyncIterator())
+                return PlatformSyncLineResponseIterator(inner: lines.makeAsyncIterator())
             }
         }
 
-        struct PlatformSyncLineResponseIterator<Base>: SyncLineResponseIterator where Base : AsyncSequence, Base.Element == UInt8, Base: Sendable {
+        struct PlatformSyncLineResponseIterator: SyncLineResponseIterator {
             typealias Element = SyncLine
 
-            var inner: AsyncLineSequence<Base>.AsyncIterator
+            var inner: URLSession.AsyncBytes.AsyncIterator
+            var buffer: Array<UInt8> = []
 
             mutating func next() async throws -> SyncLine? {
-                let line = try await inner.next()
+                // Read a line from the response stream. This doesn't use AsyncLineSequence as that splits on other
+                // unicode characters (like \u2028) as well, which the service includes in responses without escaping.
+                let line = try await readLine()
                 return line.map { SyncLine.text(contents: $0) }
+            }
+            
+            private mutating func takeLineFromBuffer() -> String? {
+                if buffer.isEmpty {
+                    return nil
+                }
+
+                defer {
+                    buffer.removeAll(keepingCapacity: true)
+                }
+                return String(decoding: buffer, as: UTF8.self)
+            }
+
+            private mutating func readLine() async throws -> String? {
+                while let first = try await inner.next() {
+                    switch first {
+                    case 10: // \n
+                        guard let result = takeLineFromBuffer() else {
+                            continue
+                        }
+                        return result
+                    default:
+                        buffer.append(first)
+                    }
+                }
+                
+                return takeLineFromBuffer()
             }
         }
 
-        return (response, PlatformSyncLineResponse(lines: bytes.lines))
+        return (response, PlatformSyncLineResponse(lines: bytes))
     }
     
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data) {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.15.1
+
+- Fix `invalid text line. cause: EOF while parsing a string` errors during sync when
+  a synced row contains an unusual line break (like `\u2028`).
+
 ## 1.15.0
 
 * `PowerSyncDatabase(dbFilename:)` now accepts an absolute path (starting with `/`), used
