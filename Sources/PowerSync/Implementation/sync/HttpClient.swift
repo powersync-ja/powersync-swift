@@ -30,10 +30,8 @@ extension URLSession: PowerSyncUrlSession {
 
 extension PowerSyncUrlSession {
     var client: HttpClient {
-        get {
-            let client = SpecializedHttpClient<Self>(session: self)
-            return HttpClient.init(client)
-        }
+        let client = SpecializedHttpClient<Self>(session: self)
+        return HttpClient.init(client)
     }
 }
 
@@ -64,18 +62,23 @@ struct SpecializedHttpClient<Session: PowerSyncUrlSession> {
 
     func receiveSyncLines(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, SyncLineResponse) {
         logger?.logRequest(request: request)
-        let (response, bytes) = try await session.readStreamed(request: request)
-        logger?.logResponse(response: response)
-        let jsonStreamMimeType = "application/x-ndjson"
+        do {
+            let (response, bytes) = try await session.readStreamed(request: request)
+            logger?.logResponse(response: response)
+            let jsonStreamMimeType = "application/x-ndjson"
 
-        if response.mimeType != jsonStreamMimeType {
-            throw UnexpectedResponseError(
-                response: response,
-                message: "Invalid sync lines response, (expected \(jsonStreamMimeType), got \(response.mimeType, default: "")"
-            )
+            if response.mimeType != jsonStreamMimeType {
+                throw UnexpectedResponseError(
+                    response: response,
+                    message: "Invalid sync lines response, (expected \(jsonStreamMimeType), got \(response.mimeType, default: "")"
+                )
+            }
+
+            return (response, SyncLineResponse(SpecializedSyncLineResponse<Session.Response>(source: bytes, logging: logger)))
+        } catch {
+            logger?.logError(error: error)
+            throw error
         }
-
-        return (response, SyncLineResponse(SpecializedSyncLineResponse<Session.Response>(source: bytes, logging: logger)))
     }
 
     func readFully(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, Data) {
