@@ -36,7 +36,7 @@ public func PowerSyncDatabase(
         activeInstanceStore: group,
         logger: logger,
         pool: pool,
-        customHttpSession: nil as URLSession?,
+        customHttpClient: nil,
         schema: schema
     )
 }
@@ -66,7 +66,7 @@ public func OpenedPowerSyncDatabase(
         identifier: identifier,
         logger: logger,
         pool: pool,
-        customHttpSession: nil as URLSession?,
+        customHttpClient: nil,
         schema: schema
     )
 }

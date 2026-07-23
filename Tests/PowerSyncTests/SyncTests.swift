@@ -980,13 +980,13 @@ let defaultSchema = Schema(tables: [
     ),
 ])
 
-private func openDatabase(_ client: MockHttpSession, schema: Schema = defaultSchema, logger: any LoggerProtocol = DefaultLogger()) -> PowerSyncDatabaseProtocol {
+private func openDatabase(_ session: MockHttpSession, schema: Schema = defaultSchema, logger: any LoggerProtocol = DefaultLogger()) -> PowerSyncDatabaseProtocol {
     return PowerSyncDatabaseImpl(
         identifier: ":memory:",
         activeInstanceStore: DatabaseGroupCollection(),
         logger: logger,
         pool: AsyncConnectionPool(location: .inMemory, logger: DefaultLogger()),
-        customHttpSession: client,
+        customHttpClient: session.client,
         schema: schema,
     )
 }

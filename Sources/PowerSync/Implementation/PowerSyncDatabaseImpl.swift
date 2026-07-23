@@ -6,24 +6,24 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     let group: ActiveDatabaseGroup
     let syncStatus = SwiftSyncStatus()
     private let dbFilename: String?
-    private let customHttpClient: BoxedHttpClient?
+    private let customHttpClient: HttpClient?
     private let initializer = DatabaseInitializationAction()
     let pool: any SQLiteConnectionPoolProtocol
     let schema: AsyncMutex<Schema>
 
-    init<Session: PowerSyncUrlSession>(
+    init(
         dbFilename: String? = nil,
         identifier: String,
         activeInstanceStore: DatabaseGroupCollection = .shared,
         logger: any LoggerProtocol,
         pool: any SQLiteConnectionPoolProtocol,
-        customHttpSession: Session?,
+        customHttpClient: HttpClient?,
         schema: Schema
     ) {
         self.dbFilename = dbFilename
         self.logger = logger
         self.schema = AsyncMutex(schema)
-        self.customHttpClient = customHttpSession.map { session in HttpClient<Session>(session: session) }
+        self.customHttpClient = customHttpClient
         self.pool = pool
         self.group = activeInstanceStore.referenceGroup(identifier: identifier, logger: logger)
     }

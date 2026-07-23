@@ -13,20 +13,6 @@ protocol PowerSyncUrlSession: Sendable where Response: AsyncSequence, Response: 
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data)
 }
 
-/// An internal protocol for HTTP clients.
-/// 
-/// This should only be implemented in this file, the protocol exists because the implementation
-/// has a generic parameter we want to ignore in the rest of the SDK.
-protocol BoxedHttpClient: Sendable {
-    /// Start streaming a `/sync/stream` response body, emitting individual lines.
-    ///
-    /// Throws an ``UnexpectedResponseError`` if the response can't be interpreted as sync lines, the response
-    /// iterator throws an ``UnexpectedEndOfStreamError`` when the response ends in the middle of a line.
-    func receiveSyncLines(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, any SyncLineResponse)
-
-    /// Read a full response body.
-    func readFully(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, Data)
-}
 
 extension URLSession: PowerSyncUrlSession {
     typealias Response = AsyncBytes
@@ -42,18 +28,41 @@ extension URLSession: PowerSyncUrlSession {
     }
 }
 
-struct HttpClient<Session: PowerSyncUrlSession>: BoxedHttpClient {
+extension PowerSyncUrlSession {
+    var client: HttpClient {
+        get {
+            let client = SpecializedHttpClient<Self>(session: self)
+            return HttpClient.init(client)
+        }
+    }
+}
+
+/// An internal HTTP client implementation.
+/// 
+/// This only exposes HTTP functionality required by the sync client, it is not a general-purpose
+/// HTTP client.
+struct HttpClient {
+    // Use closures to keep the actual client specialized for the real / mocked url session.
+    private let _receiveSyncLines: @Sendable (URLRequest, SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, SyncLineResponse)
+    private let _readFully: @Sendable (URLRequest, SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, Data)
+
+    fileprivate init<Session: PowerSyncUrlSession>(_ client: SpecializedHttpClient<Session>) {
+        _receiveSyncLines = { try await client.receiveSyncLines(request: $0, logger: $1) }
+        _readFully = { try await client.readFully(request: $0, logger: $1) }
+    }
+
+    func receiveSyncLines(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, SyncLineResponse) {
+        try await _receiveSyncLines(request, logger)
+    }
+    func readFully(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, Data) {
+        try await _readFully(request, logger)
+    }
+}
+
+struct SpecializedHttpClient<Session: PowerSyncUrlSession> {
     let session: Session
 
-    func receiveSyncLines(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, any SyncLineResponse) {
-        return try await _receiveSyncLines(request: request, logger: logger)
-    }
-
-    func readFully(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, Data) {
-        return try await _readFully(request: request, logger: logger)
-    }
-
-    func _receiveSyncLines(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, some SyncLineResponse) {
+    func receiveSyncLines(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, SyncLineResponse) {
         logger?.logRequest(request: request)
         let (response, bytes) = try await session.readStreamed(request: request)
         logger?.logResponse(response: response)
@@ -66,10 +75,10 @@ struct HttpClient<Session: PowerSyncUrlSession>: BoxedHttpClient {
             )
         }
 
-        return (response, SyncLineResponseImpl(source: bytes, logging: logger))
+        return (response, SyncLineResponse(SpecializedSyncLineResponse<Session.Response>(source: bytes, logging: logger)))
     }
 
-    func _readFully(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, Data) {
+    func readFully(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, Data) {
         logger?.logRequest(request: request)
         do {
             let (response, data) = try await session.readFully(request: request)
@@ -101,25 +110,47 @@ struct UnexpectedEndOfStreamError: Error, CustomDebugStringConvertible {
 }
 
 
-protocol SyncLineResponse: Sendable, AsyncSequence where AsyncIterator: SyncLineResponseIterator {}
+/// A response to a `/sync/stream` request, split into individual lines.
+struct SyncLineResponse: AsyncSequence, Sendable {
+    typealias Element = SyncLine
 
-protocol SyncLineResponseIterator: AsyncIteratorProtocol {
-    mutating func next() async throws -> SyncLine?
-}
+    private let _makeAsyncIterator: @Sendable () -> SyncLineResponseIterator
 
-struct SyncLineResponseImpl<Source: AsyncSequence & Sendable>: SyncLineResponse where Source.Element == UInt8 {
-    let source: Source
-    let logging: SyncRequestLoggerConfiguration?
+    fileprivate init<Source: AsyncSequence & Sendable>(_ response: SpecializedSyncLineResponse<Source>) where Source.Element == UInt8 {
+        _makeAsyncIterator = { SyncLineResponseIterator(response.makeAsyncIterator()) }
+    }
 
-    func makeAsyncIterator() -> some SyncLineResponseIterator {
-        return SyncLineResponseIteratorImpl<Source>(source: source.makeAsyncIterator(), logging: logging)
+    func makeAsyncIterator() -> SyncLineResponseIterator {
+        _makeAsyncIterator()
     }
 }
 
-struct SyncLineResponseIteratorImpl<Source: AsyncSequence>: SyncLineResponseIterator where Source.Element == UInt8 {
-    // Note: Keep this generic to specialize next().
+struct SyncLineResponseIterator: AsyncIteratorProtocol {
     typealias Element = SyncLine
 
+    private let _next: () async throws -> SyncLine?
+
+    fileprivate init<Source: AsyncSequence>(_ iterator: SpecializedSyncLineResponseIterator<Source>) where Source.Element == UInt8 {
+        var iterator = iterator
+        _next = { try await iterator.next() }
+    }
+
+    mutating func next() async throws -> SyncLine? {
+        try await _next()
+    }
+}
+
+private struct SpecializedSyncLineResponse<Source: AsyncSequence & Sendable> where Source.Element == UInt8 {
+    let source: Source
+    let logging: SyncRequestLoggerConfiguration?
+
+    func makeAsyncIterator() -> SpecializedSyncLineResponseIterator<Source> {
+        return SpecializedSyncLineResponseIterator<Source>(source: source.makeAsyncIterator(), logging: logging)
+    }
+}
+
+private struct SpecializedSyncLineResponseIterator<Source: AsyncSequence> where Source.Element == UInt8 {
+    // Note: Keep this generic to specialize next().
     var source: Source.AsyncIterator
     var logging: SyncRequestLoggerConfiguration?
     var buffer: Array<UInt8> = []

@@ -7,12 +7,12 @@ final class StreamingSyncClient: Sendable {
     let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
     let connector: CachingCredentialsConnector
-    let httpClient: any BoxedHttpClient
+    let httpClient: HttpClient
     
     init(
         db: PowerSyncDatabaseImpl,
         connector: PowerSyncBackendConnectorProtocol,
-        httpClient: any BoxedHttpClient,
+        httpClient: HttpClient,
         options: ConnectOptions,
     ) {
         self.db = db
@@ -219,7 +219,7 @@ The next upload iteration will be delayed.
         httpRequest.httpBody = try StreamingSyncClient.jsonEncoder.encode(request)
         
         let response: HTTPURLResponse
-        let stream: any SyncLineResponse
+        let stream: SyncLineResponse
         do {
             (response, stream) = try await httpClient.receiveSyncLines(request: httpRequest, logger: options.clientConfiguration?.requestLogger)
         } catch {
@@ -396,7 +396,7 @@ fileprivate struct ControlInvocationsFromStream: AsyncSequence, Sendable {
     typealias AsyncIterator = ControlInvocationsFromStreamIterator
     typealias Element = PowerSyncControlArguments
 
-    let sequence: any SyncLineResponse
+    let sequence: SyncLineResponse
     
     func makeAsyncIterator() -> ControlInvocationsFromStreamIterator {
         .beforeStart(self.sequence)
@@ -406,8 +406,8 @@ fileprivate struct ControlInvocationsFromStream: AsyncSequence, Sendable {
 fileprivate enum ControlInvocationsFromStreamIterator: AsyncIteratorProtocol {
     typealias Element = PowerSyncControlArguments
 
-    case beforeStart(any SyncLineResponse)
-    case isReceiving(any SyncLineResponseIterator)
+    case beforeStart(SyncLineResponse)
+    case isReceiving(SyncLineResponseIterator)
     case eof
     
     mutating func next() async throws -> PowerSyncControlArguments? {
