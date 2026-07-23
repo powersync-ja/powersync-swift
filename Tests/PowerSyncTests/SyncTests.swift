@@ -109,6 +109,33 @@ class InMemorySyncIntegrationTests {
         try await db.disconnect()
     }
 
+    @Test func handlesUnicodeLineSeparatorsInSyncedData() async throws {
+        // Regression test for https://github.com/powersync-ja/powersync-swift/issues/167
+        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let db = openDatabase(MockHttpSession { request in channel })
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await waitForStatus(db.currentStatus) { $0.connected }
+
+        let nameWithLineSeparator = "line one\u{2028}line two"
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)])))
+        try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [
+            OplogEntry(
+                checksum: 0,
+                op_id: "1",
+                object_id: "1",
+                object_type: "users",
+                op: .put,
+                data: String(data: StreamingSyncClient.jsonEncoder.encode(["name": nameWithLineSeparator]), encoding: .utf8)!
+            )
+        ])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        try await db.waitForFirstSync()
+
+        try await expectUserCount(db, 1)
+        let names = try await db.getAll("SELECT name FROM users") { try $0.getString(index: 0) }
+        try #require(names == [nameWithLineSeparator])
+    }
+
     @Test func setsDownloadingState() async throws {
         let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
