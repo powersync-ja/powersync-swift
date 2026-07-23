@@ -62,7 +62,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func partialSync() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let checksums = Array((0...3).map { prio in BucketChecksum(bucket: "bucket\(prio)", priority: .init(prio), checksum: 10 + prio) })
         var operationId = 1
 
@@ -111,7 +111,7 @@ class InMemorySyncIntegrationTests {
 
     @Test func handlesUnicodeLineSeparatorsInSyncedData() async throws {
         // Regression test for https://github.com/powersync-ja/powersync-swift/issues/167
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
         await waitForStatus(db.currentStatus) { $0.connected }
@@ -137,7 +137,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func setsDownloadingState() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
         await waitForStatus(db.currentStatus) { $0.connected }
@@ -165,7 +165,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func staysConnectedAfterCancellingConnectionTask() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let mockClient = MockHttpSession { request in channel }
         let db = openDatabase(mockClient)
         let task = Task {
@@ -203,7 +203,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func uploadsWritesMadeBeforeConnecting() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let mockClient = MockHttpSession { request in channel }
         let db = openDatabase(mockClient)
         mockClient.writeCheckpoint = 1
@@ -228,7 +228,7 @@ class InMemorySyncIntegrationTests {
     }
     
     @Test @MainActor func recoversFromUploadErrors() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let mockClient = MockHttpSession { request in channel }
         let db = openDatabase(mockClient)
         mockClient.writeCheckpoint = 1
@@ -265,7 +265,7 @@ class InMemorySyncIntegrationTests {
     }
     
     @Test @MainActor func uploadsOfflineWrites() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let allowConnection = Mutex(false)
         let mockClient = MockHttpSession { _ in
             if allowConnection.withLock({ $0 }) {
@@ -310,7 +310,7 @@ class InMemorySyncIntegrationTests {
             func uploadData(database: any PowerSyncDatabaseProtocol) async throws {}
         }
 
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         let connector = BackendConnector()
         try await db.connect(connector: connector, options: ConnectOptions(retryDelay: 0))
@@ -339,7 +339,7 @@ class InMemorySyncIntegrationTests {
         }
 
         let connector = BackendConnector()
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in
             if await connector.fetchCredentialsCalls == 1 {
                 // On a real 401 response, the platform client would throw because the body can't be interpreted as sync lines.
@@ -371,7 +371,7 @@ class InMemorySyncIntegrationTests {
             func uploadData(database: any PowerSyncDatabaseProtocol) async throws {}
         }
 
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         try await db.connect(connector: BackendConnector(), options: ConnectOptions(retryDelay: 0.2))
         await waitForStatus(db.currentStatus) { !$0.connected && $0.downloadError != nil }
@@ -399,7 +399,7 @@ class InMemorySyncIntegrationTests {
         }
 
         let connector = BackendConnector()
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         try await db.connect(connector: connector, options: ConnectOptions())
 
@@ -425,7 +425,7 @@ class InMemorySyncIntegrationTests {
             let name: String
         }
 
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel }, schema: Schema(RawTable(name: "lists", schema: RawTableSchema())))
 
         try await db.execute("CREATE TABLE lists (id TEXT NOT NULL PRIMARY KEY, name TEXT)")
@@ -470,7 +470,7 @@ class InMemorySyncIntegrationTests {
             let rest: String
         }
 
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel }, schema: Schema(RawTable(
             name: "lists",
             put: PendingStatement(sql: "INSERT OR REPLACE INTO lists (id, name, _rest) VALUES (?, ?, ?)", parameters: [
@@ -519,7 +519,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func endsIterationOnHttpClose() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
         await waitForStatus(db.currentStatus) { $0.connected }
@@ -528,8 +528,27 @@ class InMemorySyncIntegrationTests {
         await waitForStatus(db.currentStatus) { !$0.connected }
     }
 
+    @Test func reportsErrorWhenStreamEndsMidLine() async throws {
+        // Regression test: if the response stream closes while a line is still being received (no
+        // trailing \n was seen), this indicates a truncated response and should be reported as an
+        // error rather than being silently treated as a complete line.
+        let channel = AsyncThrowingChannel<Data, any Error>()
+        let db = openDatabase(MockHttpSession { request in channel })
+        try await db.connect(connector: TestConnector(), options: ConnectOptions(retryDelay: 0))
+        await waitForStatus(db.currentStatus) { $0.connected }
+
+        // Send a chunk that doesn't end in a newline, then close the connection, simulating a
+        // connection drop in the middle of a line.
+        await channel.send(Data(#"{"checkpoint":{"last_op_id":"1""#.utf8))
+        channel.finish()
+
+        await waitForStatus(db.currentStatus) { !$0.connected && $0.downloadError != nil }
+        let error = try #require(db.currentStatus.downloadError);
+        let _ = try #require(error as? UnexpectedEndOfStreamError)
+    }
+
     @Test func syncProgress() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
         await waitForStatus(db.currentStatus) { $0.connected }
@@ -558,7 +577,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func requestLogger() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         let lines: Mutex<[String]> = Mutex([])
 
@@ -578,7 +597,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func requestLoggerRespectsInfoLevel() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         let lines: Mutex<[String]> = Mutex([])
 
@@ -603,7 +622,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func requestLoggerRespectsHeadersLevel() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         let lines: Mutex<[String]> = Mutex([])
 
@@ -626,7 +645,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func requestLoggerRespectsBodyLevel() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         let lines: Mutex<[String]> = Mutex([])
 
@@ -649,7 +668,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func requestLoggerRespectsNoneLevel() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         let lines: Mutex<[String]> = Mutex([])
 
@@ -667,7 +686,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func requestLoggerLogsWriteCheckpointRequests() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let mockClient = MockHttpSession { request in channel }
         let db = openDatabase(mockClient)
         mockClient.writeCheckpoint = 1
@@ -713,7 +732,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func subscribesWithStreams() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in
             let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
             if case let .object(streams) = body["streams"] {
@@ -788,7 +807,7 @@ class InMemorySyncIntegrationTests {
 
     @Test func canSubscribeToStreamsWithObjectAndArrays() async throws {
         // Regression test for https://github.com/powersync-ja/powersync-kotlin/issues/349, which also affected the Swift SDK.
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in
             let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
             if case let .object(streams) = body["streams"] {
@@ -828,7 +847,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func reportsDefaultStreams() async throws {
-        let channel = AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
 
@@ -850,7 +869,7 @@ class InMemorySyncIntegrationTests {
         let db = openDatabase(MockHttpSession { request in
             let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
             await lastRequest.withMutex { $0 = body }
-            return AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+            return AsyncThrowingChannel<Data, any Error>()
         })
 
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
@@ -911,7 +930,7 @@ class InMemorySyncIntegrationTests {
                 Issue.record("Should have streams key in body")
             }
             
-            return AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+            return AsyncThrowingChannel<Data, any Error>()
         })
 
         let a = try await db.syncStream(name: "a", params: nil).subscribe()
@@ -941,7 +960,7 @@ class InMemorySyncIntegrationTests {
             }
             
             await didConnect.complete()
-            return AsyncThrowingChannel<PowerSync.SyncLine, any Error>()
+            return AsyncThrowingChannel<Data, any Error>()
         })
         
         let a = try await db.syncStream(name: "a", params: nil).subscribe()

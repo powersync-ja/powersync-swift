@@ -20,7 +20,8 @@ protocol PowerSyncUrlSession: Sendable where Response: AsyncSequence, Response: 
 protocol BoxedHttpClient: Sendable {
     /// Start streaming a `/sync/stream` response body, emitting individual lines.
     ///
-    /// Throws an ``UnexpectedResponseError`` if the response can't be interpreted as sync lines.
+    /// Throws an ``UnexpectedResponseError`` if the response can't be interpreted as sync lines, the response
+    /// iterator throws an ``UnexpectedEndOfStreamError`` when the response ends in the middle of a line.
     func receiveSyncLines(request: URLRequest, logger: SyncRequestLoggerConfiguration?) async throws -> (HTTPURLResponse, any SyncLineResponse)
 
     /// Read a full response body.
@@ -87,9 +88,15 @@ struct HttpClient<Session: PowerSyncUrlSession>: BoxedHttpClient {
 struct UnexpectedResponseError: Error, CustomDebugStringConvertible {
     let response: HTTPURLResponse
     let message: String
-    
+
     var debugDescription: String {
         message
+    }
+}
+
+struct UnexpectedEndOfStreamError: Error, CustomDebugStringConvertible {
+    var debugDescription: String {
+        "PowerSync streamed response ended unexpectedly in the middle of a line"
     }
 }
 
@@ -155,8 +162,15 @@ struct SyncLineResponseIteratorImpl<Source: AsyncSequence>: SyncLineResponseIter
                 buffer.append(first)
             }
         }
-        
-        return takeLineFromBuffer()
+
+        if buffer.isEmpty {
+            return nil
+        }
+
+        // The stream ended in the middle of a line (no trailing \n was seen), so we can't tell whether
+        // the last line we received is complete. Report this as an error instead of returning a
+        // possibly-truncated line.
+        throw UnexpectedEndOfStreamError()
     }
 }
 

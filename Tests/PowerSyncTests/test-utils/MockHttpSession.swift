@@ -4,10 +4,10 @@ import Foundation
 import Testing
 
 final class MockHttpSession: PowerSyncUrlSession {
-    typealias Response = SyncLinesAsBytes
+    typealias Response = ChunksToBytes
 
     private let _writeCheckpoint = PowerSync.Mutex(1000)
-    let handleSyncLines: @Sendable (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>
+    let handleSyncLines: @Sendable (_ request: URLRequest) async throws -> AsyncThrowingChannel<Data, any Error>
     
     var writeCheckpoint: Int {
         get {
@@ -18,7 +18,7 @@ final class MockHttpSession: PowerSyncUrlSession {
         }
     }
     
-    init(handleSyncLines: @Sendable @escaping (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>) {
+    init(handleSyncLines: @Sendable @escaping (_ request: URLRequest) async throws -> AsyncThrowingChannel<Data, any Error>) {
         self.handleSyncLines = handleSyncLines
     }
 
@@ -28,7 +28,7 @@ final class MockHttpSession: PowerSyncUrlSession {
         let channel = try await handleSyncLines(request)
         let response = HTTPURLResponse(url: request.url!, mimeType: "application/x-ndjson", expectedContentLength: 0, textEncodingName: "utf-8")
 
-        return (response, SyncLinesAsBytes(stream: channel))
+        return (response, ChunksToBytes(stream: channel))
     }
 
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data) {
@@ -46,16 +46,16 @@ final class MockHttpSession: PowerSyncUrlSession {
 }
 
 /// Converts a sequence of sync line strings into a sequence of bytes.
-struct SyncLinesAsBytes: AsyncSequence {
+struct ChunksToBytes: AsyncSequence {
     typealias Element = UInt8
     typealias AsyncIterator = Iterator
 
-    let stream: AsyncThrowingChannel<PowerSync.SyncLine, any Error>
+    let stream: AsyncThrowingChannel<Data, any Error>
 
     struct Iterator: AsyncIteratorProtocol {
         typealias Element = UInt8
 
-        var stream: AsyncThrowingChannel<PowerSync.SyncLine, any Error>.AsyncIterator
+        var stream: AsyncThrowingChannel<Data, any Error>.AsyncIterator
         var buffer: Data?
         var offset: Int = 0
 
@@ -65,14 +65,9 @@ struct SyncLinesAsBytes: AsyncSequence {
             }
 
             guard let line = try await stream.next() else { return nil }
-            switch line {
-                case .text(var contents):
-                    contents += "\n"
-                    let encoded = contents.data(using: .utf8)!
-                    buffer = encoded
-                    offset = 0
-                    return readFromBuffer(buffer: encoded)
-            }
+            buffer = line
+            offset = 0
+            return readFromBuffer(buffer: line)
         }
 
         mutating func readFromBuffer(buffer: Data) -> UInt8 {
