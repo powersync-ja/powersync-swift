@@ -7,12 +7,12 @@ final class StreamingSyncClient: Sendable {
     let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
     let connector: CachingCredentialsConnector
-    let httpClient: any HttpClient
+    let httpClient: any BoxedHttpClient
     
     init(
         db: PowerSyncDatabaseImpl,
         connector: PowerSyncBackendConnectorProtocol,
-        httpClient: any HttpClient,
+        httpClient: any BoxedHttpClient,
         options: ConnectOptions,
     ) {
         self.db = db
@@ -150,7 +150,7 @@ The next upload iteration will be delayed.
             endpoint.path += "/write-checkpoint2.json"
             endpoint.queryItems = [.init(name: "client_id", value: clientId)]
         }
-        let (response, data) = try await httpClient.readFully(request: request)
+        let (response, data) = try await httpClient.readFully(request: request, logger: options.clientConfiguration?.requestLogger)
         await self.handleCommonResponseErrors(response: response)
         if response.statusCode != 200 {
             throw PowerSyncError.operationFailed(message: "Error getting write checkpoint: \(response.statusCode)")
@@ -221,7 +221,7 @@ The next upload iteration will be delayed.
         let response: HTTPURLResponse
         let stream: any SyncLineResponse
         do {
-            (response, stream) = try await httpClient.receiveSyncLines(request: httpRequest)
+            (response, stream) = try await httpClient.receiveSyncLines(request: httpRequest, logger: options.clientConfiguration?.requestLogger)
         } catch {
             if let responseError = error as? UnexpectedResponseError {
                 await handleCommonResponseErrors(response: responseError.response)

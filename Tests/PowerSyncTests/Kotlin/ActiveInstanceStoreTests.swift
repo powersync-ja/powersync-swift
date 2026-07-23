@@ -1,3 +1,4 @@
+import Foundation
 @testable import PowerSync
 import Testing
 
@@ -9,10 +10,10 @@ struct MultipleInstanceTest {
         let logger = DefaultLogger(minSeverity: .warning, writers: [logWriter])
         let schema = Schema()
 
-        let a = PowerSyncDatabaseImpl(identifier: "id", logger: logger, pool: pool, customHttpClient: nil, schema: schema)
+        let a = PowerSyncDatabaseImpl(identifier: "id", logger: logger, pool: pool, customHttpSession: nil as URLSession?, schema: schema)
         try #require(logWriter.getLogs().isEmpty)
 
-        let b = PowerSyncDatabaseImpl(identifier: "id", logger: logger, pool: pool, customHttpClient: nil, schema: schema)
+        let b = PowerSyncDatabaseImpl(identifier: "id", logger: logger, pool: pool, customHttpSession: nil as URLSession?, schema: schema)
         let _ = try #require(logWriter.getLogs().first { $0.contains("Multiple PowerSync instances for the same database have been detected.") })
  
         // Ensure databases are kept around until the end of the test (if a gets closed before, we would't see the warning).
@@ -27,10 +28,10 @@ struct MultipleInstanceTest {
         let schema = Schema()
 
         do {
-            let _ = PowerSyncDatabaseImpl(identifier: "id2", logger: logger, pool: pool, customHttpClient: nil, schema: schema)
+            let _ = PowerSyncDatabaseImpl(identifier: "id2", logger: logger, pool: pool, customHttpSession: nil as URLSession?, schema: schema)
         }
 
-        let b = PowerSyncDatabaseImpl(identifier: "id2", logger: logger, pool: pool, customHttpClient: nil, schema: schema)
+        let b = PowerSyncDatabaseImpl(identifier: "id2", logger: logger, pool: pool, customHttpSession: nil as URLSession?, schema: schema)
         try #require(logWriter.getLogs().isEmpty)
         let _ = consume b
     }

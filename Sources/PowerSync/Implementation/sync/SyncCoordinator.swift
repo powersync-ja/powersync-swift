@@ -1,23 +1,21 @@
+import Foundation
+
 /// Manages a connection task for a PowerSync database.
 actor SyncCoordinator {
     nonisolated let streams = StreamTracker()
     private var activeSync: Task<Void, any Error>?
     
-    func connect(db: PowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: HttpClient?) async {
+    func connect(db: PowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: (any BoxedHttpClient)?) async {
         if let task = activeSync {
             await self.finishSyncTask(task: task)
         }
 
-        func defaultHttpClient() -> HttpClient {
+        func defaultHttpClient() -> BoxedHttpClient {
             let session = options.clientConfiguration?.urlSession ?? .shared
-            return PlatformHttpClient(session: session)
-        }
-        
-        var client = client ?? defaultHttpClient()
-        if let logger = options.clientConfiguration?.requestLogger {
-            client = LoggingClient(inner: client, logger: logger)
+            return HttpClient<URLSession>(session: session)
         }
 
+        let client = client ?? defaultHttpClient()
         let sync = StreamingSyncClient(db: db, connector: connector, httpClient: client, options: options)
         activeSync = sync.run()
     }
