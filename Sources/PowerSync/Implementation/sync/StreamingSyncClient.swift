@@ -5,8 +5,14 @@ fileprivate let tag = "StreamingSyncClient"
 
 final class StreamingSyncClient: Sendable {
     internal static let defaultCheckpointRequestRetryDelay: TimeInterval = 10
-    private static let minimumCheckpointRequestRetryDelayMutex = Mutex<TimeInterval>(10)
-    /// Mutable so tests can lower the retry floor; production code should keep the default.
+
+    /// The lowest retry delay production builds will honor for checkpoint requests.
+    private static let minimumCheckpointRequestRetryDelayFloor: TimeInterval = 10
+
+    #if DEBUG
+    private static let minimumCheckpointRequestRetryDelayMutex = Mutex<TimeInterval>(minimumCheckpointRequestRetryDelayFloor)
+    /// Mutable in DEBUG builds only, so tests can lower the retry floor.
+    /// Release builds always use ``minimumCheckpointRequestRetryDelayFloor``.
     internal static var minimumCheckpointRequestRetryDelay: TimeInterval {
         get {
             minimumCheckpointRequestRetryDelayMutex.withLock { $0 }
@@ -15,6 +21,11 @@ final class StreamingSyncClient: Sendable {
             minimumCheckpointRequestRetryDelayMutex.withLock { $0 = newValue }
         }
     }
+    #else
+    internal static var minimumCheckpointRequestRetryDelay: TimeInterval {
+        minimumCheckpointRequestRetryDelayFloor
+    }
+    #endif
 
     let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
@@ -278,8 +289,18 @@ The next upload iteration will be delayed.
             return
         }
 
+        // In requests mode core is expected to always provide the payload alongside the
+        // establishSyncStream instruction. Guard instead of force-unwrapping so a mismatched
+        // core version (or protocol change) surfaces a recoverable error rather than crashing
+        // the sync task. The error routes through the normal sync-line retry path.
+        guard let checkpointRequest else {
+            throw CheckpointRequestError.operationFailed(
+                message: "Core did not provide a checkpoint request payload while in requests mode."
+            )
+        }
+
         do {
-            let seed = try await postCheckpointRequest(checkpointRequest!)
+            let seed = try await postCheckpointRequest(checkpointRequest)
             _ = try await db.writeTransaction { tx in
                 try tx.powersyncSeedCheckpointRequestId(seed)
             }

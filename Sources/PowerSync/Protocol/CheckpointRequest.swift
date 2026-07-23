@@ -1,9 +1,19 @@
 import Foundation
 
+/// A common type for the errors thrown by the checkpoint request APIs.
+///
+/// Both ``CheckpointRequestError`` (thrown while creating a request) and ``CheckpointWaitError``
+/// (thrown while waiting for one to sync) conform to this protocol. A caller that drives both
+/// steps in a single `do` block can catch them together as `catch let error as any CheckpointError`,
+/// while still switching on the concrete type when it needs to distinguish the two.
+///
+/// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
+public protocol CheckpointError: Error, LocalizedError {}
+
 /// Errors thrown while creating a checkpoint request.
 ///
 /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
-public enum CheckpointRequestError: Error, LocalizedError {
+public enum CheckpointRequestError: CheckpointError {
     /// The target PowerSync service does not support checkpoint requests.
     /// Update the PowerSync service to use this API.
     case instanceNotSupported
@@ -47,7 +57,7 @@ public enum CheckpointRequestError: Error, LocalizedError {
 /// Errors thrown while waiting for a checkpoint request to sync.
 ///
 /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
-public enum CheckpointWaitError: Error, LocalizedError {
+public enum CheckpointWaitError: CheckpointError {
     /// The checkpoint request was not synced before the timeout elapsed.
     case timeout
 
@@ -98,6 +108,12 @@ public protocol CheckpointRequest: Sendable {
     ///
     /// This method observes sync-loop checkpoint application events for an already-created
     /// checkpoint request, using the currently active sync client.
+    ///
+    /// This fails fast on sync errors: if a download or upload error is already present when the
+    /// wait begins — not only if one occurs while waiting — it throws
+    /// ``CheckpointWaitError/errorDetected(message:)`` immediately, even when the error is
+    /// transient. Since the client cannot know whether such an error is directly recoverable, retry the
+    /// wait once sync has recovered.
     /// - Throws: ``CheckpointWaitError`` when no sync client is active, when the sync client
     ///   disconnects before the checkpoint is reached, or when a sync error is present or reached
     ///   while waiting. Throws ``CheckpointRequestError/checkpointRequestsNotEnabled``
