@@ -45,7 +45,7 @@ final class MockHttpSession: PowerSyncUrlSession {
     }
 }
 
-/// Converts a sequence of sync line strings into a sequence of bytes.
+/// Flattens a sequence of byte chunks into a sequence of bytes.
 struct ChunksToBytes: AsyncSequence {
     typealias Element = UInt8
     typealias AsyncIterator = Iterator
