@@ -215,10 +215,26 @@ The next upload iteration will be delayed.
     /// the custom backend instead of the service endpoint, with the same state contract.
     private func requestCheckpointFromService(requestId: Int64) async throws -> Int64 {
         let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
+        return try await postCheckpointRequest(CheckpointRequestPayload(
+            client_id: clientId,
+            checkpoint_request_id: String(requestId)
+        ))
+    }
 
+    /// Posts a checkpoint request payload prepared by core and returns the state accepted remotely.
+    private func postCheckpointRequest(_ payload: CheckpointRequestPayload) async throws -> Int64 {
         if let customCheckpointRequestConnector {
             do {
-                return try await customCheckpointRequestConnector.postCheckpointRequest(requestId, clientId: clientId)
+                guard let requestId = Int64(payload.checkpoint_request_id) else {
+                    throw CheckpointRequestError.operationFailed(
+                        message: "Invalid checkpoint request ID received from core."
+                    )
+                }
+
+                return try await customCheckpointRequestConnector.postCheckpointRequest(
+                    requestId,
+                    clientId: payload.client_id
+                )
             } catch let error as CheckpointRequestError {
                 throw error
             } catch {
@@ -234,10 +250,7 @@ The next upload iteration will be delayed.
         }
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try StreamingSyncClient.jsonEncoder.encode(CheckpointRequestPayload(
-            client_id: clientId,
-            checkpoint_request_id: String(requestId)
-        ))
+        request.httpBody = try StreamingSyncClient.jsonEncoder.encode(payload)
         let (response, data) = try await httpClient.readFully(request: request)
         await self.handleCommonResponseErrors(response: response)
         if response.statusCode == 404 {
@@ -258,7 +271,7 @@ The next upload iteration will be delayed.
     }
 
     /// Ensures the core checkpoint request counter has been seeded for the current stream.
-    fileprivate func seedCheckpointRequestState(lastCheckpointRequestId: Int64?) async throws {
+    fileprivate func seedCheckpointRequestState(checkpointRequest: CheckpointRequestPayload?) async throws {
         guard case .requests = checkpointMode else {
             // legacy mode does not require tracking local state
             signals.markCheckpointsReady()
@@ -266,39 +279,15 @@ The next upload iteration will be delayed.
         }
 
         do {
-            // If a concrete target checkpoint request id is active, checkpoint request ids must start at or above it.
-            let concreteTarget = try await db.writeTransaction { tx -> Int64? in
-                let target = try tx.powersyncTargetCheckpointRequestId()
-                guard let target, target > 0, target != PowerSyncDatabaseImpl.maxOpId else {
-                    return nil
-                }
-
-                return target
-            }
-
-            // Start from the largest value known locally. On normal reconnects, this is the core
-            // hint. The concrete target fallback mainly guards legacy-to-request-mode
-            // transitions or unusual migrated state where core has a target but no request hint.
-            // In most legacy-to-request transitions the service should already have the concrete
-            // checkpoint record and return it when we affirm the current request state, so this
-            // fallback is likely over-cautious.
-            //
-            // On a fresh database this affirms request ID 1, which consumes the ID: an affirmed
-            // ID must not be reused by a later real request, since a checkpoint created between
-            // the affirmation and that request would wrongly satisfy it. Real requests on a
-            // fresh database therefore start at 2.
-            let startingRequestId = max(lastCheckpointRequestId ?? 0, concreteTarget ?? 0)
-            let seed = try await requestCheckpointFromService(requestId: startingRequestId > 0 ? startingRequestId : 1)
-
-            // Seed only when the service returns a different value, such as after disconnectAndClear.
-            if lastCheckpointRequestId != seed {
-                _ = try await db.writeTransaction { tx in
-                    try tx.powersyncSeedCheckpointRequestId(seed)
-                }
+            let seed = try await postCheckpointRequest(checkpointRequest!)
+            _ = try await db.writeTransaction { tx in
+                try tx.powersyncSeedCheckpointRequestId(seed)
             }
 
             signals.markCheckpointsReady()
         } catch CheckpointRequestError.instanceNotSupported {
+            // An unsupported service cannot recover through retries, so fail pending callers.
+            // Other errors retry with the sync iteration while callers continue waiting.
             signals.failPendingCheckpointRequests(CheckpointRequestError.instanceNotSupported)
             throw CheckpointRequestError.instanceNotSupported
         }
@@ -481,7 +470,7 @@ The next upload iteration will be delayed.
 
         return ControlInvocationsFromStream(sequence: stream)
     }
-    
+
     static let jsonEncoder = JSONEncoder()
     static let jsonDecoder = JSONDecoder()
 
@@ -534,12 +523,13 @@ private struct ActiveSyncIteration: Sendable {
             includeDefaults: syncClient.options.includeDefaultStreams,
             activeStreams: syncClient.db.group.syncCoordinator.streams.currentStreams,
             appMetadata: syncClient.options.appMetadata,
+            checkpointMode: syncClient.checkpointMode,
         )))
 
         var controlArgs: SyncControlEvents?
 
         for instruction in initialInstructions {
-            if case .establishSyncStream(request: let request, lastCheckpointRequestId: let lastCheckpointRequestId) = instruction {
+            if case .establishSyncStream(request: let request, checkpointRequest: let checkpointRequest) = instruction {
                 // Start checkpoint request validation while establishing the sync stream, but
                 // don't block line processing on it. Operations that allocate checkpoint
                 // requests wait for the validation signal themselves.
@@ -548,7 +538,7 @@ private struct ActiveSyncIteration: Sendable {
                 //   - retries: if the user is offline initially
                 //   - rare edge cases where the user_id might have changed between connect invocations 
                 let checkpointRequestStateSeed = Task {
-                    try await syncClient.seedCheckpointRequestState(lastCheckpointRequestId: lastCheckpointRequestId)
+                    try await syncClient.seedCheckpointRequestState(checkpointRequest: checkpointRequest)
                 }
 
                 do {
@@ -649,7 +639,7 @@ private struct ActiveSyncIteration: Sendable {
             break;
         case .updateSyncStatus(status: let status):
             syncClient.db.syncStatus.mutateStatus { $0.core = status }
-        case .establishSyncStream(request: _, lastCheckpointRequestId: _):
+        case .establishSyncStream(request: _, checkpointRequest: _):
             throw PowerSyncError.operationFailed(message: "There can only be one establishSyncStream instruction per sync iteration")
         case .closeSyncStream(hideDisconnect: _):
             throw PowerSyncError.operationFailed(message: "CloseSyncStream must be handled in run() loop")

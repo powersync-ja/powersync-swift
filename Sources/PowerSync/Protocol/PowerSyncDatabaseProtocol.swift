@@ -23,7 +23,7 @@ public struct SyncClientConfiguration: Sendable {
 /// Selects the service checkpoint mechanism used by a PowerSync connection.
 ///
 /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
-public enum CheckpointMode: Sendable {
+public enum CheckpointMode: Sendable, Encodable {
     /// Uses the legacy `/write-checkpoint2.json` endpoint to obtain a target operation id.
     case legacy
 
@@ -36,6 +36,16 @@ public enum CheckpointMode: Sendable {
     /// - Parameter checkpointRequestRetryDelay: Optional delay in seconds before retrying
     ///   the latest checkpoint request when it has not been applied yet.
     case requests(checkpointRequestRetryDelay: TimeInterval? = nil)
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .legacy:
+            try container.encode("legacy")
+        case .requests:
+            try container.encode("requests")
+        }
+    }
 }
 
 /// Options for configuring a PowerSync connection.

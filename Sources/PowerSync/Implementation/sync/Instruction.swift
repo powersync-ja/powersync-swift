@@ -8,7 +8,7 @@ enum CoreLogSeverity: String, Decodable {
 enum Instruction {
     case logLine(severity: CoreLogSeverity, line: String)
     case updateSyncStatus(status: CoreDownloadSyncStatus)
-    case establishSyncStream(request: JsonParam, lastCheckpointRequestId: Int64?)
+    case establishSyncStream(request: JsonParam, checkpointRequest: CheckpointRequestPayload?)
     case fetchCredentials(didExpire: Bool)
     case closeSyncStream(hideDisconnect: Bool)
     case flushFileSystem
@@ -39,7 +39,7 @@ extension Instruction: Decodable {
     
     enum EstablishSyncStreamCodingKeys: String, CodingKey {
         case request
-        case lastCheckpointRequestId = "last_checkpoint_request_id"
+        case checkpointRequest = "checkpoint_request"
     }
     
     enum FetchCredentialsCodingKeys: String, CodingKey {
@@ -81,7 +81,7 @@ extension Instruction: Decodable {
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.EstablishSyncStreamCodingKeys.self, forKey: .establishSyncStream)
             self = Instruction.establishSyncStream(
                 request: try nestedContainer.decode(JsonParam.self, forKey: Instruction.EstablishSyncStreamCodingKeys.request),
-                lastCheckpointRequestId: try nestedContainer.decodeIfPresent(Int64.self, forKey: Instruction.EstablishSyncStreamCodingKeys.lastCheckpointRequestId)
+                checkpointRequest: try nestedContainer.decodeIfPresent(CheckpointRequestPayload.self, forKey: Instruction.EstablishSyncStreamCodingKeys.checkpointRequest)
             )
         case .fetchCredentials:
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.FetchCredentialsCodingKeys.self, forKey: .fetchCredentials)
@@ -94,7 +94,10 @@ extension Instruction: Decodable {
         case .didCompleteSync:
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.DidCompleteSyncCodingKeys.self, forKey: .didCompleteSync)
             self = Instruction.didCompleteSync(
-                appliedCheckpointRequestId: try nestedContainer.decodeIfPresent(Int64.self, forKey: Instruction.DidCompleteSyncCodingKeys.appliedCheckpointRequestId)
+                appliedCheckpointRequestId: try nestedContainer.decodeIfPresent(
+                    StringEncodedInt64.self,
+                    forKey: Instruction.DidCompleteSyncCodingKeys.appliedCheckpointRequestId
+                )?.value
             )
         case .handleDiagnostics:
             self = Instruction.handleDiagnostics

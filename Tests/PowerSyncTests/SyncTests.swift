@@ -54,7 +54,7 @@ class InMemorySyncIntegrationTests {
           "priority_status": [],
           "downloading": null,
           "streams": [],
-          "internal_last_applied_checkpoint_request_id": 7
+          "internal_last_applied_checkpoint_request_id": "7"
         }
         """.data(using: .utf8)!
 
@@ -71,7 +71,7 @@ class InMemorySyncIntegrationTests {
                 "priority_status": [],
                 "downloading": null,
                 "streams": [],
-                "internal_last_applied_checkpoint_request_id": 7
+                "internal_last_applied_checkpoint_request_id": "7"
               }
             }
           }
@@ -91,7 +91,7 @@ class InMemorySyncIntegrationTests {
         [
           {
             "DidCompleteSync": {
-              "applied_checkpoint_request_id": 7
+              "applied_checkpoint_request_id": "7"
             }
           },
           {
@@ -120,7 +120,7 @@ class InMemorySyncIntegrationTests {
           "priority_status": [],
           "downloading": null,
           "streams": [],
-          "internal_last_applied_checkpoint_request_id": 7
+          "internal_last_applied_checkpoint_request_id": "7"
         }
         """.data(using: .utf8)!
         let status = try StreamingSyncClient.jsonDecoder.decode(CoreDownloadSyncStatus.self, from: data)
@@ -959,7 +959,7 @@ class InMemorySyncIntegrationTests {
               "priority_status": [],
               "downloading": null,
               "streams": [],
-              "internal_last_applied_checkpoint_request_id": \(appliedRequestId)
+              "internal_last_applied_checkpoint_request_id": "\(appliedRequestId)"
             }
             """.data(using: .utf8)!
 

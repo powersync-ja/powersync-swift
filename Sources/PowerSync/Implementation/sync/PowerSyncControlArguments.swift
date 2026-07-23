@@ -69,6 +69,7 @@ struct StartSyncIteration: Encodable {
     let includeDefaults: Bool
     let activeStreams: [StreamKey]
     let appMetadata: [String: String]
+    let checkpointMode: CheckpointMode
     
     enum CodingKeys: String, CodingKey {
         case parameters
@@ -76,6 +77,7 @@ struct StartSyncIteration: Encodable {
         case includeDefaults = "include_defaults"
         case activeStreams = "active_streams"
         case appMetadata = "app_metadata"
+        case checkpointMode = "checkpoint_mode"
     }
 }
 

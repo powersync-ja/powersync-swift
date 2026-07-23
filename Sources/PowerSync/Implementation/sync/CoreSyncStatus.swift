@@ -1,3 +1,19 @@
+struct StringEncodedInt64: Decodable {
+    let value: Int64
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let encoded = try container.decode(String.self)
+        guard let value = Int64(encoded) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Expected a decimal Int64 string"
+            )
+        }
+        self.value = value
+    }
+}
+
 /// A raw sync status snapshot received from the core extension.
 struct CoreDownloadSyncStatus: Decodable, Sendable {
     let connected: Bool
@@ -32,9 +48,9 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
         self.priorityStatus = try container.decode([PriorityStatusEntry].self, forKey: .priorityStatus)
         self.downloading = try container.decodeIfPresent(CoreSyncDownloadProgress.self, forKey: .downloading)
         self.internalLastAppliedCheckpointRequestId = try container.decodeIfPresent(
-            Int64.self,
+            StringEncodedInt64.self,
             forKey: .internalLastAppliedCheckpointRequestId
-        )
+        )?.value
         
         var streamsContainer = try container.nestedUnkeyedContainer(forKey: .streams)
         var streams: [SyncStreamStatus] = []
