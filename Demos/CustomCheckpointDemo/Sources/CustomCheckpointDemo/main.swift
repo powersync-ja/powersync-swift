@@ -42,7 +42,7 @@ defer {
 
 try await db.connect(
     connector: connector,
-    options: ConnectOptions(checkpointMode: .requests)
+    options: ConnectOptions(checkpointMode: .requests())
 )
 
 print("Waiting for first sync...")

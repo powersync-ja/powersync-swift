@@ -4,11 +4,11 @@
 
 * Add alpha support for checkpoint requests, which let clients wait until the local database
   has caught up to the current server-side state — useful for explicit pull-to-refresh flows.
-  Connect with `checkpointMode: .requests` (requires a PowerSync service supporting
+  Connect with `checkpointMode: .requests()` (requires a PowerSync service supporting
   `/sync/checkpoint-request`), then:
 
   ```swift
-  try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests))
+  try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests()))
 
   let checkpoint = try await db.requestCheckpoint()
   try await checkpoint.waitForSync(timeout: 30)
