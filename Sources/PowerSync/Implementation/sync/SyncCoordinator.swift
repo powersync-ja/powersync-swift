@@ -11,12 +11,17 @@ actor SyncCoordinator {
         currentClient.withLock { $0 }
     }
 
-    func connect(db: PowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: HttpClient) async {
+    func connect(db: PowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: HttpClient?) async {
         if let task = activeSync {
             await self.finishSyncTask(task: task)
         }
 
-        var client = client
+        func defaultHttpClient() -> HttpClient {
+            let session = options.clientConfiguration?.urlSession ?? .shared
+            return PlatformHttpClient(session: session)
+        }
+
+        var client = client ?? defaultHttpClient()
         if let logger = options.clientConfiguration?.requestLogger {
             client = LoggingClient(inner: client, logger: logger)
         }

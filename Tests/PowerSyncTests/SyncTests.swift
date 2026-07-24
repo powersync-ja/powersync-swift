@@ -1872,7 +1872,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func subscriptionsUpdateWhileOffline() async throws {
-        let db = openDatabase(PlatformHttpClient.shared)
+        let db = openDatabase(PlatformHttpClient(session: .shared))
         // Make sure the database is initialized
         try await db.readLock { _ in }
         var statusUpdates = db.currentStatus.asFlow().makeAsyncIterator()
@@ -1964,7 +1964,7 @@ private func openDatabase(
         activeInstanceStore: DatabaseGroupCollection(),
         logger: logger,
         pool: AsyncConnectionPool(location: .inMemory, logger: DefaultLogger()),
-        httpClient: client,
+        customHttpClient: client,
         schema: schema,
     )
 }

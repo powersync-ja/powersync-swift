@@ -1,18 +1,17 @@
 import Foundation
 
 final class StreamTracker: Sendable {
-    // For each active stream key, how many StreamSubscription instances are active in that key.
-    private let groups: Mutex<Dictionary<StreamKey, Int>> = Mutex([:])
-    let streamsChanged = BroadcastStream<[StreamKey]>()
-    
-    var currentStreams: [StreamKey] {
-        groups.withLock { groups in Array(groups.keys) }
+    private let groups: Mutex<ActiveStreamsState> = Mutex(ActiveStreamsState())
+
+    /// Returns a snapshot of currently active streams, and a stream that will emit an event for all subsequent
+    /// updates to the list of active streams.
+    func observeActiveStreams() -> ([StreamKey], AsyncStream<[StreamKey]>) {
+        groups.withLock { state in
+            let subscription = state.streamsChanged.subscribe()
+            return (state.activeStreams, subscription)
+        }
     }
-    
-    private func markActiveStreamsHaveChanged() {
-        streamsChanged.dispatch(event: currentStreams)
-    }
-    
+
     fileprivate func subscriptionsCommand(db: PowerSyncDatabaseImpl, request: RustSubscriptionChangeRequest) async throws {
         let _ = try await db.writeTransaction { tx in
             let payload = String(data: try StreamingSyncClient.jsonEncoder.encode(request), encoding: .utf8)
@@ -21,10 +20,10 @@ final class StreamTracker: Sendable {
                 payload
             ])
         }
-        
+
         try await db.resolveOfflineSyncStatusIfNotConnected()
     }
-    
+
     fileprivate func subscribe(db: PowerSyncDatabaseImpl, stream: PendingSyncStream, ttl: TimeInterval?, priority: BucketPriority?) async throws -> SyncSubscriptionImplementation {
         let key = stream.key
         try await subscriptionsCommand(
@@ -35,44 +34,54 @@ final class StreamTracker: Sendable {
                 priority: priority
             )
         )
-        
-        let didCreateGroup = groups.withLock { groups in
-            if let existingCount = groups[key] {
-                groups[key] = existingCount + 1
-                return false
-            } else {
-                groups[key] = 1
-                return true
-            }
-        }
-        
-        if didCreateGroup {
-            markActiveStreamsHaveChanged()
-        }
-        
+
+        groups.withLock { state in state.addStream(key: key) }
         return SyncSubscriptionImplementation(db: db, key: key)
     }
-    
+
     fileprivate func removeStreamGroup(key: StreamKey) {
-        let _ = groups.withLock { groups in groups.removeValue(forKey: key) }
-        markActiveStreamsHaveChanged()
+        groups.withLock { state in state.removeStreamGroup(key: key) }
     }
-    
+
     fileprivate func decrementRefCount(key: StreamKey) {
-        let didChangeStreams = groups.withLock { groups in
-            if let count = groups[key] {
-                if count == 1 {
-                    groups.removeValue(forKey: key)
-                    return true
-                } else {
-                    groups[key] = count - 1
-                }
-            }
-            
-            return false
+        groups.withLock { state in state.decrementRefCount(key: key) }
+    }
+}
+
+fileprivate class ActiveStreamsState {
+    // For each active stream key, how many StreamSubscription instances are active in that key.
+    var groups: Dictionary<StreamKey, Int> = [:]
+    let streamsChanged = BroadcastStream<[StreamKey]>()
+
+    var activeStreams: [StreamKey] {
+        Array(groups.keys)
+    }
+
+    private func emit() {
+        streamsChanged.dispatch(event: activeStreams)
+    }
+
+    func addStream(key: StreamKey) {
+        if let existingCount = groups[key] {
+            groups[key] = existingCount + 1
+        } else {
+            groups[key] = 1
+            emit()
         }
-        if didChangeStreams {
-            markActiveStreamsHaveChanged()
+    }
+
+    func removeStreamGroup(key: StreamKey) {
+        groups.removeValue(forKey: key)
+        emit()
+    }
+
+    func decrementRefCount(key: StreamKey) {
+        if let count = groups[key] {
+            if count == 1 {
+                removeStreamGroup(key: key)
+            } else {
+                groups[key] = count - 1
+            }
         }
     }
 }

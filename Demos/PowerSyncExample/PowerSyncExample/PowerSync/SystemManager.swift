@@ -101,6 +101,12 @@ final class SystemManager {
     }
 
     func connectChecked() async throws {
+        // Passing a custom URL session is not required, but it can be used to intercept HTTP requests
+        // or to configure additional headers like shown here.
+        let config = URLSessionConfiguration.ephemeral
+        config.httpAdditionalHeaders = ["x-my-custom-header": "example"]
+        let session = URLSession(configuration: config)
+
         try await db.connect(
             connector: connector,
             options: ConnectOptions(
@@ -109,7 +115,8 @@ final class SystemManager {
                         requestLevel: .headers
                     ) { message in
                         self.db.logger.debug(message, tag: "SyncRequest")
-                    }
+                    },
+                    urlSession: session
                 ),
                 // This enables the requestCheckpoint method
                 checkpointMode: .requests()

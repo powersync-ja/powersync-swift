@@ -18,6 +18,14 @@
   Backends that process uploads asynchronously can handle checkpoint requests themselves by
   implementing `CustomCheckpointRequestConnector` on their connector.
   These APIs are in alpha and may change in future releases.
+
+## 1.15.1
+
+- Fix `invalid text line. cause: EOF while parsing a string` errors during sync when
+  a synced row contains an unusual line break (like `\u2028`).
+
+## 1.15.0
+
 * `PowerSyncDatabase(dbFilename:)` now accepts an absolute path (starting with `/`), used
   as-is so the database can live in an App Group container shared with app extensions.
   Plain filenames keep the existing behavior. The SDK coordinates opening the database to
@@ -27,6 +35,7 @@
 * Fix `SyncStatus.asFlow()` emitting the same object, causing SwiftUI to miss updates.
 * Add the `ObservableSyncStatus` utility, which can be used to track Sync Status updates through an `@Observable` class.
 * Clear `SyncStatus.uploadError` after a successful upload.
+* Allow passing a custom `URLSession` in `SyncClientConfiguration`.
 
 ## 1.14.4
 
