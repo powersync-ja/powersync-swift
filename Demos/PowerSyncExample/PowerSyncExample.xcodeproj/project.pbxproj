@@ -68,7 +68,6 @@
 		0B29DBEA2E68875C00D60A06 /* SearchResultItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultItem.swift; sourceTree = "<group>"; };
 		0B29DBEC2E68887700D60A06 /* SearchScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchScreen.swift; sourceTree = "<group>"; };
 		0B29DBEE2E68898800D60A06 /* SearchResultRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultRow.swift; sourceTree = "<group>"; };
-		18CC627A2CC7A8B5009F7CDE /* powersync-kotlin */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "powersync-kotlin"; path = "../powersync-kotlin"; sourceTree = SOURCE_ROOT; };
 		6A4AD3842B9EE763005CBFD4 /* SupabaseConnector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConnector.swift; sourceTree = "<group>"; };
 		6A4AD3882B9EEB21005CBFD4 /* _Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = _Secrets.swift; sourceTree = "<group>"; };
 		6A4AD38F2B9EF775005CBFD4 /* ErrorText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorText.swift; sourceTree = "<group>"; };
@@ -147,8 +146,6 @@
 				6A7315862B9854220004CB17 /* PowerSyncExample */,
 				6A7315852B9854220004CB17 /* Products */,
 				6A7315B52B9857AD0004CB17 /* Frameworks */,
-				AE7193DCE091DC4BD17BE54E /* Pods */,
-				18CC627A2CC7A8B5009F7CDE /* powersync-kotlin */,
 			);
 			sourceTree = "<group>";
 		};
@@ -196,13 +193,6 @@
 				B6F4213C2BC42F450005D0D0 /* classes */,
 			);
 			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		AE7193DCE091DC4BD17BE54E /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Pods;
 			sourceTree = "<group>";
 		};
 		B65C4D6B2C60D36700176007 /* Screens */ = {
@@ -798,7 +788,6 @@
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "PowerSyncExample/PowerSyncExample-Bridging-Header.h";
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
