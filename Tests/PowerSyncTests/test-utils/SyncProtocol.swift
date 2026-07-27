@@ -1,4 +1,5 @@
 // Helpers to encode sync lines sent by the PowerSync service, used to test sync with a mocked HTTP client.
+import Foundation
 import AsyncAlgorithms
 @testable import PowerSync
 
@@ -164,9 +165,11 @@ enum BucketSubscriptionReason: Encodable {
     }
 }
 
-extension AsyncThrowingChannel<PowerSync.SyncLine, any Error> {
+extension AsyncThrowingChannel<Data, any Error> {
     func pushLine(_ line: SyncLine) async throws {
-        let encoded = try StreamingSyncClient.jsonEncoder.encode(line)
-        await send(.text(contents: String(data: encoded, encoding: .utf8)!))
+        var encoded = try StreamingSyncClient.jsonEncoder.encode(line)
+        encoded.append(10) // newline
+
+        await send(encoded)
     }
 }

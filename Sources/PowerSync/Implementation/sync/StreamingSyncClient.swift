@@ -30,7 +30,7 @@ final class StreamingSyncClient: Sendable {
     let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
     let connector: CachingCredentialsConnector
-    let httpClient: any HttpClient
+    let httpClient: HttpClient
 
     let checkpointMode: CheckpointMode
     private let checkpointRequestRetryDelay: TimeInterval
@@ -41,7 +41,7 @@ final class StreamingSyncClient: Sendable {
     init(
         db: PowerSyncDatabaseImpl,
         connector: PowerSyncBackendConnectorProtocol,
-        httpClient: any HttpClient,
+        httpClient: HttpClient,
         options: ConnectOptions,
     ) {
         self.db = db
@@ -262,7 +262,10 @@ The next upload iteration will be delayed.
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try StreamingSyncClient.jsonEncoder.encode(payload)
-        let (response, data) = try await httpClient.readFully(request: request)
+        let (response, data) = try await httpClient.readFully(
+            request: request,
+            logger: options.clientConfiguration?.requestLogger
+        )
         await self.handleCommonResponseErrors(response: response)
         if response.statusCode == 404 {
             throw CheckpointRequestError.instanceNotSupported
@@ -405,7 +408,7 @@ The next upload iteration will be delayed.
             endpoint.path += "/write-checkpoint2.json"
             endpoint.queryItems = [.init(name: "client_id", value: clientId)]
         }
-        let (response, data) = try await httpClient.readFully(request: request)
+        let (response, data) = try await httpClient.readFully(request: request, logger: options.clientConfiguration?.requestLogger)
         await self.handleCommonResponseErrors(response: response)
         if response.statusCode != 200 {
             throw PowerSyncError.operationFailed(message: "Error getting write checkpoint: \(response.statusCode)")
@@ -473,9 +476,9 @@ The next upload iteration will be delayed.
         httpRequest.httpBody = try StreamingSyncClient.jsonEncoder.encode(request)
         
         let response: HTTPURLResponse
-        let stream: any SyncLineResponse
+        let stream: SyncLineResponse
         do {
-            (response, stream) = try await httpClient.receiveSyncLines(request: httpRequest)
+            (response, stream) = try await httpClient.receiveSyncLines(request: httpRequest, logger: options.clientConfiguration?.requestLogger)
         } catch {
             if let responseError = error as? UnexpectedResponseError {
                 await handleCommonResponseErrors(response: responseError.response)
@@ -739,7 +742,7 @@ fileprivate struct ControlInvocationsFromStream: AsyncSequence, Sendable {
     typealias AsyncIterator = ControlInvocationsFromStreamIterator
     typealias Element = PowerSyncControlArguments
 
-    let sequence: any SyncLineResponse
+    let sequence: SyncLineResponse
     
     func makeAsyncIterator() -> ControlInvocationsFromStreamIterator {
         .beforeStart(self.sequence)
@@ -749,8 +752,8 @@ fileprivate struct ControlInvocationsFromStream: AsyncSequence, Sendable {
 fileprivate enum ControlInvocationsFromStreamIterator: AsyncIteratorProtocol {
     typealias Element = PowerSyncControlArguments
 
-    case beforeStart(any SyncLineResponse)
-    case isReceiving(any SyncLineResponseIterator)
+    case beforeStart(SyncLineResponse)
+    case isReceiving(SyncLineResponseIterator)
     case eof
     
     mutating func next() async throws -> PowerSyncControlArguments? {

@@ -3,12 +3,12 @@ import Foundation
 @testable import PowerSync
 import Testing
 
-final class MockHttpClient: HttpClient {
+final class MockHttpSession: PowerSyncUrlSession {
+    typealias Response = ChunksToBytes
+
     private let _writeCheckpoint = PowerSync.Mutex(1000)
-    /// Request paths observed by the mock, useful when tests need to assert call order.
     private let _requestPaths = PowerSync.Mutex<[String]>([])
-    let handleSyncLines: @Sendable (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>
-    /// Handles `/sync/checkpoint-request` after the mock decodes and validates the request body.
+    let handleSyncLines: @Sendable (_ request: URLRequest) async throws -> AsyncThrowingChannel<Data, any Error>
     let checkpointRequestHook: @Sendable (_ request: MockCheckpointRequest) async throws -> MockCheckpointRequestResponse
     
     var writeCheckpoint: Int {
@@ -25,7 +25,7 @@ final class MockHttpClient: HttpClient {
     }
     
     init(
-        handleSyncLines: @Sendable @escaping (_ request: URLRequest) async throws -> AsyncThrowingChannel<PowerSync.SyncLine, any Error>,
+        handleSyncLines: @Sendable @escaping (_ request: URLRequest) async throws -> AsyncThrowingChannel<Data, any Error>,
         checkpointRequestHook: @Sendable @escaping (_ request: MockCheckpointRequest) async throws -> MockCheckpointRequestResponse = { request in
             .checkpointRequestId(request.requestId)
         }
@@ -33,17 +33,17 @@ final class MockHttpClient: HttpClient {
         self.handleSyncLines = handleSyncLines
         self.checkpointRequestHook = checkpointRequestHook
     }
-    
-    func receiveSyncLines(request: URLRequest) async throws -> (HTTPURLResponse, any SyncLineResponse) {
+
+    func readStreamed(request: URLRequest) async throws -> (HTTPURLResponse, Response) {
         try #require(request.url?.path == "/sync/stream")
         _requestPaths.withLock { $0.append("/sync/stream") }
 
         let channel = try await handleSyncLines(request)
         let response = HTTPURLResponse(url: request.url!, mimeType: "application/x-ndjson", expectedContentLength: 0, textEncodingName: "utf-8")
 
-        return (response, MockSyncLineResponse(inner: channel))
+        return (response, ChunksToBytes(stream: channel))
     }
-    
+
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data) {
         let path = try #require(request.url?.path)
         _requestPaths.withLock { $0.append(path) }
@@ -74,19 +74,14 @@ final class MockHttpClient: HttpClient {
 
         case "/write-checkpoint2.json":
             let checkpoint = writeCheckpoint
-            let data = try encodeWriteCheckpointResponse(Int64(checkpoint))
+            let body = WriteCheckpointResponse(data: WriteCheckpointData(write_checkpoint: String(checkpoint)))
+            let data = try StreamingSyncClient.jsonEncoder.encode(body)
             let response = HTTPURLResponse(url: request.url!, mimeType: "application/json", expectedContentLength: data.count, textEncodingName: "utf-8")
-
             return (response, data)
 
         default:
             throw PowerSyncError.operationFailed(message: "Unsupported mock request path: \(path)")
         }
-    }
-
-    private func encodeWriteCheckpointResponse(_ checkpoint: Int64) throws -> Data {
-        let response = WriteCheckpointResponse(data: WriteCheckpointData(write_checkpoint: String(checkpoint)))
-        return try StreamingSyncClient.jsonEncoder.encode(response)
     }
 
     private func encodeCheckpointRequestResponse(_ checkpointRequestId: Int64) throws -> Data {
@@ -107,18 +102,42 @@ enum MockCheckpointRequestResponse: Sendable {
     case statusCode(Int)
 }
 
-private struct MockSyncLineResponse: SyncLineResponse {
-    let inner: AsyncThrowingChannel<PowerSync.SyncLine, any Error>
-    
-    func makeAsyncIterator() -> MockSyncLineResponseIterator {
-        return MockSyncLineResponseIterator(inner: inner.makeAsyncIterator())
-    }
-}
+/// Flattens a sequence of byte chunks into a sequence of bytes.
+struct ChunksToBytes: AsyncSequence {
+    typealias Element = UInt8
+    typealias AsyncIterator = Iterator
 
-private struct MockSyncLineResponseIterator: SyncLineResponseIterator {
-    var inner: AsyncThrowingChannel<PowerSync.SyncLine, any Error>.AsyncIterator
-    
-    mutating func next() async throws -> PowerSync.SyncLine? {
-        return try await inner.next()
+    let stream: AsyncThrowingChannel<Data, any Error>
+
+    struct Iterator: AsyncIteratorProtocol {
+        typealias Element = UInt8
+
+        var stream: AsyncThrowingChannel<Data, any Error>.AsyncIterator
+        var buffer: Data?
+        var offset: Int = 0
+
+        mutating func next() async throws -> UInt8? {
+            if let buffer {
+                return readFromBuffer(buffer: buffer)
+            }
+
+            guard let line = try await stream.next() else { return nil }
+            buffer = line
+            offset = 0
+            return readFromBuffer(buffer: line)
+        }
+
+        mutating func readFromBuffer(buffer: Data) -> UInt8 {
+            let byte = buffer[offset]
+            offset += 1
+            if offset == buffer.count {
+                self.buffer = nil
+            }
+            return byte
+        }
+    }
+
+    func makeAsyncIterator() -> Iterator {
+        return Iterator(stream: stream.makeAsyncIterator())
     }
 }
