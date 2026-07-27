@@ -1,10 +1,17 @@
 # PowerSync Swift SDK
 
-## Releasing
+## Pre-release checks
 
 * Confirm every PR you want in the release has been merged into `main`.
 * Update `CHANGELOG.md` with the changes.
-+ Update `libraryVersion` variable in `Sources/PowerSync/CurrentVersion.swift` with the latest version in `CHANGELOG.md` (if a new version is being specified).
-* In GitHub actions on GitHub manually run the `Release PowerSync` action. You will be required to update the version and add release notes.
-  The version string should have the form `1.0.0`, there should not be a `v` prefix on the tag name.
-* If the release notes are complicated and don't fit on a single line it is easier to rather update those after the release is completed by updating the release notes in the new release.
+* Update `libraryVersion` variable in `Sources/PowerSync/CurrentVersion.swift` with the latest version in `CHANGELOG.md` (if a new version is being specified).
+
+## Release
+
+Given that the Swift SDK has no additional release assets and just consists of a tag, release it by creating a release
+on the [GitHub website](https://github.com/powersync-ja/powersync-swift/releases/new).
+
+Under the `Tag` option, enter the name of the version without a `v` prefix (e.g. `1.16.0`) and select "Create new tag".
+Use the version as a release title and `main` as a target ref.
+
+To generate release notes, select the previous tag and use the "Generate release notes" feature.
