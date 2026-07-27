@@ -6,8 +6,8 @@
   and `SyncSubscriptionDescription.expiresAt`) now have microsecond resolution.
 * Add alpha support for checkpoint requests, which let clients wait until the local database
   has caught up to the current server-side state — useful for explicit pull-to-refresh flows.
-  Connect with `checkpointMode: .requests()` (requires a PowerSync service supporting
-  `/sync/checkpoint-request`), then:
+  Checkpoint requests require PowerSync service version **1.24.0 or later**.
+  Connect with `checkpointMode: .requests()`, then:
 
   ```swift
   try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests()))

@@ -39,6 +39,8 @@ public protocol PowerSyncBackendConnectorProtocol: Sendable {
 ///
 /// Connect with `.requests()` to use this connector's checkpoint requests.
 /// In ``CheckpointMode/legacy`` mode this protocol is ignored and a warning is logged.
+/// Checkpoint requests require PowerSync service version 1.24.0 or later, including
+/// when this connector posts the requests through a custom backend.
 ///
 /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
 public protocol CustomCheckpointRequestConnector: PowerSyncBackendConnectorProtocol {

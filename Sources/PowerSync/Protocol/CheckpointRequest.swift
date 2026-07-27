@@ -15,7 +15,7 @@ public protocol CheckpointError: Error, LocalizedError {}
 /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
 public enum CheckpointRequestError: CheckpointError {
     /// The target PowerSync service does not support checkpoint requests.
-    /// Update the PowerSync service to use this API.
+    /// Update to PowerSync service version 1.24.0 or later to use this API.
     case instanceNotSupported
 
     /// Checkpoint requests require an active or connecting sync client.
@@ -36,7 +36,7 @@ public enum CheckpointRequestError: CheckpointError {
     public var errorDescription: String? {
         switch self {
         case .instanceNotSupported:
-            return "The PowerSync service does not support checkpoint requests. Update the PowerSync service to use this API."
+            return "The PowerSync service does not support checkpoint requests. Update to PowerSync service version 1.24.0 or later to use this API."
         case .notConnecting:
             return "Checkpoint requests require an active or connecting sync client."
         case .checkpointRequestsNotEnabled:

@@ -43,6 +43,7 @@ public enum CheckpointMode: Sendable, Encodable {
     /// Requests are sent to the service's `/sync/checkpoint-request` endpoint, or to the
     /// connector when it implements ``CustomCheckpointRequestConnector``.
     /// This mode is required for ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
+    /// It requires PowerSync service version 1.24.0 or later.
     ///
     /// - Parameter checkpointRequestRetryDelay: Optional delay in seconds before retrying
     ///   the latest checkpoint request when it has not been applied yet.
@@ -287,7 +288,8 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// The returned request can be awaited to confirm that the local database has applied
     /// server-side changes up to the checkpoint. This method requires an active or connecting
     /// sync client connected with ``ConnectOptions/checkpointMode`` set to
-    /// `.requests()`. It can throw for connection, mode, authentication, or service
+    /// `.requests()` and PowerSync service version 1.24.0 or later.
+    /// It can throw for connection, mode, authentication, or service
     /// request failures.
     ///
     /// Creating the request has no timeout of its own: while the sync client keeps retrying a
