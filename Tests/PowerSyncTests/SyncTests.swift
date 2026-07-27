@@ -540,7 +540,7 @@ class InMemorySyncIntegrationTests {
             try await useDatabase(mockClient) { db in
                 try await db.connect(
                     connector: TestConnector(),
-                    options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 0.1))
+                    options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 0.2))
                 )
                 await waitForStatus(db.currentStatus) { $0.connected }
 
@@ -548,12 +548,21 @@ class InMemorySyncIntegrationTests {
                 try await sleepForSeconds(seconds: 0.03)
                 _ = try await db.requestCheckpoint()
 
-                // The second request advances the current sequence to 3. The retry interval should restart
-                // from that newer request instead of retrying request 2 first.
+                // The second request advances the current sequence to 3. Its first retry should
+                // observe a fresh interval starting from that newer request.
                 try await waitUntil(attempts: 500) {
                     checkpointRequests.count(of: 3) >= 2
                 }
-                try #require(checkpointRequests.count(of: 2) == 1)
+                let request2Time = try #require(checkpointRequests.instants(of: 2).first)
+                let request3Times = checkpointRequests.instants(of: 3)
+                #expect(
+                    request3Times[0] - request2Time < .milliseconds(200),
+                    "The newer checkpoint request should arrive before the previous retry interval elapses"
+                )
+                #expect(
+                    request3Times[1] - request3Times[0] >= .milliseconds(180),
+                    "The latest checkpoint request should wait for the retry interval before being retried"
+                )
             }
         }
     }
@@ -2186,18 +2195,29 @@ private func withFastCheckpointRequestRetries<T>(_ operation: () async throws ->
 }
 
 private final class CheckpointRequestRecorder: @unchecked Sendable {
-    private let requestIds = Mutex<[Int64]>([])
+    private struct RecordedRequest: Sendable {
+        let id: Int64
+        let instant: ContinuousClock.Instant
+    }
+
+    private let requests = Mutex<[RecordedRequest]>([])
 
     var ids: [Int64] {
-        requestIds.withLock { $0 }
+        requests.withLock { $0.map(\.id) }
     }
 
     func contains(_ requestId: Int64) -> Bool {
-        requestIds.withLock { $0.contains(requestId) }
+        requests.withLock { $0.contains { $0.id == requestId } }
     }
 
     func count(of requestId: Int64) -> Int {
-        requestIds.withLock { $0.filter { $0 == requestId }.count }
+        requests.withLock { $0.count { $0.id == requestId } }
+    }
+
+    func instants(of requestId: Int64) -> [ContinuousClock.Instant] {
+        requests.withLock { requests in
+            requests.compactMap { $0.id == requestId ? $0.instant : nil }
+        }
     }
 
     func handler(
@@ -2206,7 +2226,9 @@ private final class CheckpointRequestRecorder: @unchecked Sendable {
         }
     ) -> @Sendable (MockCheckpointRequest) async throws -> MockCheckpointRequestResponse {
         { request in
-            self.requestIds.withLock { $0.append(request.requestId) }
+            self.requests.withLock {
+                $0.append(RecordedRequest(id: request.requestId, instant: .now))
+            }
             return try await response(request)
         }
     }
