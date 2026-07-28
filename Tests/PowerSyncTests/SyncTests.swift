@@ -553,14 +553,14 @@ class InMemorySyncIntegrationTests {
                 try await waitUntil(attempts: 500) {
                     checkpointRequests.count(of: 3) >= 2
                 }
-                let request2Time = try #require(checkpointRequests.instants(of: 2).first)
-                let request3Times = checkpointRequests.instants(of: 3)
+                let request2Time = try #require(checkpointRequests.timestamps(of: 2).first)
+                let request3Times = checkpointRequests.timestamps(of: 3)
                 #expect(
-                    request3Times[0] - request2Time < .milliseconds(200),
+                    request3Times[0] - request2Time < 0.2,
                     "The newer checkpoint request should arrive before the previous retry interval elapses"
                 )
                 #expect(
-                    request3Times[1] - request3Times[0] >= .milliseconds(180),
+                    request3Times[1] - request3Times[0] >= 0.18,
                     "The latest checkpoint request should wait for the retry interval before being retried"
                 )
             }
@@ -2197,7 +2197,7 @@ private func withFastCheckpointRequestRetries<T>(_ operation: () async throws ->
 private final class CheckpointRequestRecorder: @unchecked Sendable {
     private struct RecordedRequest: Sendable {
         let id: Int64
-        let instant: ContinuousClock.Instant
+        let timestamp: TimeInterval
     }
 
     private let requests = Mutex<[RecordedRequest]>([])
@@ -2214,9 +2214,9 @@ private final class CheckpointRequestRecorder: @unchecked Sendable {
         requests.withLock { $0.count { $0.id == requestId } }
     }
 
-    func instants(of requestId: Int64) -> [ContinuousClock.Instant] {
+    func timestamps(of requestId: Int64) -> [TimeInterval] {
         requests.withLock { requests in
-            requests.compactMap { $0.id == requestId ? $0.instant : nil }
+            requests.compactMap { $0.id == requestId ? $0.timestamp : nil }
         }
     }
 
@@ -2227,7 +2227,10 @@ private final class CheckpointRequestRecorder: @unchecked Sendable {
     ) -> @Sendable (MockCheckpointRequest) async throws -> MockCheckpointRequestResponse {
         { request in
             self.requests.withLock {
-                $0.append(RecordedRequest(id: request.requestId, instant: .now))
+                $0.append(RecordedRequest(
+                    id: request.requestId,
+                    timestamp: ProcessInfo.processInfo.systemUptime
+                ))
             }
             return try await response(request)
         }
