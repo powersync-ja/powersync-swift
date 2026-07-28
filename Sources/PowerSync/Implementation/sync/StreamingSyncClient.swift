@@ -297,19 +297,7 @@ The next upload iteration will be delayed.
     }
 
     /// Ensures the core checkpoint request counter has been seeded for the current stream.
-    fileprivate func seedCheckpointRequestState(checkpointRequest: CheckpointRequestPayload?) async throws {
-        guard case .requests = checkpointMode else {
-            // Legacy mode has no checkpoint request state to reconcile.
-            signals.markCheckpointsReady()
-            return
-        }
-
-        guard let checkpointRequest else {
-            throw CheckpointRequestError.operationFailed(
-                message: "Core did not provide checkpoint request state while in requests mode."
-            )
-        }
-
+    fileprivate func seedCheckpointRequestState(checkpointRequest: CheckpointRequestPayload) async throws {
         do {
             let seed = try await postCheckpointRequest(checkpointRequest)
             _ = try await db.writeTransaction { tx in
@@ -572,7 +560,7 @@ private struct ActiveSyncIteration: Sendable {
                 //   - retries: if the user is offline initially
                 //   - rare edge cases where the user_id might have changed between connect invocations 
                 let checkpointRequestStateSeed = Task {
-                    try await syncClient.seedCheckpointRequestState(checkpointRequest: checkpointRequest)
+                    try await prepareCheckpointRequestState(checkpointRequest)
                 }
 
                 do {
@@ -648,6 +636,18 @@ private struct ActiveSyncIteration: Sendable {
 
             return SyncIterationResult()
         }.value
+    }
+
+    private func prepareCheckpointRequestState(_ checkpointRequest: CheckpointRequestPayload?) async throws {
+        switch syncClient.checkpointMode {
+        case .legacy:
+            signals.markCheckpointsReady()
+        case .requests:
+            guard let checkpointRequest else {
+                fatalError("PowerSync core did not provide checkpoint request state while checkpoint request mode is enabled.")
+            }
+            try await syncClient.seedCheckpointRequestState(checkpointRequest: checkpointRequest)
+        }
     }
 
     private func powersyncControl(_ args: PowerSyncControlArguments) async throws -> [Instruction] {

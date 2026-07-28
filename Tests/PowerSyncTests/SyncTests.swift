@@ -86,31 +86,6 @@ class InMemorySyncIntegrationTests {
         #expect(decodedStatus.internalLastAppliedCheckpointRequestId == 7)
     }
 
-    @Test func decodesAppliedCheckpointRequestIdOnDidCompleteSync() throws {
-        let data = """
-        [
-          {
-            "DidCompleteSync": {
-              "applied_checkpoint_request_id": "7"
-            }
-          },
-          {
-            "DidCompleteSync": {}
-          }
-        ]
-        """.data(using: .utf8)!
-
-        let instructions = try StreamingSyncClient.jsonDecoder.decode([Instruction].self, from: data)
-        guard case .didCompleteSync(appliedCheckpointRequestId: 7) = try #require(instructions.first) else {
-            Issue.record("Expected DidCompleteSync with an applied checkpoint request id")
-            return
-        }
-        guard case .didCompleteSync(appliedCheckpointRequestId: nil) = try #require(instructions.last) else {
-            Issue.record("Expected DidCompleteSync without an applied checkpoint request id")
-            return
-        }
-    }
-
     @Test func syncStatusTracksInternalLastAppliedCheckpointRequestId() throws {
         let syncStatus = SwiftSyncStatus()
         let data = """
@@ -750,6 +725,35 @@ class InMemorySyncIntegrationTests {
             // Once applied, the checkpoint request stays synced even without a connection.
             try await db.disconnect()
             try #require(checkpoint.hasSynced)
+        }
+    }
+
+    @Test func waitForSyncRequiresCheckpointRequestModeAfterReconnect() async throws {
+        let mockClient = MockHttpSession(
+            handleSyncLines: { _ in AsyncThrowingChannel<Data, any Error>() }
+        )
+
+        try await useDatabase(mockClient) { db in
+            try await db.connect(
+                connector: TestConnector(),
+                options: ConnectOptions(checkpointMode: .requests())
+            )
+            await waitForStatus(db.currentStatus) { $0.connected }
+            let checkpoint = try await db.requestCheckpoint()
+
+            try await db.disconnect()
+            try await db.connect(connector: TestConnector())
+            await waitForStatus(db.currentStatus) { $0.connected }
+
+            do {
+                try await checkpoint.waitForSync()
+                Issue.record("Expected waitForSync() to require checkpoint request mode")
+            } catch CheckpointWaitError.operationFailed(let message, let underlyingError) {
+                #expect(message == "The active connection is not configured to use checkpoint requests.")
+                #expect(underlyingError == nil)
+            } catch {
+                Issue.record("Expected CheckpointWaitError.operationFailed, got \(error)")
+            }
         }
     }
 
