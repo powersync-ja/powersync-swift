@@ -296,8 +296,11 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// failing connection, this call keeps waiting. Cancel the calling task to stop waiting, and
     /// use ``CheckpointRequest/waitForSync(timeout:)`` to bound the wait for the checkpoint itself.
     ///
+    /// - Throws: ``CheckpointRequestError`` when checkpoint requests are unavailable or the
+    ///   request cannot be completed.
+    ///
     /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
-    func requestCheckpoint() async throws -> any CheckpointRequest
+    func requestCheckpoint() async throws(CheckpointRequestError) -> any CheckpointRequest
 
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.

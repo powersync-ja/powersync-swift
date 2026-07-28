@@ -48,7 +48,7 @@ final class CheckpointRequestImpl: CheckpointRequest {
     }
 
     /// Waits until sync status reports that this checkpoint request has been applied.
-    private func waitForCheckpointRequest() async throws {
+    private func waitForCheckpointRequest() async throws(CheckpointWaitError) {
         if db.syncStatus.isCheckpointRequestApplied(requestId) {
             return
         }
@@ -67,11 +67,8 @@ final class CheckpointRequestImpl: CheckpointRequest {
             if !update.connected && !update.connecting {
                 throw CheckpointWaitError.disconnected
             }
-
-            try Task.checkCancellation()
         }
 
-        try Task.checkCancellation()
         throw CheckpointWaitError.disconnected
     }
 }

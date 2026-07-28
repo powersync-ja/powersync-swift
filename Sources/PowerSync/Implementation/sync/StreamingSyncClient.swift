@@ -210,9 +210,9 @@ The next upload iteration will be delayed.
     /// later sync-loop events can report when the same checkpoint request has been applied.
     /// This does not update the target checkpoint request id: explicit checkpoint requests are wait markers,
     /// not local upload gates.
-    func requestCheckpoint() async throws -> any CheckpointRequest {
+    func requestCheckpoint() async throws(CheckpointRequestError) -> any CheckpointRequest {
         guard case .requests = checkpointMode else {
-            throw CheckpointRequestError.checkpointRequestsNotEnabled
+            throw .checkpointRequestsNotEnabled
         }
 
         // Allocate the request ID locally before reporting it to the service.
@@ -224,26 +224,29 @@ The next upload iteration will be delayed.
     ///
     /// When the connector implements ``CustomCheckpointRequestConnector``, the request is posted to
     /// the custom backend instead of the service endpoint, with the same state contract.
-    private func requestCheckpointFromService(requestId: Int64) async throws -> Int64 {
-        let clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
+    private func requestCheckpointFromService(requestId: Int64) async throws(CheckpointRequestError) -> Int64 {
+        let clientId: String
+        do {
+            clientId = try await db.get("SELECT powersync_client_id()") { try $0.getString(index: 0) }
+        } catch {
+            throw .operationFailed(
+                message: "Failed to read the PowerSync client ID.",
+                underlyingError: error
+            )
+        }
+
         return try await postCheckpointRequest(CheckpointRequestPayload(
             client_id: clientId,
-            checkpoint_request_id: String(requestId)
+            checkpoint_request_id: requestId
         ))
     }
 
     /// Posts a checkpoint request payload prepared by core and returns the state accepted remotely.
-    private func postCheckpointRequest(_ payload: CheckpointRequestPayload) async throws -> Int64 {
+    private func postCheckpointRequest(_ payload: CheckpointRequestPayload) async throws(CheckpointRequestError) -> Int64 {
         if let customCheckpointRequestConnector {
             do {
-                guard let requestId = Int64(payload.checkpoint_request_id) else {
-                    throw CheckpointRequestError.operationFailed(
-                        message: "Invalid checkpoint request ID received from core."
-                    )
-                }
-
                 return try await customCheckpointRequestConnector.postCheckpointRequest(
-                    requestId,
+                    payload.checkpoint_request_id,
                     clientId: payload.client_id
                 )
             } catch let error as CheckpointRequestError {
@@ -256,29 +259,38 @@ The next upload iteration will be delayed.
             }
         }
 
-        var (_, request) = try await authenticatedRequest { endpoint in
-            endpoint.path += "/sync/checkpoint-request"
-        }
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try StreamingSyncClient.jsonEncoder.encode(payload)
-        let (response, data) = try await httpClient.readFully(
-            request: request,
-            logger: options.clientConfiguration?.requestLogger
-        )
-        await self.handleCommonResponseErrors(response: response)
-        if response.statusCode == 404 {
-            throw CheckpointRequestError.instanceNotSupported
-        }
-        if response.statusCode != 200 {
-            throw CheckpointRequestError.operationFailed(message: "Checkpoint request failed with status code: \(response.statusCode)")
-        }
-
         do {
-            return try StreamingSyncClient.decodeCheckpointRequestId(from: data)
+            var (_, request) = try await authenticatedRequest { endpoint in
+                endpoint.path += "/sync/checkpoint-request"
+            }
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try StreamingSyncClient.jsonEncoder.encode(payload)
+            let (response, data) = try await httpClient.readFully(
+                request: request,
+                logger: options.clientConfiguration?.requestLogger
+            )
+            await self.handleCommonResponseErrors(response: response)
+            if response.statusCode == 404 {
+                throw CheckpointRequestError.instanceNotSupported
+            }
+            if response.statusCode != 200 {
+                throw CheckpointRequestError.operationFailed(message: "Checkpoint request failed with status code: \(response.statusCode)")
+            }
+
+            do {
+                return try StreamingSyncClient.decodeCheckpointRequestId(from: data)
+            } catch {
+                throw CheckpointRequestError.operationFailed(
+                    message: "Invalid checkpoint request response.",
+                    underlyingError: error
+                )
+            }
+        } catch let error as CheckpointRequestError {
+            throw error
         } catch {
             throw CheckpointRequestError.operationFailed(
-                message: "Invalid checkpoint request response.",
+                message: "Checkpoint request failed.",
                 underlyingError: error
             )
         }
@@ -287,18 +299,14 @@ The next upload iteration will be delayed.
     /// Ensures the core checkpoint request counter has been seeded for the current stream.
     fileprivate func seedCheckpointRequestState(checkpointRequest: CheckpointRequestPayload?) async throws {
         guard case .requests = checkpointMode else {
-            // legacy mode does not require tracking local state
+            // Legacy mode has no checkpoint request state to reconcile.
             signals.markCheckpointsReady()
             return
         }
 
-        // In requests mode core is expected to always provide the payload alongside the
-        // establishSyncStream instruction. Guard instead of force-unwrapping so a mismatched
-        // core version (or protocol change) surfaces a recoverable error rather than crashing
-        // the sync task. The error routes through the normal sync-line retry path.
         guard let checkpointRequest else {
             throw CheckpointRequestError.operationFailed(
-                message: "Core did not provide a checkpoint request payload while in requests mode."
+                message: "Core did not provide checkpoint request state while in requests mode."
             )
         }
 
@@ -330,8 +338,19 @@ The next upload iteration will be delayed.
         }
     }
 
-    private func requestNextCheckpointFromService() async throws -> Int64 {
-        let requestId = try await nextCheckpointRequestId()
+    private func requestNextCheckpointFromService() async throws(CheckpointRequestError) -> Int64 {
+        let requestId: Int64
+        do {
+            requestId = try await nextCheckpointRequestId()
+        } catch let error as CheckpointRequestError {
+            throw error
+        } catch {
+            throw .operationFailed(
+                message: "Failed to allocate a checkpoint request ID.",
+                underlyingError: error
+            )
+        }
+
         return try await requestCheckpointFromService(requestId: requestId)
     }
 
@@ -354,7 +373,7 @@ The next upload iteration will be delayed.
             return
         }
 
-        while !Task.isCancelled {
+        while true {
             do {
                 // Make sure the system is seeded and ready
                 try await signals.waitForCheckpointRequestsReady(wakeDownloadLoop: false)
@@ -499,21 +518,11 @@ The next upload iteration will be delayed.
     static let jsonDecoder = JSONDecoder()
 
     private static func decodeWriteCheckpointId(from data: Data) throws -> Int64 {
-        let checkpoint = try jsonDecoder.decode(WriteCheckpointResponse.self, from: data).data.write_checkpoint
-        guard let checkpointId = Int64(checkpoint) else {
-            throw PowerSyncError.operationFailed(message: "Invalid write checkpoint returned by service: \(checkpoint)")
-        }
-
-        return checkpointId
+        try jsonDecoder.decode(WriteCheckpointResponse.self, from: data).data.write_checkpoint
     }
 
     private static func decodeCheckpointRequestId(from data: Data) throws -> Int64 {
-        let requestId = try jsonDecoder.decode(CheckpointRequestResponse.self, from: data).data.checkpoint_request_id
-        guard let checkpointRequestId = Int64(requestId) else {
-            throw PowerSyncError.operationFailed(message: "Invalid checkpoint request returned by service: \(requestId)")
-        }
-
-        return checkpointRequestId
+        try jsonDecoder.decode(CheckpointRequestResponse.self, from: data).data.checkpoint_request_id
     }
 }
 
@@ -576,10 +585,8 @@ private struct ActiveSyncIteration: Sendable {
                     // iteration even while sync-line events are allowed to flow before
                     // checkpoint request state is ready.
                     controlArgs = AsyncAlgorithms.merge(
-                        AsyncAlgorithms.merge(
-                            serviceEvents,
-                            checkpointRequestStateValidationEvents(task: checkpointRequestStateSeed)
-                        ),
+                        serviceEvents,
+                        checkpointRequestStateValidationEvents(task: checkpointRequestStateSeed),
                         localEvents.subscribe()
                     )
                 } catch {
@@ -682,10 +689,7 @@ private struct ActiveSyncIteration: Sendable {
                     }
                 }
             }
-        case .flushFileSystem:
-            // Noop on native platforms.
-            break;
-        case .didCompleteSync(appliedCheckpointRequestId: _):
+        case .didCompleteSync:
             syncClient.db.syncStatus.mutateStatus {
                 $0.internalDownloadError = nil
             }
@@ -709,8 +713,9 @@ private struct ActiveSyncIteration: Sendable {
 }
 
 fileprivate typealias CheckpointRequestStateValidationEvents = AsyncThrowingStream<PowerSyncControlArguments, any Error>
-fileprivate typealias SyncControlEvents = AsyncMerge2Sequence<
-    AsyncMerge2Sequence<ControlInvocationsFromStream, CheckpointRequestStateValidationEvents>,
+fileprivate typealias SyncControlEvents = AsyncMerge3Sequence<
+    ControlInvocationsFromStream,
+    CheckpointRequestStateValidationEvents,
     AsyncStream<PowerSyncControlArguments>
 >
 
@@ -790,7 +795,7 @@ struct WriteCheckpointResponse: Codable {
 }
 
 struct WriteCheckpointData: Codable {
-    let write_checkpoint: String
+    @StringEncodedInt64 var write_checkpoint: Int64
 }
 
 struct CheckpointRequestResponse: Codable {
@@ -798,10 +803,10 @@ struct CheckpointRequestResponse: Codable {
 }
 
 struct CheckpointRequestResponseData: Codable {
-    let checkpoint_request_id: String
+    @StringEncodedInt64 var checkpoint_request_id: Int64
 }
 
 struct CheckpointRequestPayload: Codable {
     let client_id: String
-    let checkpoint_request_id: String
+    @StringEncodedInt64 var checkpoint_request_id: Int64
 }
