@@ -91,6 +91,13 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift")
             ]
         ),
+        .executableTarget(
+            name: "CustomCheckpointDemo",
+            dependencies: [
+                .target(name: "PowerSync"),
+            ],
+            path: "Demos/CustomCheckpointDemo/Sources/CustomCheckpointDemo"
+        ),
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]

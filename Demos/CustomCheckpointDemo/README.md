@@ -9,9 +9,8 @@ Node.js todo backend. It uses that backend's auth, batch upload, and checkpoint 
 ## Run
 
 ```sh
-cd Demos/CustomCheckpointDemo
 BACKEND_URL=http://localhost:6060 \
-swift run
+swift run CustomCheckpointDemo
 ```
 
 `BACKEND_URL` defaults to `http://localhost:6060`, `POWERSYNC_URL` defaults to
