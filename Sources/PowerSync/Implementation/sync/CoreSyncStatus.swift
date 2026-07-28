@@ -1,5 +1,10 @@
-struct StringEncodedInt64: Decodable {
-    let value: Int64
+@propertyWrapper
+struct StringEncodedInt64: Codable {
+    let wrappedValue: Int64
+
+    init(wrappedValue: Int64) {
+        self.wrappedValue = wrappedValue
+    }
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -10,7 +15,12 @@ struct StringEncodedInt64: Decodable {
                 debugDescription: "Expected a decimal Int64 string"
             )
         }
-        self.value = value
+        self.wrappedValue = value
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(String(wrappedValue))
     }
 }
 
@@ -50,7 +60,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
         self.internalLastAppliedCheckpointRequestId = try container.decodeIfPresent(
             StringEncodedInt64.self,
             forKey: .internalLastAppliedCheckpointRequestId
-        )?.value
+        )?.wrappedValue
         
         var streamsContainer = try container.nestedUnkeyedContainer(forKey: .streams)
         var streams: [SyncStreamStatus] = []

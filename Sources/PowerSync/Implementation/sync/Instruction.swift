@@ -11,8 +11,7 @@ enum Instruction {
     case establishSyncStream(request: JsonParam, checkpointRequest: CheckpointRequestPayload?)
     case fetchCredentials(didExpire: Bool)
     case closeSyncStream(hideDisconnect: Bool)
-    case flushFileSystem
-    case didCompleteSync(appliedCheckpointRequestId: Int64?)
+    case didCompleteSync
     case handleDiagnostics
 }
 
@@ -23,7 +22,6 @@ extension Instruction: Decodable {
         case establishSyncStream = "EstablishSyncStream"
         case fetchCredentials = "FetchCredentials"
         case closeSyncStream = "CloseSyncStream"
-        case flushFileSystem = "FlushFileSystem"
         case didCompleteSync = "DidCompleteSync"
         case handleDiagnostics = "HandleDiagnostics"
     }
@@ -48,13 +46,6 @@ extension Instruction: Decodable {
 
     enum CloseSyncStreamCodingKeys: String, CodingKey {
         case hideDisconnect = "hide_disconnect"
-    }
-    
-    enum FlushFileSystemCodingKeys: CodingKey {
-    }
-    
-    enum DidCompleteSyncCodingKeys: String, CodingKey {
-        case appliedCheckpointRequestId = "applied_checkpoint_request_id"
     }
     
     init(from decoder: any Decoder) throws {
@@ -89,16 +80,8 @@ extension Instruction: Decodable {
         case .closeSyncStream:
             let nestedContainer = try container.nestedContainer(keyedBy: Instruction.CloseSyncStreamCodingKeys.self, forKey: .closeSyncStream)
             self = Instruction.closeSyncStream(hideDisconnect: try nestedContainer.decode(Bool.self, forKey: Instruction.CloseSyncStreamCodingKeys.hideDisconnect))
-        case .flushFileSystem:
-            self = Instruction.flushFileSystem
         case .didCompleteSync:
-            let nestedContainer = try container.nestedContainer(keyedBy: Instruction.DidCompleteSyncCodingKeys.self, forKey: .didCompleteSync)
-            self = Instruction.didCompleteSync(
-                appliedCheckpointRequestId: try nestedContainer.decodeIfPresent(
-                    StringEncodedInt64.self,
-                    forKey: Instruction.DidCompleteSyncCodingKeys.appliedCheckpointRequestId
-                )?.value
-            )
+            self = Instruction.didCompleteSync
         case .handleDiagnostics:
             self = Instruction.handleDiagnostics
         }
