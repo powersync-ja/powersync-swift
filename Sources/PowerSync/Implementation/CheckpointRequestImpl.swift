@@ -27,18 +27,20 @@ final class CheckpointRequestImpl: CheckpointRequest {
         }
     }
 
-    func waitForSync() async throws {
+    func waitForSync() async throws(CheckpointWaitError) {
         if hasSynced {
             return
         }
 
         try await db.group.syncCoordinator.guardNotConnected(
-            inner: {
+            inner: { () async throws(CheckpointWaitError) -> Void in
                 throw CheckpointWaitError.disconnected
             },
-            ifConnected: { client in
+            ifConnected: { (client: StreamingSyncClient) async throws(CheckpointWaitError) -> Void in
                 guard case .requests = client.checkpointMode else {
-                    throw CheckpointRequestError.checkpointRequestsNotEnabled
+                    throw CheckpointWaitError.operationFailed(
+                        message: "The active connection is not configured to use checkpoint requests."
+                    )
                 }
             }
         )

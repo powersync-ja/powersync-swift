@@ -70,6 +70,9 @@ public enum CheckpointWaitError: CheckpointError {
     /// The sync client reported a download or upload error while waiting.
     case errorDetected(message: String)
 
+    /// The checkpoint request could not be awaited.
+    case operationFailed(message: String? = nil, underlyingError: Error? = nil)
+
     public var errorDescription: String? {
         switch self {
         case .timeout:
@@ -78,6 +81,15 @@ public enum CheckpointWaitError: CheckpointError {
             return "The sync client disconnected before the checkpoint request was synced."
         case .errorDetected(let message):
             return "The sync client reported an error while waiting for the checkpoint request: \(message)"
+        case .operationFailed(let message, let underlyingError):
+            var description = "The checkpoint request could not be awaited."
+            if let message {
+                description += " \(message)"
+            }
+            if let underlyingError {
+                description += " (\(underlyingError))"
+            }
+            return description
         }
     }
 }
@@ -116,9 +128,9 @@ public protocol CheckpointRequest: Sendable {
     /// wait once sync has recovered.
     /// - Throws: ``CheckpointWaitError`` when no sync client is active, when the sync client
     ///   disconnects before the checkpoint is reached, or when a sync error is present or reached
-    ///   while waiting. Throws ``CheckpointRequestError/checkpointRequestsNotEnabled``
-    ///   when the active connection was not configured with `.requests()`.
-    func waitForSync() async throws
+    ///   while waiting. If the active connection is no longer configured with `.requests()`, this
+    ///   throws ``CheckpointWaitError/operationFailed(message:underlyingError:)``.
+    func waitForSync() async throws(CheckpointWaitError)
 
     /// Waits until this checkpoint has been synced locally, or until a timeout elapses.
     ///

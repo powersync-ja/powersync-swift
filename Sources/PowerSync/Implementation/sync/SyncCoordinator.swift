@@ -44,13 +44,24 @@ actor SyncCoordinator {
     }
     
     /// Executes an inner function, but only if no connection is active or scheduled.
-    func guardNotConnected<T>(inner: () async throws -> T, ifConnected: (StreamingSyncClient) async throws -> T) async rethrows -> T {
+    func guardNotConnected<T, Failure: Error>(
+        inner: () async throws(Failure) -> T,
+        ifConnected: (StreamingSyncClient) async throws(Failure) -> T
+    ) async throws(Failure) -> T {
         guard activeSync != nil, let sync = syncClient else {
-            return try await inner();
+            return try await inner()
         }
         return try await ifConnected(sync)
     }
-    
+
+    /// Requests a checkpoint while serializing the active-client check with connect and disconnect.
+    func requestCheckpoint() async throws(CheckpointRequestError) -> any CheckpointRequest {
+        guard activeSync != nil, let sync = syncClient else {
+            throw .notConnecting
+        }
+        return try await sync.requestCheckpoint()
+    }
+
     private func finishSyncTask(task: Task<Void, any Error>) async {
         self.activeSync = nil
         currentClient.withLock { $0 = nil }
