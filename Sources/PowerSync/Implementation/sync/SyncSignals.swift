@@ -13,8 +13,9 @@ final class SyncSignals: Sendable {
 
     /// Tracks connect-time validation for pending checkpoint request creation.
     ///
-    /// Request ID allocation waits on this state so `next_checkpoint_request_id` only runs after
-    /// the service has affirmed or seeded the local counter for the active connection.
+    /// The local checkpoint request counter must be reconciled with the service before a new
+    /// request ID can be allocated. Request creation waits on this state until that reconciliation
+    /// has completed for the active connection.
     private struct PendingCheckpointRequestsState {
         var isReady = false
         /// Terminal readiness failure replayed to pending checkpoint request callers.
@@ -24,7 +25,6 @@ final class SyncSignals: Sendable {
         /// failures surface through the normal sync download error path instead.
         var failure: (any Error)?
         var nextWaiterId: Int64 = 0
-        var downloadRetryWakeGeneration: Int64 = 0
         /// Pending checkpoint requests blocked before creating request IDs.
         ///
         /// These resume once connect-time checkpoint request state has been seeded or affirmed
@@ -137,9 +137,6 @@ final class SyncSignals: Sendable {
 
                 state.nextWaiterId += 1
                 let waiterId = state.nextWaiterId
-                if wakeDownloadLoop {
-                    state.downloadRetryWakeGeneration += 1
-                }
                 state.waiters.append(PendingCheckpointRequestWaiter(id: waiterId, continuation: continuation))
                 return .registered(waiterId: waiterId, shouldWakeDownloadLoop: wakeDownloadLoop)
             }
@@ -177,11 +174,13 @@ final class SyncSignals: Sendable {
     /// waiting for the configured retry delay to elapse. Existing pending requests do not skip
     /// the delay: they already had an opportunity to wake the loop when they registered.
     func waitForRetryDelayOrPendingCheckpointRequest(seconds: TimeInterval) async throws {
+        let pendingRequest = signalPendingCheckpointRequestWaitingForReady.subscribe(
+            bufferingPolicy: .bufferingNewest(1)
+        )
+
         guard seconds > 0 else {
             return
         }
-
-        let initialWakeGeneration = pendingCheckpointRequests.withLock { $0.downloadRetryWakeGeneration }
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
@@ -189,18 +188,14 @@ final class SyncSignals: Sendable {
             }
 
             group.addTask {
-                let stream = self.signalPendingCheckpointRequestWaitingForReady.subscribe(bufferingPolicy: .bufferingNewest(1))
-                // A waiter may have registered between the initial snapshot and this subscription.
-                if self.pendingCheckpointRequests.withLock({ $0.downloadRetryWakeGeneration > initialWakeGeneration }) {
-                    return
-                }
-
-                var iterator = stream.makeAsyncIterator()
+                var iterator = pendingRequest.makeAsyncIterator()
                 _ = await iterator.next()
             }
 
             let _ = try await group.next()
             group.cancelAll()
+            // Cancelling a task while AsyncStream.next() is awaiting a value terminates the
+            // stream, but next() may return nil instead of throwing. Propagate parent cancellation.
             try Task.checkCancellation()
         }
     }
