@@ -162,9 +162,8 @@ final class SyncSignals: Sendable {
             signalPendingCheckpointRequestWaitingForReady.dispatch(event: ())
         }
 
-        for try await _ in stream {
-            try Task.checkCancellation()
-        }
+        // The stream never yields a value: it only finishes, or finishes with a readiness failure.
+        for try await _ in stream {}
         try Task.checkCancellation()
     }
 
@@ -174,13 +173,15 @@ final class SyncSignals: Sendable {
     /// waiting for the configured retry delay to elapse. Existing pending requests do not skip
     /// the delay: they already had an opportunity to wake the loop when they registered.
     func waitForRetryDelayOrPendingCheckpointRequest(seconds: TimeInterval) async throws {
-        let pendingRequest = signalPendingCheckpointRequestWaitingForReady.subscribe(
-            bufferingPolicy: .bufferingNewest(1)
-        )
-
         guard seconds > 0 else {
             return
         }
+
+        // Subscribe before starting the task group so a waiter registering in the meantime is
+        // observed by the iteration below instead of being missed while the group starts up.
+        let pendingRequest = signalPendingCheckpointRequestWaitingForReady.subscribe(
+            bufferingPolicy: .bufferingNewest(1)
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {

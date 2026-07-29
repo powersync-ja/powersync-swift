@@ -511,11 +511,15 @@ class InMemorySyncIntegrationTests {
             handleSyncLines: { _ in channel },
             checkpointRequestHook: checkpointRequests.handler()
         )
+        let retryDelay: TimeInterval = 0.2
+        // Scheduling jitter means the observed interval can land just under the configured delay.
+        let retryDelayTolerance = retryDelay * 0.9
+
         try await withFastCheckpointRequestRetries {
             try await useDatabase(mockClient) { db in
                 try await db.connect(
                     connector: TestConnector(),
-                    options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 0.2))
+                    options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: retryDelay))
                 )
                 await waitForStatus(db.currentStatus) { $0.connected }
 
@@ -531,11 +535,11 @@ class InMemorySyncIntegrationTests {
                 let request2Time = try #require(checkpointRequests.timestamps(of: 2).first)
                 let request3Times = checkpointRequests.timestamps(of: 3)
                 #expect(
-                    request3Times[0] - request2Time < 0.2,
+                    request3Times[0] - request2Time < retryDelay,
                     "The newer checkpoint request should arrive before the previous retry interval elapses"
                 )
                 #expect(
-                    request3Times[1] - request3Times[0] >= 0.18,
+                    request3Times[1] - request3Times[0] >= retryDelayTolerance,
                     "The latest checkpoint request should wait for the retry interval before being retried"
                 )
             }
@@ -748,11 +752,91 @@ class InMemorySyncIntegrationTests {
             do {
                 try await checkpoint.waitForSync()
                 Issue.record("Expected waitForSync() to require checkpoint request mode")
-            } catch CheckpointWaitError.operationFailed(let message, let underlyingError) {
-                #expect(message == "The active connection is not configured to use checkpoint requests.")
-                #expect(underlyingError == nil)
+            } catch CheckpointWaitError.checkpointRequestsNotEnabled {
             } catch {
-                Issue.record("Expected CheckpointWaitError.operationFailed, got \(error)")
+                Issue.record("Expected CheckpointWaitError.checkpointRequestsNotEnabled, got \(error)")
+            }
+        }
+    }
+
+    @Test func waitForSyncReportsCancellation() async throws {
+        let channel = AsyncThrowingChannel<Data, any Error>()
+
+        try await useDatabase(MockHttpSession { _ in channel }) { db in
+            try await db.connect(
+                connector: TestConnector(),
+                options: ConnectOptions(checkpointMode: .requests())
+            )
+            await waitForStatus(db.currentStatus) { $0.connected }
+
+            let checkpoint = try await db.requestCheckpoint()
+            try #require(!checkpoint.hasSynced)
+
+            // `SyncStatus.asFlow()` is a non-throwing `AsyncStream`, so a cancelled wait ends the
+            // iteration silently. Both overloads must still report cancellation as a
+            // `CancellationError` rather than as a disconnect.
+            let waiter = Task {
+                do {
+                    try await checkpoint.waitForSync()
+                    Issue.record("Expected waitForSync() to throw when cancelled")
+                } catch is CancellationError {
+                } catch {
+                    Issue.record("Expected CancellationError, got \(error)")
+                }
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+            waiter.cancel()
+            await waiter.value
+
+            let timeoutWaiter = Task {
+                do {
+                    try await checkpoint.waitForSync(timeout: 30)
+                    Issue.record("Expected waitForSync(timeout:) to throw when cancelled")
+                } catch is CancellationError {
+                } catch {
+                    Issue.record("Expected CancellationError, got \(error)")
+                }
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+            timeoutWaiter.cancel()
+            await timeoutWaiter.value
+        }
+    }
+
+    @Test func requestCheckpointReportsTransportFailuresAsCheckpointErrors() async throws {
+        let channel = AsyncThrowingChannel<Data, any Error>()
+        let mockClient = MockHttpSession(
+            handleSyncLines: { _ in channel },
+            checkpointRequestHook: { request in
+                // Let the connect-time seed (request ID 1) succeed so checkpoint requests become
+                // ready, then fail the explicit request with a non-checkpoint transport error.
+                guard request.requestId > 1 else {
+                    return .checkpointRequestId(request.requestId)
+                }
+                throw URLError(.notConnectedToInternet)
+            }
+        )
+
+        try await useDatabase(mockClient) { db in
+            try await db.connect(
+                connector: TestConnector(),
+                options: ConnectOptions(checkpointMode: .requests())
+            )
+            await waitForStatus(db.currentStatus) { $0.connected }
+
+            do {
+                _ = try await db.requestCheckpoint()
+                Issue.record("Expected requestCheckpoint() to throw when the request cannot be posted")
+            } catch let error as any CheckpointError {
+                // Callers drive requestCheckpoint() and waitForSync() in one `do` block and catch
+                // both as `CheckpointError`, so transport failures must not escape untyped.
+                guard case CheckpointRequestError.operationFailed(_, let underlyingError) = error else {
+                    Issue.record("Expected CheckpointRequestError.operationFailed, got \(error)")
+                    return
+                }
+                #expect(underlyingError != nil, "The originating error should be preserved")
+            } catch {
+                Issue.record("Expected a CheckpointError, got \(type(of: error)): \(error)")
             }
         }
     }

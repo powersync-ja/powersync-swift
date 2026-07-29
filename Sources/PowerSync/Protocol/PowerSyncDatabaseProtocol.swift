@@ -300,7 +300,7 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     ///   request cannot be completed.
     ///
     /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
-    func requestCheckpoint() async throws(CheckpointRequestError) -> any CheckpointRequest
+    func requestCheckpoint() async throws -> any CheckpointRequest
 
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.

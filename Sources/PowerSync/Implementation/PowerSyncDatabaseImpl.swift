@@ -195,9 +195,11 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         return watchImpl(db: self, options: options)
     }
 
-    func requestCheckpoint() async throws(CheckpointRequestError) -> any CheckpointRequest {
+    func requestCheckpoint() async throws -> any CheckpointRequest {
         do {
             try await initialize()
+        } catch let error as CancellationError {
+            throw error
         } catch {
             throw CheckpointRequestError.operationFailed(
                 message: "Failed to initialize the database before requesting a checkpoint.",
@@ -205,7 +207,14 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
             )
         }
 
-        return try await group.syncCoordinator.requestCheckpoint()
+        return try await group.syncCoordinator.guardNotConnected(
+            inner: {
+                throw CheckpointRequestError.notConnecting
+            },
+            ifConnected: { client in
+                try await client.requestCheckpoint()
+            }
+        )
     }
 
     static let maxOpId = Int64.max

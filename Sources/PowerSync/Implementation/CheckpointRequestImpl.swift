@@ -27,20 +27,18 @@ final class CheckpointRequestImpl: CheckpointRequest {
         }
     }
 
-    func waitForSync() async throws(CheckpointWaitError) {
+    func waitForSync() async throws {
         if hasSynced {
             return
         }
 
         try await db.group.syncCoordinator.guardNotConnected(
-            inner: { () async throws(CheckpointWaitError) -> Void in
+            inner: {
                 throw CheckpointWaitError.disconnected
             },
-            ifConnected: { (client: StreamingSyncClient) async throws(CheckpointWaitError) -> Void in
+            ifConnected: { client in
                 guard case .requests = client.checkpointMode else {
-                    throw CheckpointWaitError.operationFailed(
-                        message: "The active connection is not configured to use checkpoint requests."
-                    )
+                    throw CheckpointWaitError.checkpointRequestsNotEnabled
                 }
             }
         )
@@ -50,7 +48,7 @@ final class CheckpointRequestImpl: CheckpointRequest {
     }
 
     /// Waits until sync status reports that this checkpoint request has been applied.
-    private func waitForCheckpointRequest() async throws(CheckpointWaitError) {
+    private func waitForCheckpointRequest() async throws {
         if db.syncStatus.isCheckpointRequestApplied(requestId) {
             return
         }
@@ -70,6 +68,11 @@ final class CheckpointRequestImpl: CheckpointRequest {
                 throw CheckpointWaitError.disconnected
             }
         }
+
+        // `asFlow()` is a non-throwing `AsyncStream`: cancelling the waiting task terminates the
+        // iteration instead of throwing, so cancellation has to be reported explicitly. Without
+        // this, a cancelled wait would be indistinguishable from a disconnect.
+        try Task.checkCancellation()
 
         throw CheckpointWaitError.disconnected
     }

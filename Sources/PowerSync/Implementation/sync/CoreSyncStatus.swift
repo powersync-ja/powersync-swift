@@ -12,7 +12,7 @@ struct StringEncodedInt64: Codable {
         guard let value = Int64(encoded) else {
             throw DecodingError.dataCorruptedError(
                 in: container,
-                debugDescription: "Expected a decimal Int64 string"
+                debugDescription: "Expected a decimal Int64 string, got \"\(encoded)\""
             )
         }
         self.wrappedValue = value
