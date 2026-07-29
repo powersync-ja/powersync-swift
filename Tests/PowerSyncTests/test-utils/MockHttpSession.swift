@@ -58,7 +58,7 @@ final class MockHttpSession: PowerSyncUrlSession {
             let data = try #require(request.httpBody)
             let body = try StreamingSyncClient.jsonDecoder.decode(CheckpointRequestPayload.self, from: data)
             #expect(!body.client_id.isEmpty)
-            let requestId = try #require(Int64(body.checkpoint_request_id))
+            let requestId = body.checkpoint_request_id
             #expect(requestId > 0)
             let checkpointRequest = MockCheckpointRequest(clientId: body.client_id, requestId: requestId)
 
@@ -74,7 +74,7 @@ final class MockHttpSession: PowerSyncUrlSession {
 
         case "/write-checkpoint2.json":
             let checkpoint = writeCheckpoint
-            let body = WriteCheckpointResponse(data: WriteCheckpointData(write_checkpoint: String(checkpoint)))
+            let body = WriteCheckpointResponse(data: WriteCheckpointData(write_checkpoint: Int64(checkpoint)))
             let data = try StreamingSyncClient.jsonEncoder.encode(body)
             let response = HTTPURLResponse(url: request.url!, mimeType: "application/json", expectedContentLength: data.count, textEncodingName: "utf-8")
             return (response, data)
@@ -86,7 +86,7 @@ final class MockHttpSession: PowerSyncUrlSession {
 
     private func encodeCheckpointRequestResponse(_ checkpointRequestId: Int64) throws -> Data {
         let response = CheckpointRequestResponse(
-            data: CheckpointRequestResponseData(checkpoint_request_id: String(checkpointRequestId))
+            data: CheckpointRequestResponseData(checkpoint_request_id: checkpointRequestId)
         )
         return try StreamingSyncClient.jsonEncoder.encode(response)
     }
