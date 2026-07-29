@@ -77,10 +77,6 @@ private func monitorSyncErrors(_ status: any SyncStatus) -> Task<Void, Never> {
         var previousUploadError: String?
 
         for await update in status.asFlow() {
-            guard !Task.isCancelled else {
-                return
-            }
-
             reportSyncError(update.downloadError, label: "download", previousError: &previousDownloadError)
             reportSyncError(update.uploadError, label: "upload", previousError: &previousUploadError)
         }
