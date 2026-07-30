@@ -5,31 +5,25 @@ import Foundation
 /// This bridges upload and download task notifications, tracks when pending checkpoint requests are
 /// safe to allocate after connect-time validation.
 final class SyncSignals: Sendable {
-    /// A pending `requestCheckpoint()` caller blocked before creating a checkpoint request ID.
-    private struct PendingCheckpointRequestWaiter {
-        let id: Int64
-        let continuation: AsyncThrowingStream<Void, any Error>.Continuation
-    }
-
     /// Tracks connect-time validation for pending checkpoint request creation.
     ///
     /// The local checkpoint request counter must be reconciled with the service before a new
     /// request ID can be allocated. Request creation waits on this state until that reconciliation
     /// has completed for the active connection.
     private struct PendingCheckpointRequestsState {
-        var isReady = false
-        /// Terminal readiness failure replayed to pending checkpoint request callers.
-        ///
-        /// This is set when checkpoint requests are not supported by the service (for example, a
-        /// 404 from the seed/affirm route), or when the sync client shuts down. Other connect-time
-        /// failures surface through the normal sync download error path instead.
-        var failure: (any Error)?
-        var nextWaiterId: Int64 = 0
-        /// Pending checkpoint requests blocked before creating request IDs.
-        ///
-        /// These resume once connect-time checkpoint request state has been seeded or affirmed
-        /// against the service.
-        var waiters: [PendingCheckpointRequestWaiter] = []
+        enum Outcome: Sendable {
+            case pending
+            case ready
+            /// Terminal readiness failure replayed to pending checkpoint request callers.
+            ///
+            /// This is set when checkpoint requests are not supported by the service (for example,
+            /// a 404 from the seed/affirm route), or when the sync client shuts down. Other
+            /// connect-time failures surface through the normal sync download error path instead.
+            case failed(any Error)
+        }
+
+        var outcome = Outcome.pending
+        let outcomeChanged = BroadcastStream<Outcome>()
     }
 
     let signalCrudUpload = BroadcastStream<Void>()
@@ -52,44 +46,33 @@ final class SyncSignals: Sendable {
     /// Marks checkpoint request allocation as blocked until the next connect-time affirmation completes.
     func markPendingCheckpointRequestsRequiringAffirmation() {
         pendingCheckpointRequests.withLock { state in
-            state.isReady = false
-            // A previous failure (such as an unsupported service) is checked again by the next
+            // A previous failure is checked again by the next
             // iteration, so it should not be replayed to new callers in the meantime.
-            state.failure = nil
+            state.outcome = .pending
         }
     }
 
     /// Marks checkpoint processing as safe and resumes pending callers waiting to create request IDs.
     func markCheckpointsReady() {
-        let waiters = pendingCheckpointRequests.withLock { state in
-            if state.isReady {
-                return [] as [PendingCheckpointRequestWaiter]
+        pendingCheckpointRequests.withLock { state in
+            if case .ready = state.outcome {
+                return
             }
 
-            state.isReady = true
-            state.failure = nil
-            let waiters = state.waiters
-            state.waiters.removeAll()
-            return waiters
-        }
-
-        for waiter in waiters {
-            waiter.continuation.finish()
+            state.outcome = .ready
+            // Dispatch while the state lock is held so a new affirmation cycle and its waiters
+            // cannot observe this transition after the state has returned to pending.
+            state.outcomeChanged.dispatch(event: .ready)
         }
     }
 
     /// Fails pending checkpoint requests and resumes callers blocked before ID allocation.
     func failPendingCheckpointRequests(_ error: any Error) {
-        let waiters = pendingCheckpointRequests.withLock { state in
-            state.isReady = false
-            state.failure = error
-            let waiters = state.waiters
-            state.waiters.removeAll()
-            return waiters
-        }
-
-        for waiter in waiters {
-            waiter.continuation.finish(throwing: error)
+        pendingCheckpointRequests.withLock { state in
+            state.outcome = .failed(error)
+            // Keep transition delivery atomic with the state update for the same reason as the
+            // ready path above.
+            state.outcomeChanged.dispatch(event: .failed(error))
         }
     }
 
@@ -106,65 +89,57 @@ final class SyncSignals: Sendable {
     /// Registering a waiter here also wakes the download loop from its retry delay so connect-time
     /// validation can run promptly after a failed connection attempt.
     func waitForCheckpointRequestsReady(wakeDownloadLoop: Bool = true) async throws {
-        let initialState = pendingCheckpointRequests.withLock { state in
-            (isReady: state.isReady, failure: state.failure)
-        }
-        if let failure = initialState.failure {
-            throw failure
-        }
-        if initialState.isReady {
-            try Task.checkCancellation()
-            return
-        }
-
-        enum ImmediateResult {
+        enum WaitResult {
             case ready
             case failed(any Error)
-            case registered(waiterId: Int64, shouldWakeDownloadLoop: Bool)
+            case waiting(AsyncStream<PendingCheckpointRequestsState.Outcome>)
         }
 
-        var shouldSignalDownloadLoop = false
-        // This is a one-shot wait; `AsyncThrowingStream` is a convenience because `onTermination`
-        // lets us remove the registered waiter when the waiting task is cancelled.
-        let stream = AsyncThrowingStream<Void, any Error> { continuation in
-            let immediateResult = pendingCheckpointRequests.withLock { state -> ImmediateResult in
-                if let failure = state.failure {
-                    return .failed(failure)
-                }
-                if state.isReady {
+        while true {
+            // AsyncStream.next() may return nil instead of throwing when cancelled.
+            try Task.checkCancellation()
+
+            // Subscribe while holding the state lock so a transition cannot be missed between
+            // checking the outcome and registering for its next change.
+            let result = pendingCheckpointRequests.withLock { state -> WaitResult in
+                switch state.outcome {
+                case .pending:
+                    // Preserve the first transition observed by this one-shot waiter. A later
+                    // state change must not replace the readiness result that originally woke it.
+                    return .waiting(state.outcomeChanged.subscribe(bufferingPolicy: .bufferingOldest(1)))
+                case .ready:
                     return .ready
+                case .failed(let error):
+                    return .failed(error)
                 }
-
-                state.nextWaiterId += 1
-                let waiterId = state.nextWaiterId
-                state.waiters.append(PendingCheckpointRequestWaiter(id: waiterId, continuation: continuation))
-                return .registered(waiterId: waiterId, shouldWakeDownloadLoop: wakeDownloadLoop)
             }
 
-            switch immediateResult {
+            switch result {
             case .ready:
-                continuation.finish()
+                return
             case .failed(let error):
-                continuation.finish(throwing: error)
-            case .registered(let waiterId, let shouldWakeDownloadLoop):
-                shouldSignalDownloadLoop = shouldWakeDownloadLoop
-                continuation.onTermination = { @Sendable _ in
-                    self.pendingCheckpointRequests.withLock { state in
-                        state.waiters.removeAll { $0.id == waiterId }
-                    }
+                throw error
+            case .waiting(let outcomeChanged):
+                if wakeDownloadLoop {
+                    signalPendingCheckpointRequestWaitingForReady.dispatch(event: ())
+                }
+
+                var iterator = outcomeChanged.makeAsyncIterator()
+                guard let outcome = await iterator.next() else {
+                    try Task.checkCancellation()
+                    continue
+                }
+
+                switch outcome {
+                case .pending:
+                    continue
+                case .ready:
+                    return
+                case .failed(let error):
+                    throw error
                 }
             }
         }
-
-        if shouldSignalDownloadLoop {
-            // Wake the download loop only after the waiter is registered, so
-            // `waitForRetryDelayOrPendingCheckpointRequest` observes it when re-checking.
-            signalPendingCheckpointRequestWaitingForReady.dispatch(event: ())
-        }
-
-        // The stream never yields a value: it only finishes, or finishes with a readiness failure.
-        for try await _ in stream {}
-        try Task.checkCancellation()
     }
 
     /// Waits for the normal retry delay, unless a new checkpoint request starts waiting for readiness.

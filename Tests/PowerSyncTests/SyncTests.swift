@@ -1072,6 +1072,49 @@ class InMemorySyncIntegrationTests {
         }
     }
 
+    @Test func cancellingCheckpointReadinessWaitDoesNotCancelOtherWaiters() async throws {
+        let signals = SyncSignals()
+        let cancelledWaiter = Task {
+            try await signals.waitForCheckpointRequestsReady(wakeDownloadLoop: false)
+        }
+        let remainingWaiter = Task {
+            try await signals.waitForCheckpointRequestsReady(wakeDownloadLoop: false)
+        }
+
+        try await sleepForSeconds(seconds: 0.01)
+        cancelledWaiter.cancel()
+        do {
+            try await cancelledWaiter.value
+            Issue.record("Expected the cancelled readiness waiter to throw")
+        } catch is CancellationError {
+        } catch {
+            Issue.record("Expected CancellationError, got \(error)")
+        }
+
+        signals.markCheckpointsReady()
+        try await remainingWaiter.value
+    }
+
+    @Test func checkpointReadinessWaitPreservesFailureAcrossAffirmationReset() async throws {
+        let signals = SyncSignals()
+        let waiter = Task {
+            try await signals.waitForCheckpointRequestsReady(wakeDownloadLoop: false)
+        }
+
+        try await sleepForSeconds(seconds: 0.01)
+        signals.failPendingCheckpointRequests(CheckpointRequestError.instanceNotSupported)
+        signals.markPendingCheckpointRequestsRequiringAffirmation()
+        signals.markCheckpointsReady()
+
+        do {
+            try await waiter.value
+            Issue.record("Expected the readiness failure that woke the waiter")
+        } catch CheckpointRequestError.instanceNotSupported {
+        } catch {
+            Issue.record("Expected instanceNotSupported, got \(error)")
+        }
+    }
+
     @Test func appliedCheckpointRequestUsesLatestSyncStatusValue() throws {
         let syncStatus = SwiftSyncStatus()
 
