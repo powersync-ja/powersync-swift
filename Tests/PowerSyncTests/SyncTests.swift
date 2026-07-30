@@ -1020,6 +1020,10 @@ class InMemorySyncIntegrationTests {
             await firstAttempt.await()
             await waitForStatus(db.currentStatus) { $0.downloadError != nil }
 
+            // A checkpoint request only interrupts an active retry delay. Give the download loop
+            // an opportunity to enter that delay after publishing the download error.
+            try await sleepForSeconds(seconds: 0.05)
+
             let requestTask = Task {
                 try await db.requestCheckpoint()
             }
