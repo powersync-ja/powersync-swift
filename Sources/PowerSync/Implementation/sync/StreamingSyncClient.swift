@@ -7,25 +7,7 @@ final class StreamingSyncClient: Sendable {
     internal static let defaultCheckpointRequestRetryDelay: TimeInterval = 10
 
     /// The lowest retry delay production builds will honor for checkpoint requests.
-    private static let minimumCheckpointRequestRetryDelayFloor: TimeInterval = 10
-
-    #if DEBUG
-    private static let minimumCheckpointRequestRetryDelayMutex = Mutex<TimeInterval>(minimumCheckpointRequestRetryDelayFloor)
-    /// Mutable in DEBUG builds only, so tests can lower the retry floor.
-    /// Release builds always use ``minimumCheckpointRequestRetryDelayFloor``.
-    internal static var minimumCheckpointRequestRetryDelay: TimeInterval {
-        get {
-            minimumCheckpointRequestRetryDelayMutex.withLock { $0 }
-        }
-        set {
-            minimumCheckpointRequestRetryDelayMutex.withLock { $0 = newValue }
-        }
-    }
-    #else
-    internal static var minimumCheckpointRequestRetryDelay: TimeInterval {
-        minimumCheckpointRequestRetryDelayFloor
-    }
-    #endif
+    internal static let minimumCheckpointRequestRetryDelay: TimeInterval = 10
 
     let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
@@ -49,11 +31,22 @@ final class StreamingSyncClient: Sendable {
         self.httpClient = httpClient
         self.options = options
         self.checkpointMode = options.checkpointMode
-        self.checkpointRequestRetryDelay = Self.resolveCheckpointRequestRetryDelay(for: options.checkpointMode)
+        #if DEBUG
+        let minimumCheckpointRequestRetryDelay = db.minimumCheckpointRequestRetryDelay
+        #else
+        let minimumCheckpointRequestRetryDelay = Self.minimumCheckpointRequestRetryDelay
+        #endif
+        self.checkpointRequestRetryDelay = Self.resolveCheckpointRequestRetryDelay(
+            for: options.checkpointMode,
+            minimumCheckpointRequestRetryDelay: minimumCheckpointRequestRetryDelay
+        )
         self.customCheckpointRequestConnector = connector as? any CustomCheckpointRequestConnector
     }
 
-    internal static func resolveCheckpointRequestRetryDelay(for checkpointMode: CheckpointMode) -> TimeInterval {
+    internal static func resolveCheckpointRequestRetryDelay(
+        for checkpointMode: CheckpointMode,
+        minimumCheckpointRequestRetryDelay: TimeInterval = StreamingSyncClient.minimumCheckpointRequestRetryDelay
+    ) -> TimeInterval {
         let retryDelay: TimeInterval?
         switch checkpointMode {
         case .requests(checkpointRequestRetryDelay: let configuredRetryDelay):

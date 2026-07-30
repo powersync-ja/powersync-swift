@@ -3,7 +3,6 @@ import Foundation
 @testable import PowerSync
 import Testing
 
-@Suite(.serialized)
 class InMemorySyncIntegrationTests {
     @Test func decodesCoreSyncStatusTimestampsAsMicroseconds() throws {
         let data = """
@@ -323,9 +322,13 @@ class InMemorySyncIntegrationTests {
             var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
             try #require(try await query.next() == ["local write"])
 
-            // The connect-time seed consumes request ID 1, so the upload's write checkpoint is 2.
-            try await waitUntil { checkpointRequests.contains(2) }
-            try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
+            let uploadTarget = try await waitForPersistedUploadTarget(db)
+            #expect(checkpointRequests.contains(uploadTarget))
+            try await channel.pushLine(.fullCheckpoint(Checkpoint(
+                last_op_id: "1",
+                buckets: [BucketChecksum(bucket: "a", checksum: 0)],
+                writeCheckpoint: String(uploadTarget)
+            )))
             try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
                 checksum: 0,
                 op_id: "1",
@@ -363,10 +366,14 @@ class InMemorySyncIntegrationTests {
             var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
             try #require(try await query.next() == ["local write"])
 
-            // The connect-time seed consumes request ID 1, so the upload's write checkpoint is 2.
-            try await waitUntil { checkpointRequests.contains(2) }
+            let uploadTarget = try await waitForPersistedUploadTarget(db)
+            #expect(checkpointRequests.contains(uploadTarget))
             try #require(db.currentStatus.uploadError == nil)
-            try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
+            try await channel.pushLine(.fullCheckpoint(Checkpoint(
+                last_op_id: "1",
+                buckets: [BucketChecksum(bucket: "a", checksum: 0)],
+                writeCheckpoint: String(uploadTarget)
+            )))
             try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
                 checksum: 0,
                 op_id: "1",
@@ -386,6 +393,7 @@ class InMemorySyncIntegrationTests {
     @Test @MainActor func uploadsOfflineWrites() async throws {
         let channel = AsyncThrowingChannel<Data, any Error>()
         let allowConnection = Mutex(false)
+        let checkpointRequests = CheckpointRequestRecorder()
         let mockClient = MockHttpSession(
             handleSyncLines: { _ in
                 if allowConnection.withLock({ $0 }) {
@@ -393,7 +401,7 @@ class InMemorySyncIntegrationTests {
                 }
                 throw PowerSyncError.operationFailed(message: "Fake IO error for test", underlyingError: nil)
             },
-            checkpointRequestHook: { _ in .checkpointRequestId(1) }
+            checkpointRequestHook: checkpointRequests.handler()
         )
 
         try await useDatabaseOnMainActor(mockClient) { db in
@@ -406,8 +414,17 @@ class InMemorySyncIntegrationTests {
             try #require(try await query.next() == ["local write"])
 
             allowConnection.withLock { $0 = true }
-            // The connect-time seed consumes request ID 1, so the upload's write checkpoint is 2.
-            try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
+            // The upload target is usually request ID 2 after the connect-time seed. However, if
+            // the local write changes the CRUD sequence while that request is in flight, the
+            // upload loop discards it and requests a newer ID. Use the target that was actually
+            // persisted instead of assuming a particular scheduling order.
+            let persistedUploadTarget = try await waitForPersistedUploadTarget(db)
+            #expect(checkpointRequests.contains(persistedUploadTarget))
+            try await channel.pushLine(.fullCheckpoint(Checkpoint(
+                last_op_id: "1",
+                buckets: [BucketChecksum(bucket: "a", checksum: 0)],
+                writeCheckpoint: String(persistedUploadTarget)
+            )))
             try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
                 checksum: 0,
                 op_id: "1",
@@ -476,31 +493,29 @@ class InMemorySyncIntegrationTests {
             handleSyncLines: { _ in channel },
             checkpointRequestHook: checkpointRequests.handler()
         )
-        try await withFastCheckpointRequestRetries {
-            try await useDatabase(mockClient) { db in
-                try await db.connect(
-                    connector: TestConnector(),
-                    options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 0.1))
-                )
-                await waitForStatus(db.currentStatus) { $0.connected }
+        try await useDatabase(mockClient, minimumCheckpointRequestRetryDelay: 0) { db in
+            try await db.connect(
+                connector: TestConnector(),
+                options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 0.1))
+            )
+            await waitForStatus(db.currentStatus) { $0.connected }
 
-                let checkpoint = try await db.requestCheckpoint()
+            let checkpoint = try await db.requestCheckpoint()
 
-                // The connect-time seed consumes request ID 1, so this request is ID 2.
-                try await waitUntil(attempts: 5) {
-                    checkpointRequests.count(of: 2) >= 2
-                }
-
-                try await channel.pushLine(.fullCheckpoint(Checkpoint(
-                    last_op_id: "0",
-                    buckets: [BucketChecksum(bucket: "a", checksum: 0)],
-                    writeCheckpoint: "2"
-                )))
-                try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
-
-                try await checkpoint.waitForSync(timeout: 1)
-                try #require(checkpoint.hasSynced)
+            // The connect-time seed consumes request ID 1, so this request is ID 2.
+            try await waitUntil(attempts: 5) {
+                checkpointRequests.count(of: 2) >= 2
             }
+
+            try await channel.pushLine(.fullCheckpoint(Checkpoint(
+                last_op_id: "0",
+                buckets: [BucketChecksum(bucket: "a", checksum: 0)],
+                writeCheckpoint: "2"
+            )))
+            try await channel.pushLine(.checkpointComplete(lastOpId: "0"))
+
+            try await checkpoint.waitForSync(timeout: 1)
+            try #require(checkpoint.hasSynced)
         }
     }
 
@@ -515,34 +530,32 @@ class InMemorySyncIntegrationTests {
         // Scheduling jitter means the observed interval can land just under the configured delay.
         let retryDelayTolerance = retryDelay * 0.9
 
-        try await withFastCheckpointRequestRetries {
-            try await useDatabase(mockClient) { db in
-                try await db.connect(
-                    connector: TestConnector(),
-                    options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: retryDelay))
-                )
-                await waitForStatus(db.currentStatus) { $0.connected }
+        try await useDatabase(mockClient, minimumCheckpointRequestRetryDelay: 0) { db in
+            try await db.connect(
+                connector: TestConnector(),
+                options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: retryDelay))
+            )
+            await waitForStatus(db.currentStatus) { $0.connected }
 
-                _ = try await db.requestCheckpoint()
-                try await sleepForSeconds(seconds: 0.03)
-                _ = try await db.requestCheckpoint()
+            _ = try await db.requestCheckpoint()
+            try await sleepForSeconds(seconds: 0.03)
+            _ = try await db.requestCheckpoint()
 
-                // The second request advances the current sequence to 3. Its first retry should
-                // observe a fresh interval starting from that newer request.
-                try await waitUntil(attempts: 500) {
-                    checkpointRequests.count(of: 3) >= 2
-                }
-                let request2Time = try #require(checkpointRequests.timestamps(of: 2).first)
-                let request3Times = checkpointRequests.timestamps(of: 3)
-                #expect(
-                    request3Times[0] - request2Time < retryDelay,
-                    "The newer checkpoint request should arrive before the previous retry interval elapses"
-                )
-                #expect(
-                    request3Times[1] - request3Times[0] >= retryDelayTolerance,
-                    "The latest checkpoint request should wait for the retry interval before being retried"
-                )
+            // The second request advances the current sequence to 3. Its first retry should
+            // observe a fresh interval starting from that newer request.
+            try await waitUntil(attempts: 500) {
+                checkpointRequests.count(of: 3) >= 2
             }
+            let request2Time = try #require(checkpointRequests.timestamps(of: 2).first)
+            let request3Times = checkpointRequests.timestamps(of: 3)
+            #expect(
+                request3Times[0] - request2Time < retryDelay,
+                "The newer checkpoint request should arrive before the previous retry interval elapses"
+            )
+            #expect(
+                request3Times[1] - request3Times[0] >= retryDelayTolerance,
+                "The latest checkpoint request should wait for the retry interval before being retried"
+            )
         }
     }
 
@@ -553,24 +566,22 @@ class InMemorySyncIntegrationTests {
             handleSyncLines: { _ in channel },
             checkpointRequestHook: checkpointRequests.handler()
         )
-        try await withFastCheckpointRequestRetries {
-            try await useDatabase(mockClient) { db in
-                try await db.connect(
-                    connector: TestConnector(),
-                    options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 0.05))
-                )
-                await waitForStatus(db.currentStatus) { $0.connected }
+        try await useDatabase(mockClient, minimumCheckpointRequestRetryDelay: 0) { db in
+            try await db.connect(
+                connector: TestConnector(),
+                options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 0.05))
+            )
+            await waitForStatus(db.currentStatus) { $0.connected }
 
-                _ = try await db.requestCheckpoint()
-                try await waitUntil(attempts: 500) {
-                    checkpointRequests.count(of: 2) >= 2
-                }
-
-                try await db.disconnect()
-                let requestIdsAfterDisconnect = checkpointRequests.ids
-                try await sleepForSeconds(seconds: 0.15)
-                try #require(checkpointRequests.ids == requestIdsAfterDisconnect)
+            _ = try await db.requestCheckpoint()
+            try await waitUntil(attempts: 500) {
+                checkpointRequests.count(of: 2) >= 2
             }
+
+            try await db.disconnect()
+            let requestIdsAfterDisconnect = checkpointRequests.ids
+            try await sleepForSeconds(seconds: 0.15)
+            try #require(checkpointRequests.ids == requestIdsAfterDisconnect)
         }
     }
 
@@ -1359,11 +1370,15 @@ class InMemorySyncIntegrationTests {
             var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
             try #require(try await query.next() == ["local write"])
 
-            // The upload's write checkpoint (ID 2, after the seed consumed ID 1) is posted to the
-            // connector instead of the service.
-            try await waitUntil { connector.postedCheckpointRequests == [1, 2] }
+            // The upload target is posted to the connector instead of the service.
+            let uploadTarget = try await waitForPersistedUploadTarget(db)
+            #expect(connector.postedCheckpointRequests.contains(uploadTarget))
             try #require(checkpointRequests.ids.isEmpty)
-            try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [BucketChecksum(bucket: "a", checksum: 0)], writeCheckpoint: "2")))
+            try await channel.pushLine(.fullCheckpoint(Checkpoint(
+                last_op_id: "1",
+                buckets: [BucketChecksum(bucket: "a", checksum: 0)],
+                writeCheckpoint: String(uploadTarget)
+            )))
             try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "a", data: [OplogEntry(
                 checksum: 0,
                 op_id: "1",
@@ -2265,7 +2280,7 @@ private func openDatabase(
     _ session: MockHttpSession,
     schema: Schema = defaultSchema,
     logger: any LoggerProtocol = DefaultLogger()
-) -> PowerSyncDatabaseProtocol {
+) -> PowerSyncDatabaseImpl {
     return PowerSyncDatabaseImpl(
         identifier: ":memory:",
         activeInstanceStore: DatabaseGroupCollection(),
@@ -2280,9 +2295,13 @@ private func useDatabase<T>(
     _ client: MockHttpSession,
     schema: Schema = defaultSchema,
     logger: any LoggerProtocol = DefaultLogger(),
+    minimumCheckpointRequestRetryDelay: TimeInterval? = nil,
     _ operation: (any PowerSyncDatabaseProtocol) async throws -> T
 ) async throws -> T {
     let db = openDatabase(client, schema: schema, logger: logger)
+    if let minimumCheckpointRequestRetryDelay {
+        db.minimumCheckpointRequestRetryDelay = minimumCheckpointRequestRetryDelay
+    }
     do {
         let result = try await operation(db)
         try await closeDatabaseAfterUse(db)
@@ -2319,14 +2338,6 @@ private func closeDatabaseAfterUse(_ db: any PowerSyncDatabaseProtocol) async th
         throw error
     }
     try await db.close()
-}
-
-private func withFastCheckpointRequestRetries<T>(_ operation: () async throws -> T) async throws -> T {
-    let previousMinimum = StreamingSyncClient.minimumCheckpointRequestRetryDelay
-    StreamingSyncClient.minimumCheckpointRequestRetryDelay = 0
-    defer { StreamingSyncClient.minimumCheckpointRequestRetryDelay = previousMinimum }
-
-    return try await operation()
 }
 
 private final class CheckpointRequestRecorder: @unchecked Sendable {
@@ -2386,6 +2397,30 @@ private func targetCheckpointRequestId(_ db: any PowerSyncDatabaseProtocol) asyn
     ) { cursor in
         try cursor.getInt64(index: 0)
     }
+}
+
+private func waitForPersistedUploadTarget(_ db: any PowerSyncDatabaseProtocol) async throws -> Int64 {
+    let targets = try db.watch(
+        sql: """
+            SELECT CAST(value AS INTEGER)
+            FROM ps_kv
+            WHERE key = 'target_checkpoint_request_id'
+            """,
+        parameters: []
+    ) { cursor in
+        try cursor.getInt64(index: 0)
+    }
+
+    for try await targets in targets {
+        if let target = targets.first, target != PowerSyncDatabaseImpl.maxOpId {
+            return target
+        }
+    }
+
+    return try #require(
+        nil,
+        "Expected the target checkpoint request watch to produce a concrete upload target"
+    )
 }
 
 private func lastRequestedCheckpointRequestId(_ db: any PowerSyncDatabaseProtocol) async throws -> Int64? {

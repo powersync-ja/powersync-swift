@@ -11,6 +11,24 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     let pool: any SQLiteConnectionPoolProtocol
     let schema: AsyncMutex<Schema>
 
+    #if DEBUG
+    /// Per-instance retry floor override used by tests that exercise checkpoint request retries.
+    ///
+    /// Keeping this on the database avoids shared mutable test state and lets those tests run in
+    /// parallel. Release builds always use ``StreamingSyncClient/minimumCheckpointRequestRetryDelay``.
+    private let minimumCheckpointRequestRetryDelayMutex = Mutex(
+        StreamingSyncClient.minimumCheckpointRequestRetryDelay
+    )
+    internal var minimumCheckpointRequestRetryDelay: TimeInterval {
+        get {
+            minimumCheckpointRequestRetryDelayMutex.withLock { $0 }
+        }
+        set {
+            minimumCheckpointRequestRetryDelayMutex.withLock { $0 = newValue }
+        }
+    }
+    #endif
+
     init(
         dbFilename: String? = nil,
         identifier: String,
