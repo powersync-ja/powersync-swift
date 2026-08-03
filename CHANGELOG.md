@@ -20,6 +20,7 @@
   Backends that process uploads asynchronously can handle checkpoint requests themselves by
   implementing `CustomCheckpointRequestConnector` on their connector.
   These APIs are in alpha and may change in future releases.
+* Fix races around `PowerSyncDatabase.close()` crashing the process.
 
 ## 1.15.1
 
