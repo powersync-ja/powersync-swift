@@ -5,7 +5,7 @@ import Testing
 struct StatementTests {
     @Test func bindValues() throws {
         let connection = try DatabaseLocation.inMemory.openConnection(writer: true)
-        let lease = connection.asLease()
+        let lease = try connection.asLease()
         try lease.withIterator(
             sql: "SELECT ?, ?, ?, ?, ?, ?, typeof(?), typeof(?)",
             parameters: [

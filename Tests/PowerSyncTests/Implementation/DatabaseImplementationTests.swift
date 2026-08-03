@@ -42,4 +42,24 @@ struct DatabaseImplementationTests {
         try #require(results == [2, 4, 6])
         try await db.close()
     }
+
+    @Test func canCancelClose() async throws {
+        let db = PowerSyncDatabase(
+            schema: Schema(),
+            dbFilename: "cancel-close-test",
+            logger: DefaultLogger()
+        )
+
+        let result = try await db.readLock { reader in
+            // Try to close the database, this can't work because of the busy read connection.
+            let task = Task { try await db.close() };
+            task.cancel();
+            return task
+        }.result
+        #expect(throws: CancellationError.self) { try result.get() }
+
+        // Verify that the database is not in a half-closed state by updating the schema, which runs statements
+        // on all connections.
+        try await db.updateSchema(schema: Schema(Table(name: "users", columns: [.text("name")])))
+    }
 }

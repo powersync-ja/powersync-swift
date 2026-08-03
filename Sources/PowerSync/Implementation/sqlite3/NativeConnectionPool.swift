@@ -56,13 +56,13 @@ final class NativeConnectionPool: Sendable {
         // No dedicated readers? Acquire write connection for this then
         let semaphore = readers ?? writer
         let connection = try await semaphore.acquire(count: 1)
-        let lease = connection.acquiredItems[0].asLease()
+        let lease = try connection.acquiredItems[0].asLease()
         return try await onConnection(lease)
     }
 
     func write<T>(onConnection: (NativeConnectionLease) async throws -> T) async throws -> T {
         let connection = try await writer.acquire(count: 1)
-        let lease = connection.acquiredItems[0].asLease()
+        let lease = try connection.acquiredItems[0].asLease()
         defer { dispatchWrites(lease: lease) }
         let result = try await onConnection(lease)
         return result
@@ -70,7 +70,7 @@ final class NativeConnectionPool: Sendable {
     
     func withAllConnections<T>(onConnection: (NativeConnectionLease, [NativeConnectionLease]) async throws -> T) async throws -> T {
         let write = try await writer.acquire(count: 1)
-        let writeLease = write.acquiredItems[0].asLease()
+        let writeLease = try write.acquiredItems[0].asLease()
         defer { dispatchWrites(lease: writeLease) }
 
         let result: T
@@ -80,7 +80,7 @@ final class NativeConnectionPool: Sendable {
             
             let span = acquiredReaders.acquiredItems.span
             for idx in span.indices {
-                readerLeases.append(span[idx].asLease())
+                readerLeases.append(try span[idx].asLease())
             }
             result = try await onConnection(writeLease, readerLeases)
         } else {
@@ -128,8 +128,11 @@ struct RawSqliteConnection: ~Copyable {
         sqlite3_close_v2(connection)
     }
     
-    func asLease() -> NativeConnectionLease {
-        precondition(!closed)
+    func asLease() throws(PowerSyncError) -> NativeConnectionLease {
+        if closed {
+            throw .databaseClosedError()
+        }
+
         return NativeConnectionLease(pointer: self.connection)
     }
 }

@@ -245,7 +245,7 @@ private actor DatabaseInitializationAction {
     
     func ensureInitialized(db: PowerSyncDatabaseImpl) async throws {
         if closed {
-            throw PowerSyncError.operationFailed(message: "Attempted to use closed PowerSync database")
+            throw PowerSyncError.databaseClosedError()
         }
         if isInitialized {
             return
@@ -270,8 +270,8 @@ private actor DatabaseInitializationAction {
     
     func close(action: () async throws -> ()) async rethrows {
         if !closed {
-            closed = true
             try await action()
+            closed = true
         }
     }
 }

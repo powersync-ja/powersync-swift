@@ -49,4 +49,8 @@ public enum PowerSyncError: Error, LocalizedError {
             return msg
         }
     }
+
+    internal static func databaseClosedError() -> Self {
+        .operationFailed(message: "Attempted to use closed PowerSync database")
+    }
 }

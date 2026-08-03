@@ -101,7 +101,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
     }
 
     private func configureConnection(connection: borrowing RawSqliteConnection, isWriter: Bool) throws {
-        let context = connection.asLease()
+        let context = try connection.asLease()
         for stmt in initialStatements {
             let _ = try context.execute(sql: stmt, parameters: [])
         }
