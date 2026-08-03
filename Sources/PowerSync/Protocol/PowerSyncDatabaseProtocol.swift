@@ -14,7 +14,7 @@ public struct SyncClientConfiguration: Sendable {
     public let requestLogger: SyncRequestLoggerConfiguration?
 
     /// The URL session to use when connecting to the PowerSync service.
-    /// 
+    ///
     /// Customizing this may be convenient to add additional headers or to otherwise alter requests
     /// sent by the PowerSync Swift SDK.
     public var urlSession: URLSession
@@ -28,6 +28,35 @@ public struct SyncClientConfiguration: Sendable {
     ) {
         self.requestLogger = requestLogger
         self.urlSession = urlSession
+    }
+}
+
+/// Selects the service checkpoint mechanism used by a PowerSync connection.
+///
+/// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
+public enum CheckpointMode: Sendable, Encodable {
+    /// Uses the legacy `/write-checkpoint2.json` endpoint to obtain a target operation id.
+    case legacy
+
+    /// Uses client-generated checkpoint request IDs.
+    ///
+    /// Requests are sent to the service's `/sync/checkpoint-request` endpoint, or to the
+    /// connector when it implements ``CustomCheckpointRequestConnector``.
+    /// This mode is required for ``PowerSyncDatabaseProtocol/requestCheckpoint()``.
+    /// It requires PowerSync service version 1.24.0 or later.
+    ///
+    /// - Parameter checkpointRequestRetryDelay: Optional delay in seconds before retrying
+    ///   the latest checkpoint request when it has not been applied yet.
+    case requests(checkpointRequestRetryDelay: TimeInterval? = nil)
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .legacy:
+            try container.encode("legacy")
+        case .requests:
+            try container.encode("requests")
+        }
     }
 }
 
@@ -99,13 +128,23 @@ public struct ConnectOptions: Sendable {
     /// when they don't have an explicit subscription.
     public var includeDefaultStreams: Bool
 
+    /// Selects the service checkpoint mechanism for this connection.
+    ///
+    /// Use `.requests()` to enable ``PowerSyncDatabaseProtocol/requestCheckpoint()``
+    /// and connectors implementing ``CustomCheckpointRequestConnector``.
+    /// Defaults to ``CheckpointMode/legacy`` for backwards-compatible write checkpoints.
+    ///
+    /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
+    public var checkpointMode: CheckpointMode
+
     /// Initializes a `ConnectOptions` instance with optional values.
     ///
     /// - Parameters:
-    ///   - crudThrottle: TimeInterval between CRUD operations in milliseconds. Defaults to `1` second.
-    ///   - retryDelay: Delay TimeInterval between retry attempts in milliseconds. Defaults to `5` seconds.
+    ///   - crudThrottle: TimeInterval between CRUD operations in seconds. Defaults to `1` second.
+    ///   - retryDelay: Delay TimeInterval between retry attempts in seconds. Defaults to `5` seconds.
     ///   - params: Custom sync parameters to send to the server. Defaults to an empty dictionary.
     ///   - clientConfiguration: Configuration for the HTTP client used to connect to PowerSync.
+    ///   - checkpointMode: Service checkpoint mechanism to use for this connection.
     public init(
         crudThrottle: TimeInterval = 1,
         retryDelay: TimeInterval = 5,
@@ -113,6 +152,7 @@ public struct ConnectOptions: Sendable {
         clientConfiguration: SyncClientConfiguration? = nil,
         appMetadata: [String: String] = [:],
         includeDefaultStreams: Bool = true,
+        checkpointMode: CheckpointMode = .legacy
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
@@ -121,6 +161,7 @@ public struct ConnectOptions: Sendable {
         self.clientConfiguration = clientConfiguration
         self.appMetadata = appMetadata
         self.includeDefaultStreams = includeDefaultStreams
+        self.checkpointMode = checkpointMode
     }
 
     /// Initializes a ``ConnectOptions`` instance with optional values, including experimental options.
@@ -131,12 +172,13 @@ public struct ConnectOptions: Sendable {
     )
     public init(
         crudThrottle: TimeInterval = 1,
-        retryDelay: TimeInterval = 5,
+        retryDelay: TimeInterval = Self.defaultRetryDelay,
         params: JsonParam = [:],
         newClientImplementation: Bool = true,
         clientConfiguration: SyncClientConfiguration? = nil,
         appMetadata: [String: String] = [:],
-        includeDefaultStreams: Bool = true
+        includeDefaultStreams: Bool = true,
+        checkpointMode: CheckpointMode = .legacy
     ) {
         self.crudThrottle = crudThrottle
         self.retryDelay = retryDelay
@@ -145,7 +187,11 @@ public struct ConnectOptions: Sendable {
         self.clientConfiguration = clientConfiguration
         self.appMetadata = appMetadata
         self.includeDefaultStreams = includeDefaultStreams
+        self.checkpointMode = checkpointMode
     }
+
+    @usableFromInline
+    static let defaultRetryDelay: TimeInterval = 5
 }
 
 /// A PowerSync managed database.
@@ -238,6 +284,25 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     ///
     /// Use ``SyncStream/subscribe`` on the returned instance to subscribe to the stream.
     func syncStream(name: String, params: JsonParam?) -> any SyncStream
+
+    /// Requests a checkpoint from the PowerSync service.
+    ///
+    /// The returned request can be awaited to confirm that the local database has applied
+    /// server-side changes up to the checkpoint. This method requires an active or connecting
+    /// sync client connected with ``ConnectOptions/checkpointMode`` set to
+    /// `.requests()` and PowerSync service version 1.24.0 or later.
+    /// It can throw for connection, mode, authentication, or service
+    /// request failures.
+    ///
+    /// Creating the request has no timeout of its own: while the sync client keeps retrying a
+    /// failing connection, this call keeps waiting. Cancel the calling task to stop waiting, and
+    /// use ``CheckpointRequest/waitForSync(timeout:)`` to bound the wait for the checkpoint itself.
+    ///
+    /// - Throws: ``CheckpointRequestError`` when checkpoint requests are unavailable or the
+    ///   request cannot be completed.
+    ///
+    /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
+    func requestCheckpoint() async throws -> any CheckpointRequest
 
     /// Close the database, releasing resources.
     /// Also disconnects any active connection.

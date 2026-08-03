@@ -1,3 +1,5 @@
+import Foundation
+
 /// Arguments to the `powersync_control()` SQL function driving the sync process.
 enum PowerSyncControlArguments {
     case start(start: StartSyncIteration)
@@ -12,7 +14,7 @@ enum PowerSyncControlArguments {
     
     func execute(_ context: ConnectionContext) throws -> String {
         let op: String
-        let param: Sendable?
+        let param: (any Sendable)?
         
         switch (self) {
         case .start(let start):
@@ -67,6 +69,7 @@ struct StartSyncIteration: Encodable {
     let includeDefaults: Bool
     let activeStreams: [StreamKey]
     let appMetadata: [String: String]
+    let checkpointMode: CheckpointMode
     
     enum CodingKeys: String, CodingKey {
         case parameters
@@ -74,6 +77,7 @@ struct StartSyncIteration: Encodable {
         case includeDefaults = "include_defaults"
         case activeStreams = "active_streams"
         case appMetadata = "app_metadata"
+        case checkpointMode = "checkpoint_mode"
     }
 }
 

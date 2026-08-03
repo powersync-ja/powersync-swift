@@ -26,7 +26,7 @@ if let corePath = localCoreExtension {
     conditionalDependencies.append(
         .package(
             url: "https://github.com/powersync-ja/powersync-sqlite-core-swift.git",
-            exact: "0.4.13",
+            exact: "0.5.2",
         ))
 }
 
@@ -90,6 +90,13 @@ let package = Package(
                 .target(name: "PowerSync"),
                 .product(name: "GRDB", package: "GRDB.swift")
             ]
+        ),
+        .executableTarget(
+            name: "CustomCheckpointDemo",
+            dependencies: [
+                .target(name: "PowerSync"),
+            ],
+            path: "Demos/CustomCheckpointDemo/Sources/CustomCheckpointDemo"
         ),
         .testTarget(
             name: "PowerSyncTests",

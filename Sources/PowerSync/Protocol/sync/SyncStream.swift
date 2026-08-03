@@ -69,10 +69,13 @@ public struct SyncSubscriptionDescription: SyncStreamDescription {
     /// ``SyncSubscriptionDescription/hasExplicitSubscription`` to be true at the same time. This
     /// happens when a default stream was subscribed to explicitly.
     public let hasExplicitSubscription: Bool
-    /// For sync streams that have a time-to-live, the current time at which the stream would expire if not subscribed to
-    /// again.
+    /// For sync streams that have a time-to-live, the time at which the stream would expire if not subscribed to again.
+    ///
+    /// This is exposed as a `TimeInterval` in seconds since the Unix epoch.
     public let expiresAt: TimeInterval?
     /// If ``SyncSubscriptionDescription/hasSynced`` is true, the last time data from this stream has been synced.
+    ///
+    /// This is exposed as a `TimeInterval` in seconds since the Unix epoch.
     public let lastSyncedAt: TimeInterval?
     
     /// Whether this stream has been synced at least once.
@@ -99,7 +102,7 @@ public struct SyncSubscriptionDescription: SyncStreamDescription {
         self.active = try container.decode(Bool.self, forKey: .active)
         self.isDefault = try container.decode(Bool.self, forKey: .isDefault)
         self.hasExplicitSubscription = try container.decode(Bool.self, forKey: .hasExplicitSubscription)
-        self.expiresAt = try container.decodeIfPresent(Int64.self, forKey: .expiresAt).map { t in TimeInterval(t) }
-        self.lastSyncedAt = try container.decodeIfPresent(Int64.self, forKey: .lastSyncedAt).map { t in TimeInterval(t) }
+        self.expiresAt = try container.decodeIfPresent(Int64.self, forKey: .expiresAt).map(coreTimestampTimeInterval)
+        self.lastSyncedAt = try container.decodeIfPresent(Int64.self, forKey: .lastSyncedAt).map(coreTimestampTimeInterval)
     }
 }

@@ -73,29 +73,68 @@ final class SystemManager {
 
     func connect() async {
         do {
-            // Passing a custom URL session is not required, but it can be used to intercept HTTP requests
-            // or to configure additional headers like shown here.
-            let config = URLSessionConfiguration.ephemeral
-            config.httpAdditionalHeaders = ["x-my-custom-header": "example"]
-            let session = URLSession(configuration: config)
-
-            try await db.connect(
-                connector: connector,
-                options: ConnectOptions(
-                    clientConfiguration: SyncClientConfiguration(
-                        requestLogger: SyncRequestLoggerConfiguration(
-                            requestLevel: .headers
-                        ) { message in
-                            self.db.logger.debug(message, tag: "SyncRequest")
-                        },
-                        urlSession: session
-                    )
-                )
-            )
-            try await attachments?.startSync()
-            try await configureFts(db: db, schema: AppSchema)
+            try await connectChecked()
         } catch {
             print("Unexpected error: \(error.localizedDescription)") // Catches any other error
+        }
+    }
+
+    func disconnect() async throws {
+        do {
+            try await db.disconnect()
+        } catch {
+            try? await attachments?.stopSyncing()
+            throw error
+        }
+
+        try await attachments?.stopSyncing()
+    }
+
+    func connectAndSync(timeout: TimeInterval = 30) async throws {
+        try await connectAndWaitForStatus()
+        try await refreshFromRemote(timeout: timeout)
+    }
+
+    func connectAndWaitForStatus() async throws {
+        try await connectChecked()
+        await waitForConnectionStatus()
+    }
+
+    func connectChecked() async throws {
+        // Passing a custom URL session is not required, but it can be used to intercept HTTP requests
+        // or to configure additional headers like shown here.
+        let config = URLSessionConfiguration.ephemeral
+        config.httpAdditionalHeaders = ["x-my-custom-header": "example"]
+        let session = URLSession(configuration: config)
+
+        try await db.connect(
+            connector: connector,
+            options: ConnectOptions(
+                clientConfiguration: SyncClientConfiguration(
+                    requestLogger: SyncRequestLoggerConfiguration(
+                        requestLevel: .headers
+                    ) { message in
+                        self.db.logger.debug(message, tag: "SyncRequest")
+                    },
+                    urlSession: session
+                ),
+                // This enables the requestCheckpoint method
+                checkpointMode: .requests()
+            )
+        )
+        try await attachments?.startSync()
+        try await configureFts(db: db, schema: AppSchema)
+    }
+
+    private func waitForConnectionStatus() async {
+        if db.currentStatus.connected || db.currentStatus.connecting {
+            return
+        }
+
+        for await status in db.currentStatus.asFlow() {
+            if status.connected || status.connecting {
+                return
+            }
         }
     }
 
@@ -105,6 +144,15 @@ final class SystemManager {
         } catch {
             return error.localizedDescription
         }
+    }
+
+    /// Requests a remote checkpoint and waits until the local database has applied it.
+    ///
+    /// The demo uses this for pull-to-refresh so the refresh indicator only completes once
+    /// changes available on the service have been synced locally.
+    func refreshFromRemote(timeout: TimeInterval = 30) async throws {
+        let checkpoint = try await db.requestCheckpoint()
+        try await checkpoint.waitForSync(timeout: timeout)
     }
 
     func signOut() async throws {

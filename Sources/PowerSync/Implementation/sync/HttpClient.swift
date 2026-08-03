@@ -3,12 +3,12 @@ import Foundation
 /// A protocol exposing parts of ``URLSession`` so that it can be mocked in tests.
 protocol PowerSyncUrlSession: Sendable where Response: AsyncSequence, Response: Sendable, Response.Element == UInt8 {
     associatedtype Response
-    
+
     /// Start streaming a `/sync/stream` response body, emitting individual lines.
     ///
     /// Throws an ``UnexpectedResponseError`` if the response can't be interpreted as sync lines.
     func readStreamed(request: URLRequest) async throws -> (HTTPURLResponse, Response)
-    
+
     /// Read a full response body.
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data)
 }
@@ -36,7 +36,7 @@ extension PowerSyncUrlSession {
 }
 
 /// An internal HTTP client implementation.
-/// 
+///
 /// This only exposes HTTP functionality required by the sync client, it is not a general-purpose
 /// HTTP client.
 struct HttpClient {

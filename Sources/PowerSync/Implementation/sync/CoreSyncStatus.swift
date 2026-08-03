@@ -1,3 +1,29 @@
+@propertyWrapper
+struct StringEncodedInt64: Codable {
+    let wrappedValue: Int64
+
+    init(wrappedValue: Int64) {
+        self.wrappedValue = wrappedValue
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let encoded = try container.decode(String.self)
+        guard let value = Int64(encoded) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Expected a decimal Int64 string, got \"\(encoded)\""
+            )
+        }
+        self.wrappedValue = value
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(String(wrappedValue))
+    }
+}
+
 /// A raw sync status snapshot received from the core extension.
 struct CoreDownloadSyncStatus: Decodable, Sendable {
     let connected: Bool
@@ -5,6 +31,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
     let priorityStatus: [PriorityStatusEntry]
     let downloading: CoreSyncDownloadProgress?
     let streams: [SyncStreamStatus]
+    let internalLastAppliedCheckpointRequestId: Int64?
 
     enum CodingKeys: String, CodingKey {
         case connected
@@ -12,6 +39,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
         case priorityStatus = "priority_status"
         case downloading
         case streams
+        case internalLastAppliedCheckpointRequestId = "internal_last_applied_checkpoint_request_id"
     }
 
     init() {
@@ -20,6 +48,7 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
         self.priorityStatus = []
         self.downloading = nil
         self.streams = []
+        self.internalLastAppliedCheckpointRequestId = nil
     }
 
     init(from decoder: any Decoder) throws {
@@ -28,6 +57,10 @@ struct CoreDownloadSyncStatus: Decodable, Sendable {
         self.connecting = try container.decode(Bool.self, forKey: .connecting)
         self.priorityStatus = try container.decode([PriorityStatusEntry].self, forKey: .priorityStatus)
         self.downloading = try container.decodeIfPresent(CoreSyncDownloadProgress.self, forKey: .downloading)
+        self.internalLastAppliedCheckpointRequestId = try container.decodeIfPresent(
+            StringEncodedInt64.self,
+            forKey: .internalLastAppliedCheckpointRequestId
+        )?.wrappedValue
         
         var streamsContainer = try container.nestedUnkeyedContainer(forKey: .streams)
         var streams: [SyncStreamStatus] = []

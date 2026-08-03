@@ -57,12 +57,10 @@ struct TodoListView: View {
                             return
                         }
                         Task {
-                            do {
+                            await $error.catching {
                                 try await attachments.deleteFile(attachmentId: attachmentID) { tx, _ in
                                     _ = try tx.execute(sql: "UPDATE \(TODOS_TABLE) SET photo_id = NULL WHERE id = ?", parameters: [todo.id])
                                 }
-                            } catch {
-                                self.error = error
                             }
                         }
 
@@ -97,8 +95,10 @@ struct TodoListView: View {
                     let selectedItems = indexSet.compactMap { index in
                         todos.indices.contains(index) ? todos[index] : nil
                     }
-                    for try todo in selectedItems {
-                        await delete(todo: todo)
+                    for todo in selectedItems {
+                        await $error.catching {
+                            try await system.deleteTodo(todo: todo)
+                        }
                     }
                 }
             }
@@ -112,6 +112,11 @@ struct TodoListView: View {
         }
 #endif
         .animation(.default, value: todos)
+        .refreshable {
+            await $error.catching {
+                try await system.refreshFromRemote()
+            }
+        }
         .navigationTitle("Todos")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -169,21 +174,8 @@ struct TodoListView: View {
     func toggleCompletion(of todo: Todo) async {
         var updatedTodo = todo
         updatedTodo.isComplete.toggle()
-        do {
-            error = nil
+        await $error.catching {
             try await system.updateTodo(updatedTodo)
-        } catch {
-            self.error = error
-        }
-    }
-
-    func delete(todo: Todo) async {
-        do {
-            error = nil
-            try await system.deleteTodo(todo: todo)
-
-        } catch {
-            self.error = error
         }
     }
 
@@ -197,7 +189,7 @@ struct TodoListView: View {
                 return
             }
 
-            do {
+            await $error.catching {
                 try await attachments.saveFile(
                     data: fileData,
                     mediaType: "image/jpeg",
@@ -208,8 +200,6 @@ struct TodoListView: View {
                         parameters: [record.id, todo.id]
                     )
                 }
-            } catch {
-                self.error = error
             }
         }
     }

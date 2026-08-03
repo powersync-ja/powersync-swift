@@ -26,6 +26,13 @@ struct HomeScreen: View {
                         Label("Search", systemImage: "magnifyingglass")
                     }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        navigationModel.path.append(Route.admin)
+                    } label: {
+                        Label("Admin", systemImage: "gearshape")
+                    }
+                }
             }
             .task {
                 if(system.db.currentStatus.connected == false) {

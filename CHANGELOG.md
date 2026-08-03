@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+* Sync status timestamps (`PriorityStatusEntry.lastSyncedAt`, `SyncSubscriptionDescription.lastSyncedAt`,
+  and `SyncSubscriptionDescription.expiresAt`) now have microsecond resolution.
+* Add alpha support for checkpoint requests, which let clients wait until the local database
+  has caught up to the current server-side state — useful for explicit pull-to-refresh flows.
+  Checkpoint requests require PowerSync service version **1.24.0 or later**.
+  Connect with `checkpointMode: .requests()`, then:
+
+  ```swift
+  try await db.connect(connector: connector, options: ConnectOptions(checkpointMode: .requests()))
+
+  let checkpoint = try await db.requestCheckpoint()
+  try await checkpoint.waitForSync(timeout: 30)
+  // The local database now contains all changes up to when the checkpoint was requested.
+  ```
+
+  Backends that process uploads asynchronously can handle checkpoint requests themselves by
+  implementing `CustomCheckpointRequestConnector` on their connector.
+  These APIs are in alpha and may change in future releases.
+
 ## 1.15.1
 
 - Fix `invalid text line. cause: EOF while parsing a string` errors during sync when

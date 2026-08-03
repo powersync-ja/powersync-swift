@@ -46,6 +46,15 @@ struct MergeItemSequenceTest {
         await #expect(throws: PowerSyncError.self) { try await items.next() }
     }
 
+    @Test func reportsErrorsToSlowListener() async throws {
+        let items = generateMerged().makeAsyncIterator()
+        await source.fail(PowerSyncError.operationFailed(message: "error for test"))
+        for _ in 0...100 {
+            await Task.yield()
+        }
+        await #expect(throws: PowerSyncError.self) { try await items.next() }
+    }
+
     @Test func forwardsClose() async throws {
         let items = generateMerged().makeAsyncIterator()
         await source.send(())

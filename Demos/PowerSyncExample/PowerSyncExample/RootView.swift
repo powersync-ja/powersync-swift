@@ -25,6 +25,8 @@ struct RootView: View {
                     SignUpScreen()
                 case .search:
                     SearchScreen()
+                case .admin:
+                    AdminScreen()
                 }
             }
         }

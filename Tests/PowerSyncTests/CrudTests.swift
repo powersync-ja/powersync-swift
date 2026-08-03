@@ -320,6 +320,8 @@ final class CrudTests: XCTestCase {
     }
 
     func testCustomWriteCheckpoints() async throws {
+        let database = self.database!
+
         try await database.execute(
             sql: "INSERT INTO users (id, name) VALUES (uuid(), 'a')",
             parameters: []
@@ -328,10 +330,10 @@ final class CrudTests: XCTestCase {
         let tx = try await database.getNextCrudTransaction()!
         try await tx.complete(writeCheckpoint: "123")
 
-        let targetOp = try await database.get("SELECT target_op FROM ps_buckets WHERE name = '$local'") {
-            try $0.getInt(index: 0)
+        let targetCheckpointRequestId = try await database.writeTransaction { tx in
+            try tx.powersyncTargetCheckpointRequestId()
         }
-        XCTAssertEqual(targetOp, 123)
+        XCTAssertEqual(targetCheckpointRequestId, 123)
 
         try await database.execute(
             sql: "INSERT INTO users (id, name) VALUES (uuid(), 'a')",
@@ -339,9 +341,9 @@ final class CrudTests: XCTestCase {
         )
         let batch = try await database.getCrudBatch()!
         try await batch.complete(writeCheckpoint: "124")
-        let newTargetOp = try await database.get("SELECT target_op FROM ps_buckets WHERE name = '$local'") {
-            try $0.getInt(index: 0)
+        let newTargetCheckpointRequestId = try await database.writeTransaction { tx in
+            try tx.powersyncTargetCheckpointRequestId()
         }
-        XCTAssertEqual(newTargetOp, 124)
+        XCTAssertEqual(newTargetCheckpointRequestId, 124)
     }
 }

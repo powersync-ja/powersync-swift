@@ -29,14 +29,14 @@ struct MergeItemSequence<Base: AsyncSequence & Sendable>: AsyncSequence where Ba
         init(inner: Base) {
             let state = IteratorState()
             self.pollTask = Task {
-                defer { state.inner.withLock { $0.transitionToDone() } }
-
                 do {
-                    for try await event in inner {
-                        state.inner.withLock { $0.markHasEvent(event: .success(event)) }
+                    for try await _ in inner {
+                        state.inner.withLock { $0.markHasEvent() }
                     }
+
+                    state.inner.withLock { $0.transitionToDone() }
                 } catch {
-                    state.inner.withLock { $0.markHasEvent(event: .failure(error)) }
+                    state.inner.withLock { $0.markFailed(error: error) }
                 }
             }
 
@@ -74,7 +74,16 @@ private enum MergeSequenceState {
     /// We're waiting in next() for an upstream emission.
     case waitingForUpstream(CheckedContinuation<()?, any Error>)
     /// We have an upstream emission that has not yet been sent (due to backpressure or throttle).
-    case hasPendingEvent(Result<(), any Error>)
+    case hasPendingEvent
+    /// Fetching from upstream failed.
+    /// 
+    /// For the task fetching events, this is a final state: Once errored, it will not emit any
+    /// further events, and it won't set the state to `done` like it would if the source iterator
+    /// had completed normally.
+    /// 
+    /// This exists as a separate state to ensure a subsequent call to `next()` can throw. Once
+    /// the error was observed there, this state transitions to `done`.
+    case failure(any Error)
     case done
     
     mutating func registerListener(_ continuation: CheckedContinuation<()?, any Error>) {
@@ -83,20 +92,32 @@ private enum MergeSequenceState {
             self = .waitingForUpstream(continuation)
         case .waitingForUpstream(_):
             fatalError("Async throttle sequence has two concurrent listeners?!")
-        case .hasPendingEvent(let pending):
-            continuation.resume(with: pending.map { _ in () })
+        case .hasPendingEvent:
+            continuation.resume(returning: ())
             self = .idle
+        case .failure(let error):
+            continuation.resume(throwing: error)
+            self = .done
         case .done:
             continuation.resume(returning: nil)
         }
     }
 
-    mutating func markHasEvent(event: Result<(), any Error>) {
+    mutating func markHasEvent() {
         if case let .waitingForUpstream(continuation) = self {
-            continuation.resume(with: event.map { _ in () })
+            continuation.resume(returning: ())
             self = .idle
         } else {
-            self = .hasPendingEvent(event)
+            self = .hasPendingEvent
+        }
+    }
+
+    mutating func markFailed(error: any Error) {
+        if case let .waitingForUpstream(continuation) = self {
+            continuation.resume(throwing: error)
+            self = .done
+        } else {
+            self = .failure(error)
         }
     }
 
