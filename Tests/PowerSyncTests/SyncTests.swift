@@ -526,7 +526,7 @@ class InMemorySyncIntegrationTests {
             handleSyncLines: { _ in channel },
             checkpointRequestHook: checkpointRequests.handler()
         )
-        let retryDelay: TimeInterval = 1
+        let retryDelay: TimeInterval = 2
         // Scheduling jitter means the observed interval can land just under the configured delay.
         let retryDelayTolerance = retryDelay * 0.9
 
