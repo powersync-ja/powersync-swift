@@ -2576,13 +2576,13 @@ func waitForStatus(_ status: SyncStatus, predicate: @Sendable (borrowing SyncSta
     let _ = await status.asFlow().first(where: predicate)
 }
 
-func waitUntil(attempts: Int = 100, delay: TimeInterval = 0.05, _ predicate: @escaping @Sendable () -> Bool) async throws {
+func waitUntil(attempts: Int = 100, _ predicate: @escaping @Sendable () -> Bool) async throws {
     for _ in 0..<attempts {
         if predicate() {
             return
         }
 
-        try await sleepForSeconds(seconds: delay)
+        try await sleepForSeconds(seconds: 0.05)
     }
 
     try #require(predicate())
