@@ -172,7 +172,7 @@ public struct ConnectOptions: Sendable {
     )
     public init(
         crudThrottle: TimeInterval = 1,
-        retryDelay: TimeInterval = 5,
+        retryDelay: TimeInterval = Self.defaultRetryDelay,
         params: JsonParam = [:],
         newClientImplementation: Bool = true,
         clientConfiguration: SyncClientConfiguration? = nil,
@@ -190,6 +190,8 @@ public struct ConnectOptions: Sendable {
         self.checkpointMode = checkpointMode
     }
 
+    @usableFromInline
+    static let defaultRetryDelay: TimeInterval = 5
 }
 
 /// A PowerSync managed database.

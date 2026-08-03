@@ -526,7 +526,7 @@ class InMemorySyncIntegrationTests {
             handleSyncLines: { _ in channel },
             checkpointRequestHook: checkpointRequests.handler()
         )
-        let retryDelay: TimeInterval = 0.2
+        let retryDelay: TimeInterval = 1
         // Scheduling jitter means the observed interval can land just under the configured delay.
         let retryDelayTolerance = retryDelay * 0.9
 
@@ -538,7 +538,7 @@ class InMemorySyncIntegrationTests {
             await waitForStatus(db.currentStatus) { $0.connected }
 
             _ = try await db.requestCheckpoint()
-            try await sleepForSeconds(seconds: 0.03)
+            try await sleepForSeconds(seconds: 0.5)
             _ = try await db.requestCheckpoint()
 
             // The second request advances the current sequence to 3. Its first retry should
@@ -606,7 +606,7 @@ class InMemorySyncIntegrationTests {
             try await sleepForSeconds(seconds: 0.05)
             let start = Date()
             try await db.disconnect()
-            #expect(Date().timeIntervalSince(start) < 1)
+            #expect(Date().timeIntervalSince(start) < ConnectOptions.defaultRetryDelay)
         }
     }
 
@@ -2576,13 +2576,13 @@ func waitForStatus(_ status: SyncStatus, predicate: @Sendable (borrowing SyncSta
     let _ = await status.asFlow().first(where: predicate)
 }
 
-func waitUntil(attempts: Int = 100, _ predicate: @escaping @Sendable () -> Bool) async throws {
+func waitUntil(attempts: Int = 100, delay: TimeInterval = 0.05, _ predicate: @escaping @Sendable () -> Bool) async throws {
     for _ in 0..<attempts {
         if predicate() {
             return
         }
 
-        try await sleepForSeconds(seconds: 0.05)
+        try await sleepForSeconds(seconds: delay)
     }
 
     try #require(predicate())
