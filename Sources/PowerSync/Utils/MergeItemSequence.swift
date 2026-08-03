@@ -77,8 +77,12 @@ private enum MergeSequenceState {
     case hasPendingEvent
     /// Fetching from upstream failed.
     /// 
-    /// This is a final state, we just need to ensure it gets emitted downstream before transitioning
-    /// to done.
+    /// For the task fetching events, this is a final state: Once errored, it will not emit any
+    /// further events, and it won't set the state to `done` like it would if the source iterator
+    /// had completed normally.
+    /// 
+    /// This exists as a separate state to ensure a subsequent call to `next()` can throw. Once
+    /// the error was observed there, this state transitions to `done`.
     case failure(any Error)
     case done
     
