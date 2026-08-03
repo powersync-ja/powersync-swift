@@ -269,9 +269,16 @@ private actor DatabaseInitializationAction {
     }
     
     func close(action: () async throws -> ()) async rethrows {
-        if !closed {
+        if closed {
+            return
+        }
+
+        closed = true
+        do {
             try await action()
-            closed = true
+        } catch {
+            closed = false
+            throw error
         }
     }
 }
