@@ -2,6 +2,7 @@ name: Deploy Docs
 
 on:
   push:
+  pull_request:
 
 permissions: {}
 
@@ -12,6 +13,7 @@ jobs:
   build:
     name: Build
     runs-on: macos-latest
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
     steps:
       - uses: actions/checkout@v7
         with:
@@ -51,7 +53,7 @@ jobs:
 
   # Deployment job
   deploy:
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     environment:
       name: github-pages
       url: ${{ needs.build.outputs.page_url }}

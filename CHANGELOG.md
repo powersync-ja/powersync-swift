@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.16.0
 
 * Sync status timestamps (`PriorityStatusEntry.lastSyncedAt`, `SyncSubscriptionDescription.lastSyncedAt`,
   and `SyncSubscriptionDescription.expiresAt`) now have microsecond resolution.
