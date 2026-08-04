@@ -62,4 +62,48 @@ struct DatabaseImplementationTests {
         // on all connections.
         try await db.updateSchema(schema: Schema(Table(name: "users", columns: [.text("name")])))
     }
+
+    @Test func canCloseAfterCancellingClose() async throws {
+        let pool = AsyncConnectionPool(
+            location: .inMemory,
+            logger: DefaultLogger()
+        )
+        let db = OpenedPowerSyncDatabase(
+            schema: Schema(),
+            pool: pool,
+            identifier: "cancel-then-close-test"
+        )
+
+        let (readerAcquired, signalReaderAcquired) = AsyncStream<Void>.makeStream()
+        let releaseReader = DispatchSemaphore(value: 0)
+        let reader = Task {
+            try await db.readLock { _ in
+                signalReaderAcquired.yield()
+                releaseReader.wait()
+            }
+        }
+
+        // Wait until the callback has leased a reader, then initiate close independently.
+        var readerAcquiredIterator = readerAcquired.makeAsyncIterator()
+        _ = await readerAcquiredIterator.next()
+        let cancelledClose = Task { try await db.close() }
+        cancelledClose.cancel()
+        await #expect(throws: CancellationError.self) {
+            try await cancelledClose.value
+        }
+        releaseReader.signal()
+        try await reader.value
+
+        // Retrying close must still reach and close the underlying connection pool.
+        try await db.close()
+
+        // We inspect the pool directly because the database's initialization actor now considers
+        // the database closed and would reject public operations before they reach the pool. A
+        // successful retry closes every RawSqliteConnection, so acquiring a lease must throw. If
+        // this succeeds, PoolOpener kept isClosed = true after the cancelled attempt and treated
+        // the retry as a no-op, leaving the native connections open.
+        await #expect(throws: PowerSyncError.self) {
+            try await pool.read { _ in () }
+        }
+    }
 }
