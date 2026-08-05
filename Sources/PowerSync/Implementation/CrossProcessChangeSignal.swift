@@ -1,20 +1,20 @@
 import Foundation
 import notify
 
-/// Cross-process change signaling for a database file, built on Darwin notifications —
-/// the same mechanism Core Data uses for its remote-change notifications.
+/// Cross-process change transport for a database file, built on Darwin notifications, the
+/// same mechanism Core Data uses for its remote-change notifications.
 ///
-/// PowerSync's update hooks only observe writes made through the local connection pool.
-/// When several processes share a database file (an app and its widgets or App Intents
-/// extensions), each process posts this signal after committing a write; the others
-/// re-emit their `tableUpdates` with ``EXTERNAL_CHANGES_MARKER`` so `watch` queries
-/// re-run and the upload client checks `ps_crud`.
+/// PowerSync's update hooks only observe writes made through the local connection pool. When
+/// several processes share a database file (an app and its widgets or App Intents
+/// extensions), each process records the tables it changed in the `ps_swift_updates` table
+/// and posts this signal; the others read the new rows and re-emit those tables on their
+/// `tableUpdates` so `watch` queries re-run and the upload client checks `ps_crud`.
 ///
 /// Darwin notifications carry no payload and are coalesced under pressure, which is fine:
-/// the marker means "something changed, re-query". Deliveries to the posting process
-/// itself are not suppressed — a redundant re-query (already throttled) is preferable to
-/// the race a sender-stamp suppression scheme introduces, where an external change could
-/// be misattributed and silently dropped.
+/// the payload lives in `ps_swift_updates`, and each receiver tracks the highest row id it
+/// has consumed. Deliveries to the posting process itself are not suppressed here either; that
+/// is handled where the rows are read, by ignoring this process's own `author`, so a process
+/// never wakes itself.
 final class CrossProcessChangeSignal: @unchecked Sendable {
     private let name: String
     private let logger: any LoggerProtocol
@@ -28,8 +28,10 @@ final class CrossProcessChangeSignal: @unchecked Sendable {
         self.logger = logger
     }
 
-    /// Starts listening; `onExternalChange` runs on a private queue for every signal
-    /// (including this process's own posts).
+    /// Starts listening; `onChange` runs on a private queue for every notification, including
+    /// the ones caused by this process's own posts. Callers are expected to throttle it: the
+    /// notification carries no information, so handling several of them at once is the same as
+    /// handling one.
     func start(onChange: @escaping @Sendable () -> Void) {
         guard token == NOTIFY_TOKEN_INVALID else {
             return
@@ -47,7 +49,7 @@ final class CrossProcessChangeSignal: @unchecked Sendable {
         }
     }
 
-    /// Posts the signal; called after every committed write.
+    /// Posts the signal; called after a write recorded the tables it changed.
     func post() {
         notify_post(name)
     }

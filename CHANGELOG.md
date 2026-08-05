@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+* Fix a re-query storm on databases opened at an absolute path (App Group container). The
+  cross-process change notification carried no payload, so every process (including the one
+  that wrote) re-ran **all** of its `watch` queries on every write. That also let a write to
+  one table re-trigger a watcher of an unrelated table, which could feed itself into a
+  permanent loop that pinned the CPU. Processes now exchange the concrete changed tables
+  through a local `ps_swift_updates` table, so each process ignores its own changes and only
+  wakes the queries whose tables actually changed.
+
 ## 1.16.0
 
 * Sync status timestamps (`PriorityStatusEntry.lastSyncedAt`, `SyncSubscriptionDescription.lastSyncedAt`,
