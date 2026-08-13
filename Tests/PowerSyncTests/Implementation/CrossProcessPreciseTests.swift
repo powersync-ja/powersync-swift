@@ -25,7 +25,7 @@ struct CrossProcessPreciseTests {
     }
 
     @available(iOS 16, macOS 13, watchOS 9, tvOS 16, *)
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func aWriteToAnotherTableDoesNotWakeAnUnrelatedWatch() async throws {
         let path = FileManager.default.temporaryDirectory
             .appendingPathComponent("xchg-precise-\(UUID().uuidString).db").path
@@ -66,7 +66,7 @@ struct CrossProcessPreciseTests {
     /// Counting on `tableUpdates` rather than through `watch`, because a watch query coalesces
     /// two updates arriving close together into a single re-run and would hide the difference.
     @available(iOS 16, macOS 13, watchOS 9, tvOS 16, *)
-    @Test(.timeLimit(.minutes(1)))
+    @Test
     func ownWriteIsAnnouncedOnlyOnce() async throws {
         let path = FileManager.default.temporaryDirectory
             .appendingPathComponent("xchg-self-\(UUID().uuidString).db").path

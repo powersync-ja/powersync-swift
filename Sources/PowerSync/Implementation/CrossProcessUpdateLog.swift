@@ -33,8 +33,8 @@ struct CrossProcessUpdateLog: Sendable {
         """
 
     /// Rows older than this are pruned on each write. A receiver that falls behind by more than
-    /// this window can no longer rely on the rows it missed still being there, so it detects the
-    /// gap and re-queries everything instead.
+    /// this window can no longer rely on the rows it missed still being there, so it emits a
+    /// generic ``EXTERNAL_CHANGES_MARKER`` instead.
     static let retentionSeconds: Int64 = 15
 
     private static let insertSQL =
@@ -46,6 +46,11 @@ struct CrossProcessUpdateLog: Sendable {
 
     static let readSQL =
         "SELECT id, tables FROM \(tableName) WHERE id > ? AND author != ? ORDER BY id"
+
+    /// Reads a row of ``readSQL``: the row id, and the JSON array of tables it recorded.
+    static func readRow(_ cursor: any SqlCursor) throws -> (id: Int64, tables: String) {
+        (try cursor.getInt64(index: 0), try cursor.getString(index: 1))
+    }
 
     /// Whether a changed table is worth telling other processes about.
     ///
@@ -68,7 +73,7 @@ struct CrossProcessUpdateLog: Sendable {
         guard !relevant.isEmpty else { return false }
 
         do {
-            let json = String(decoding: try JSONEncoder().encode(relevant.sorted()), as: UTF8.self)
+            let json = String(decoding: try JSONEncoder().encode(relevant), as: UTF8.self)
             let _ = try lease.execute(
                 sql: Self.insertSQL,
                 parameters: [.int64(author), .string(json)]

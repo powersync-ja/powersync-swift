@@ -45,19 +45,21 @@ final class NativeConnectionPool: Sendable {
     private func dispatchWrites(lease: NativeConnectionLease) {
         do {
             try lease.withIterator(sql: "SELECT powersync_update_hooks('get')", parameters: []) { rows in
-                let affectedTables = try rows.next {
+                guard var affectedTables = try rows.next(callback: {
                     let decoder = JSONDecoder()
                     return try decoder.decode(Set<String>.self, from: try $0.getString(index: 0).data(using: .utf8)!)
-                }
-
-                // Our own writes to the update log must not feed back into the machinery.
-                let changed = (affectedTables ?? []).subtracting([CrossProcessUpdateLog.tableName])
-                guard !changed.isEmpty else {
+                }) else {
                     return
                 }
 
-                self.handleUpdates(changed)
-                if let updateLog, updateLog.record(tables: changed, lease: lease) {
+                // Our own writes to the update log must not feed back into the machinery.
+                affectedTables.remove(CrossProcessUpdateLog.tableName)
+                guard !affectedTables.isEmpty else {
+                    return
+                }
+
+                self.handleUpdates(affectedTables)
+                if let updateLog, updateLog.record(tables: affectedTables, lease: lease) {
                     updateLog.signal.post()
                 }
             }

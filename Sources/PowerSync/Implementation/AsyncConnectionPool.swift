@@ -102,7 +102,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
     }
 
     private let readState = Mutex(ReadState())
-    /// Notifications from other processes, consumed by ``startReadingUpdateLog(context:)``.
+    /// Notifications from other processes, consumed by ``startReadingUpdateLog()``.
     private let updateNotifications = BroadcastStream<Void>()
     private let updateLogReader = Mutex<Task<Void, Never>?>(nil)
 
@@ -247,21 +247,25 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
     /// Reads the update log whenever another process signals, merging notifications that arrive
     /// while a read is in progress (or during the throttle that follows) into a single re-read,
     /// the same way `watch` queries throttle table updates.
-    private static func startReadingUpdateLog(context: AsyncConnectionPool) {
-        let notifications = context.updateNotifications.subscribe()
-        let task = Task { [weak context] in
+    ///
+    /// The task lives as long as the pool does and is cancelled in ``close()``. It is detached
+    /// because it belongs to the pool and not to whichever caller happened to open it: that
+    /// caller's priority, task locals and cancellation must not reach this loop.
+    private func startReadingUpdateLog() {
+        let notifications = updateNotifications.subscribe()
+        let task = Task.detached { [weak self] in
             let merged = MergeItemSequence(inner: notifications)
             do {
                 for try await _ in merged {
-                    guard let context else { return }
-                    await context.performUpdateLogRead()
-                    try await sleepForSeconds(seconds: readThrottleSeconds)
+                    guard let self else { return }
+                    await self.performUpdateLogRead()
+                    try await sleepForSeconds(seconds: Self.readThrottleSeconds)
                 }
             } catch {
                 // Cancelled while reading or waiting; nothing left to do.
             }
         }
-        context.updateLogReader.withLock { $0 = task }
+        updateLogReader.withLock { $0 = task }
     }
 
     /// Rows written by this pool are skipped, so a notification caused by our own write finds
@@ -272,7 +276,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
         guard let updateLog else { return }
 
         let (since, gap) = readState.withLock { state in
-            (state.watermark, state.lastReadAt.map { Date().timeIntervalSince($0) })
+            (state.watermark, state.lastReadAt.map(Date().timeIntervalSince))
         }
         // Rows are only pruned once they are older than the retention window, so having read
         // within that window proves nothing we still need was pruned. A longer gap does not
@@ -291,11 +295,9 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
                     sql: CrossProcessUpdateLog.readSQL,
                     parameters: [.int64(since), .int64(author)],
                     callback: { rows in
-                        while let row = try rows.next(callback: { cursor -> (Int64, String) in
-                            (try cursor.getInt64(index: 0), try cursor.getString(index: 1))
-                        }) {
-                            maxSeen = row.0
-                            if let decoded = try? JSONDecoder().decode([String].self, from: Data(row.1.utf8)) {
+                        while let row = try rows.next(callback: CrossProcessUpdateLog.readRow) {
+                            maxSeen = row.id
+                            if let decoded = try? JSONDecoder().decode([String].self, from: Data(row.tables.utf8)) {
                                 tables.formUnion(decoded)
                             } else {
                                 decodeFailed = true
@@ -326,9 +328,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
     }
 
     func close() async throws {
-        // Only stop listening once the pool is really closed: `close()` can be cancelled, and
-        // the database stays usable in that case, so it must keep receiving other processes'
-        // changes. A notification arriving while we close is harmless, the read just fails.
+        // Only stop update notifications after the async close, since that can be cancelled.
         try await self.opener.close()
         updateLog?.signal.stop()
         updateLogReader.withLock { reader in
@@ -357,7 +357,7 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
             // re-enter this actor and build a second pool.
             context.readState.withLock { $0.lastReadAt = Date() }
             if context.updateLog != nil {
-                AsyncConnectionPool.startReadingUpdateLog(context: context)
+                context.startReadingUpdateLog()
                 context.updateLog?.signal.start { [weak context] in
                     context?.updateNotifications.dispatch(event: ())
                 }
