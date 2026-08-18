@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.16.1
 
 * Fix a re-query storm on databases opened at an absolute path (App Group container). The
   cross-process change notification carried no payload, so every process (including the one
@@ -9,6 +9,7 @@
   permanent loop that pinned the CPU. Processes now exchange the concrete changed tables
   through a local `ps_swift_updates` table, so each process ignores its own changes and only
   wakes the queries whose tables actually changed.
+* Update PowerSync SQLite core extension to version 0.5.3, improving internal error messages.
 
 ## 1.16.0
 
