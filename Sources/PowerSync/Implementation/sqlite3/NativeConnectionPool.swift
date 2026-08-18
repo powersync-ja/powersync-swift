@@ -42,7 +42,10 @@ final class NativeConnectionPool: Sendable {
         self.updateLog = updateLog
     }
 
-    private func dispatchWrites(lease: NativeConnectionLease) {
+    /// Reads outstanding changes and records them for other processes.
+    /// 
+    /// Recording them for other processes might write, so this should be called on a background thread only.
+    func dispatchWrites(lease: NativeConnectionLease) {
         do {
             try lease.withIterator(sql: "SELECT powersync_update_hooks('get')", parameters: []) { rows in
                 guard var affectedTables = try rows.next(callback: {
@@ -79,7 +82,6 @@ final class NativeConnectionPool: Sendable {
     func write<T>(onConnection: (NativeConnectionLease) async throws -> T) async throws -> T {
         let connection = try await writer.acquire(count: 1)
         let lease = try connection.acquiredItems[0].asLease()
-        defer { dispatchWrites(lease: lease) }
         let result = try await onConnection(lease)
         return result
     }
@@ -87,7 +89,6 @@ final class NativeConnectionPool: Sendable {
     func withAllConnections<T>(onConnection: (NativeConnectionLease, [NativeConnectionLease]) async throws -> T) async throws -> T {
         let write = try await writer.acquire(count: 1)
         let writeLease = try write.acquiredItems[0].asLease()
-        defer { dispatchWrites(lease: writeLease) }
 
         let result: T
         if let readers {
