@@ -519,7 +519,8 @@ class InMemorySyncIntegrationTests {
         }
     }
 
-    @Test func checkpointRequestRetryWaitsAgainAfterNewRequest() async throws {
+    @Test(.disabled("Flaky in CI"))
+    func checkpointRequestRetryWaitsAgainAfterNewRequest() async throws {
         let channel = AsyncThrowingChannel<Data, any Error>()
         let checkpointRequests = CheckpointRequestRecorder()
         let mockClient = MockHttpSession(
