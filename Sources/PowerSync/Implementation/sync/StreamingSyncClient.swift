@@ -514,6 +514,8 @@ private struct ActiveSyncIteration: Sendable {
             signals.markPendingCheckpointRequestsRequiringAffirmation()
         }
 
+        let pendingLocalEvents = localEvents.subscribe()
+
         // Notify the core extension for changed Sync Stream subscriptions, as we might have to reconnect.
         let (currentStreams, streamChanges) = syncClient.db.group.syncCoordinator.streams.observeActiveStreams()
         async let _ = watchSyncStreams(changes: streamChanges)
@@ -557,7 +559,7 @@ private struct ActiveSyncIteration: Sendable {
                     controlArgs = AsyncAlgorithms.merge(
                         serviceEvents,
                         checkpointRequestStateValidationEvents(task: checkpointRequestStateSeed),
-                        localEvents.subscribe()
+                        pendingLocalEvents
                     )
                 } catch {
                     let streamError = error

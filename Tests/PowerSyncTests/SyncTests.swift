@@ -2192,6 +2192,55 @@ class InMemorySyncIntegrationTests {
         try await db.close()
     }
 
+    @Test func subscriptionAddedWhileConnectingReconnects() async throws {
+        // Regression test: a subscription added after `connect()` returned but before the first
+        // `/sync/stream` response arrived must trigger a reconnect on its own. Nothing here sends a
+        // keep-alive, so the second request can only come from the subscription change.
+        let firstRequestStarted = Signal()
+        let releaseFirstResponse = Signal()
+        let requests = AsyncMutex<[JsonParam]>([])
+        let db = openDatabase(MockHttpSession { request in
+            let body = try StreamingSyncClient.jsonDecoder.decode(JsonParam.self, from: try #require(request.httpBody))
+            let count = await requests.withMutex { requests in
+                requests.append(body)
+                return requests.count
+            }
+            if count == 1 {
+                await firstRequestStarted.complete()
+                await releaseFirstResponse.await()
+            }
+            return AsyncThrowingChannel<Data, any Error>()
+        })
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await firstRequestStarted.await()
+
+        // The first request is in flight and its response has not arrived yet.
+        let subscription = try await db.syncStream(name: "a", params: nil).subscribe()
+        await releaseFirstResponse.complete()
+
+        try await waitUntilAsync { await requests.inner.count == 2 }
+        let allRequests = await requests.inner
+        if case let .object(streams) = allRequests[0]["streams"] {
+            try #require(streams["subscriptions"] == .array([]))
+        } else {
+            Issue.record("Should have streams key in first body")
+        }
+        if case let .object(streams) = allRequests[1]["streams"] {
+            try #require(streams["subscriptions"] == .array([
+                .object([
+                    "stream": .string("a"),
+                    "parameters": .null,
+                    "override_priority": .null,
+                ])
+            ]))
+        } else {
+            Issue.record("Should have streams key in second body")
+        }
+        let _ = consume subscription
+        try await db.close()
+    }
+
     @Test func subscriptionsUpdateWhileOffline() async throws {
         let db = openDatabase(MockHttpSession {
             request in throw PowerSyncError.operationFailed(message: "Unexpected connection", underlyingError: nil)

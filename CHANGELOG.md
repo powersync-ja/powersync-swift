@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.2
+
+* Fix sync stream subscriptions changed while the connection was still being established only
+  taking effect on the next keep-alive line from the service, typically 20 seconds later.
+
 ## 1.16.1
 
 * Fix a re-query storm on databases opened at an absolute path (App Group container). The
