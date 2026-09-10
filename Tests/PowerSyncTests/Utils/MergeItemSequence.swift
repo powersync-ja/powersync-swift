@@ -73,4 +73,21 @@ struct MergeItemSequenceTest {
 
         try await task.value
     }
+
+    @Test func cancellationCanRaceWithUpstreamFinish() async throws {
+        for _ in 0..<1_000 {
+            let source = AsyncThrowingChannel<(), any Error>()
+            let items = MergeItemSequence(inner: source).makeAsyncIterator()
+            let next = Task { try await items.next() }
+
+            await Task.yield()
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { source.finish() }
+                group.addTask { next.cancel() }
+            }
+
+            _ = try? await next.value
+            try? await items.pollTask.value
+        }
+    }
 }

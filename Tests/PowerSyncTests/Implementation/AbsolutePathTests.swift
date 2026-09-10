@@ -36,4 +36,36 @@ struct AbsolutePathTests {
 
         try? FileManager.default.removeItem(at: directory)
     }
+
+    @Test func repeatedAbsolutePathCloseStopsUpdateReaders() async throws {
+        let schema = Schema(tables: [
+            Table(name: "items", columns: [.text("name")]),
+        ])
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("powersync-absolute-close-\(UUID().uuidString)")
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for lane in 0..<4 {
+                group.addTask {
+                    for iteration in 0..<50 {
+                        let path = directory
+                            .appendingPathComponent("\(lane)-\(iteration).db")
+                            .path
+                        let database = PowerSyncDatabase(
+                            schema: schema,
+                            dbFilename: path,
+                            logger: DefaultLogger()
+                        )
+                        _ = try await database.get(sql: "SELECT 1", parameters: nil) { row in
+                            try row.getInt(index: 0)
+                        }
+                        try await database.close(deleteDatabase: true)
+                    }
+                }
+            }
+            try await group.waitForAll()
+        }
+
+        try? FileManager.default.removeItem(at: directory)
+    }
 }
