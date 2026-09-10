@@ -338,9 +338,14 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
         // Only stop update notifications after the async close, since that can be cancelled.
         try await self.opener.close()
         updateLog?.signal.stop()
-        updateLogReader.withLock { reader in
-            reader?.cancel()
+        let reader = updateLogReader.withLock { reader in
+            let task = reader
             reader = nil
+            return task
+        }
+        reader?.cancel()
+        if let reader {
+            await reader.value
         }
     }
 

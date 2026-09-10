@@ -31,12 +31,15 @@ struct MergeItemSequence<Base: AsyncSequence & Sendable>: AsyncSequence where Ba
             self.pollTask = Task {
                 do {
                     for try await _ in inner {
-                        state.inner.withLock { $0.markHasEvent() }
+                        let resolution = state.inner.withLock { $0.markHasEvent() }
+                        resolution.resume()
                     }
 
-                    state.inner.withLock { $0.transitionToDone() }
+                    let resolution = state.inner.withLock { $0.transitionToDone() }
+                    resolution.resume()
                 } catch {
-                    state.inner.withLock { $0.markFailed(error: error) }
+                    let resolution = state.inner.withLock { $0.markFailed(error: error) }
+                    resolution.resume()
                 }
             }
 
@@ -47,23 +50,37 @@ struct MergeItemSequence<Base: AsyncSequence & Sendable>: AsyncSequence where Ba
             try await withTaskCancellationHandler(
                 operation: {
                     try await withCheckedThrowingContinuation { continuation in
-                        state.inner.withLock { $0.registerListener(continuation) }
+                        let resolution = state.inner.withLock { $0.registerListener(continuation) }
+                        resolution.resume()
                     }
                 },
                 onCancel: {
                     pollTask.cancel()
-                    state.inner.withLock {
-                        if case .waitingForUpstream(let continuation) = $0 {
-                            continuation.resume(returning: nil)
-                        }
-                        $0 = .done
-                    }
+                    let resolution = state.inner.withLock { $0.cancel() }
+                    resolution.resume()
                 }
             )
         }
         
         deinit {
             self.pollTask.cancel()
+        }
+    }
+}
+
+private enum MergeSequenceResolution {
+    case none
+    case success(CheckedContinuation<()?, any Error>, ()?)
+    case failure(CheckedContinuation<()?, any Error>, any Error)
+
+    func resume() {
+        switch self {
+        case .none:
+            break
+        case let .success(continuation, value):
+            continuation.resume(returning: value)
+        case let .failure(continuation, error):
+            continuation.resume(throwing: error)
         }
     }
 }
@@ -86,45 +103,65 @@ private enum MergeSequenceState {
     case failure(any Error)
     case done
     
-    mutating func registerListener(_ continuation: CheckedContinuation<()?, any Error>) {
+    mutating func registerListener(_ continuation: CheckedContinuation<()?, any Error>) -> MergeSequenceResolution {
         switch self {
         case .idle:
             self = .waitingForUpstream(continuation)
+            return .none
         case .waitingForUpstream(_):
             fatalError("Async throttle sequence has two concurrent listeners?!")
         case .hasPendingEvent:
-            continuation.resume(returning: ())
             self = .idle
+            return .success(continuation, ())
         case .failure(let error):
-            continuation.resume(throwing: error)
             self = .done
+            return .failure(continuation, error)
         case .done:
-            continuation.resume(returning: nil)
+            return .success(continuation, nil)
         }
     }
 
-    mutating func markHasEvent() {
-        if case let .waitingForUpstream(continuation) = self {
-            continuation.resume(returning: ())
+    mutating func markHasEvent() -> MergeSequenceResolution {
+        switch self {
+        case let .waitingForUpstream(continuation):
             self = .idle
-        } else {
+            return .success(continuation, ())
+        case .idle, .hasPendingEvent:
             self = .hasPendingEvent
+            return .none
+        case .failure, .done:
+            return .none
         }
     }
 
-    mutating func markFailed(error: any Error) {
-        if case let .waitingForUpstream(continuation) = self {
-            continuation.resume(throwing: error)
+    mutating func markFailed(error: any Error) -> MergeSequenceResolution {
+        switch self {
+        case let .waitingForUpstream(continuation):
             self = .done
-        } else {
+            return .failure(continuation, error)
+        case .idle, .hasPendingEvent, .failure:
             self = .failure(error)
+            return .none
+        case .done:
+            return .none
         }
     }
 
-    mutating func transitionToDone() {
+    mutating func transitionToDone() -> MergeSequenceResolution {
         if case let .waitingForUpstream(continuation) = self {
-            continuation.resume(returning: nil)
+            self = .done
+            return .success(continuation, nil)
         }
         self = .done
+        return .none
+    }
+
+    mutating func cancel() -> MergeSequenceResolution {
+        if case let .waitingForUpstream(continuation) = self {
+            self = .done
+            return .success(continuation, nil)
+        }
+        self = .done
+        return .none
     }
 }
