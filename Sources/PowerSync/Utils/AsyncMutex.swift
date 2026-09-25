@@ -38,10 +38,21 @@ final class AsyncSemaphore<T: ~Copyable>: Sendable {
     }
 
     fileprivate func returnItems(items: consuming RigidArray<T>) {
-        state.withLock { state in            
+        // Waiters completed by these items are resumed after the lock is released, never
+        // under it: resuming a task takes that task's status-record lock in the runtime,
+        // and a task being cancelled holds that lock while its cancellation handler runs
+        // `abortWaiter`, which takes `state`. Resuming under `state` deadlocks the pair.
+        let resumed = state.withLock { state in
+            var resumed: [CheckedContinuation<(), Never>] = []
             while !items.isEmpty {
-                state.returnItem(item: items.removeLast())
+                if let continuation = state.returnItem(item: items.removeLast()) {
+                    resumed.append(continuation)
+                }
             }
+            return resumed
+        }
+        for continuation in resumed {
+            continuation.resume()
         }
     }
 
@@ -106,9 +117,11 @@ private struct SemaphoreState<T: ~Copyable>: ~Copyable {
         assert(lastWaiter == nil)
     }
 
-    private mutating func deactivateWaiter(waiter: SemaphoreWaitNode) {
+    /// Unlinks the waiter and hands back its continuation. The caller resumes it once the
+    /// semaphore lock is released; see `AsyncSemaphore.returnItems`.
+    private mutating func deactivateWaiter(waiter: SemaphoreWaitNode) -> CheckedContinuation<(), Never>? {
         if !waiter.isActive {
-            return
+            return nil
         }
 
         let prev = waiter.prev
@@ -131,37 +144,53 @@ private struct SemaphoreState<T: ~Copyable>: ~Copyable {
         }
 
         waiter.isActive = false
-        waiter.continuation.resume(returning: ())
+        return waiter.continuation
     }
 
-    mutating func returnItem(item: consuming T) {
+    /// Returns the continuation of a waiter this item completed, if any, for the caller to
+    /// resume outside the lock.
+    mutating func returnItem(item: consuming T) -> CheckedContinuation<(), Never>? {
         // Give it to the next waiter, if possible.
         if let firstWaiter {
             firstWaiter.pushItem(item: item)
             if firstWaiter.isFull {
-                self.deactivateWaiter(waiter: firstWaiter)
+                return self.deactivateWaiter(waiter: firstWaiter)
             }
+            return nil
         } else {
             // No pending waiter, return lease into pool.
             available.append(item)
+            return nil
         }
     }
 
-    mutating func returnItems(items: consuming RigidArray<T>) {
+    mutating func returnItems(items: consuming RigidArray<T>) -> [CheckedContinuation<(), Never>] {
+        var resumed: [CheckedContinuation<(), Never>] = []
         while !items.isEmpty {
-            returnItem(item: items.removeLast())
+            if let continuation = returnItem(item: items.removeLast()) {
+                resumed.append(continuation)
+            }
         }
+        return resumed
     }
 
-    mutating func abortWaiter(waiter: SemaphoreWaitNode) {
+    /// Returns the aborted waiter's continuation and those of any waiters completed by the
+    /// items it gives back, for the caller to resume outside the lock.
+    mutating func abortWaiter(waiter: SemaphoreWaitNode) -> [CheckedContinuation<(), Never>] {
         let items: RigidArray<T>? = waiter.consumeItems()
-        deactivateWaiter(waiter: waiter)
-        if let items {
-            returnItems(items: items)
+        var resumed: [CheckedContinuation<(), Never>] = []
+        if let continuation = deactivateWaiter(waiter: waiter) {
+            resumed.append(continuation)
         }
+        if let items {
+            resumed.append(contentsOf: returnItems(items: items))
+        }
+        return resumed
     }
 
-    mutating func addWaiter(requestedItems: Int, continuation: CheckedContinuation<(), Never>) -> SemaphoreWaitNode {
+    /// Returns the new node and, when the pool could fill it at once, its continuation for
+    /// the caller to resume outside the lock.
+    mutating func addWaiter(requestedItems: Int, continuation: CheckedContinuation<(), Never>) -> (SemaphoreWaitNode, CheckedContinuation<(), Never>?) {
         let node = SemaphoreWaitNode(requestedItems: requestedItems, continuation: continuation)
         if let lastWaiter {
             lastWaiter.next = node
@@ -180,9 +209,9 @@ private struct SemaphoreState<T: ~Copyable>: ~Copyable {
         }
 
         if node.isFull {
-            self.deactivateWaiter(waiter: node)
+            return (node, self.deactivateWaiter(waiter: node))
         }
-        return node
+        return (node, nil)
     }
 }
 
@@ -267,28 +296,38 @@ private struct TypedWaitNode<T: ~Copyable>: Sendable, ~Copyable {
 
     /// Adds a wait node to the semaphore and waits for a grant or that node to be aborted.
     private func acquireInternal(count: Int) async {
+        // Continuations are resumed after both locks are released. The cancellation handler
+        // runs while the runtime holds this task's status-record lock, and resuming a task
+        // takes that lock, so a resume under `inner` or the semaphore's `state` can deadlock
+        // against a concurrent cancel of the task being resumed.
         await withTaskCancellationHandler(operation: {
             await withCheckedContinuation { continuation in
-                inner.withLock { state in
+                let resumed: CheckedContinuation<(), Never>? = inner.withLock { state in
                     if state != nil {
-                        continuation.resume()
-                        return
+                        return continuation
                     }
 
-                    let waiter = semaphore.state.withLock { state in
+                    let (waiter, granted) = semaphore.state.withLock { state in
                         state.addWaiter(requestedItems: count, continuation: continuation)
                     }
                     state = .hasWaiter(waiter)
+                    return granted
                 }
+                resumed?.resume()
             }
         }, onCancel: {
-            inner.withLock { state in
+            let resumed = inner.withLock { state in
+                var resumed: [CheckedContinuation<(), Never>] = []
                 if case let .hasWaiter(waiter) = state {
-                    semaphore.state.withLock { state in
+                    resumed = semaphore.state.withLock { state in
                         state.abortWaiter(waiter: waiter)
                     }
                 }
                 state = .cancelled
+                return resumed
+            }
+            for continuation in resumed {
+                continuation.resume()
             }
         })
     }

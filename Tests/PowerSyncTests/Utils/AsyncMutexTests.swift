@@ -120,4 +120,34 @@ struct AsyncSemaphoreTests {
         let _ = consume grant1
         try (await third.result).get()
     }
+
+    /// A waiter cancelled at the moment another task returns the item it waits for must not
+    /// deadlock. The runtime holds the cancelled task's status-record lock while its
+    /// cancellation handler takes the semaphore lock; the returning task must therefore not
+    /// resume the waiter while it holds that same lock.
+    @Test func cancellationCanRaceWithReturn() async throws {
+        let semaphore = AsyncSemaphore(from: ["a"])
+        for _ in 0..<1_000 {
+            let (release, releaser) = AsyncStream<Void>.makeStream()
+            let holder = Task {
+                let grant = try await semaphore.acquire(count: 1)
+                var iterator = release.makeAsyncIterator()
+                _ = await iterator.next()
+                let _ = consume grant
+            }
+            await Task.yield()
+            let waiter = Task {
+                let _ = try await semaphore.acquire(count: 1)
+            }
+            await Task.yield()
+
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { releaser.finish() }
+                group.addTask { waiter.cancel() }
+            }
+
+            _ = await waiter.result
+            _ = try await holder.value
+        }
+    }
 }
