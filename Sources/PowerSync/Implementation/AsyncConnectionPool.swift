@@ -343,8 +343,8 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
             reader = nil
             return task
         }
-        reader?.cancel()
         if let reader {
+            reader.cancel()
             await reader.value
         }
     }
