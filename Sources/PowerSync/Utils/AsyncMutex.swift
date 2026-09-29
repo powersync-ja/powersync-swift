@@ -38,10 +38,6 @@ final class AsyncSemaphore<T: ~Copyable>: Sendable {
     }
 
     fileprivate func returnItems(items: consuming RigidArray<T>) {
-        // Waiters completed by these items are resumed after the lock is released, never
-        // under it: resuming a task takes that task's status-record lock in the runtime,
-        // and a task being cancelled holds that lock while its cancellation handler runs
-        // `abortWaiter`, which takes `state`. Resuming under `state` deadlocks the pair.
         let resumed = state.withLock { state in
             var resumed: [CheckedContinuation<(), Never>] = []
             while !items.isEmpty {
@@ -51,6 +47,8 @@ final class AsyncSemaphore<T: ~Copyable>: Sendable {
             }
             return resumed
         }
+
+        // Resume outside of the mutex to avoid deadlocks.
         for continuation in resumed {
             continuation.resume()
         }
@@ -117,8 +115,6 @@ private struct SemaphoreState<T: ~Copyable>: ~Copyable {
         assert(lastWaiter == nil)
     }
 
-    /// Unlinks the waiter and hands back its continuation. The caller resumes it once the
-    /// semaphore lock is released; see `AsyncSemaphore.returnItems`.
     private mutating func deactivateWaiter(waiter: SemaphoreWaitNode) -> CheckedContinuation<(), Never>? {
         if !waiter.isActive {
             return nil
@@ -296,10 +292,6 @@ private struct TypedWaitNode<T: ~Copyable>: Sendable, ~Copyable {
 
     /// Adds a wait node to the semaphore and waits for a grant or that node to be aborted.
     private func acquireInternal(count: Int) async {
-        // Continuations are resumed after both locks are released. The cancellation handler
-        // runs while the runtime holds this task's status-record lock, and resuming a task
-        // takes that lock, so a resume under `inner` or the semaphore's `state` can deadlock
-        // against a concurrent cancel of the task being resumed.
         await withTaskCancellationHandler(operation: {
             await withCheckedContinuation { continuation in
                 let resumed: CheckedContinuation<(), Never>? = inner.withLock { state in
