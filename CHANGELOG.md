@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.16.3
+
+* Fix deadlocks around task cancellation ([#189](https://github.com/powersync-ja/powersync-swift/issues/189))
+
 ## 1.16.2
 
 * Fix sync stream subscriptions changed while the connection was still being established only
