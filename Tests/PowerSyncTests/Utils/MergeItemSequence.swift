@@ -73,4 +73,21 @@ struct MergeItemSequenceTest {
 
         try await task.value
     }
+
+    /// A cancellation of `next()` racing an upstream event or completion must never deadlock:
+    /// cancelling holds the task's status-record lock and runs `onCancel` (state lock), while
+    /// the poll task resumes the same task's continuation — which needs that status-record lock.
+    @Test(.timeLimit(.minutes(1))) func cancellingWhileUpstreamEmitsNeverDeadlocks() async throws {
+        for round in 0..<3000 {
+            let source = AsyncThrowingChannel<(), any Error>()
+            let items = MergeItemSequence(inner: source).makeAsyncIterator()
+            let waiter = Task { try await items.next() }
+            if round % 2 == 0 { await Task.yield() }
+            async let emitted: Void = source.send(())
+            waiter.cancel()
+            source.finish()
+            _ = try? await waiter.value
+            await emitted
+        }
+    }
 }

@@ -31,12 +31,12 @@ struct MergeItemSequence<Base: AsyncSequence & Sendable>: AsyncSequence where Ba
             self.pollTask = Task {
                 do {
                     for try await _ in inner {
-                        state.inner.withLock { $0.markHasEvent() }
+                        state.inner.withLock { $0.markHasEvent() }?.run()
                     }
 
-                    state.inner.withLock { $0.transitionToDone() }
+                    state.inner.withLock { $0.transitionToDone() }?.run()
                 } catch {
-                    state.inner.withLock { $0.markFailed(error: error) }
+                    state.inner.withLock { $0.markFailed(error: error) }?.run()
                 }
             }
 
@@ -47,23 +47,54 @@ struct MergeItemSequence<Base: AsyncSequence & Sendable>: AsyncSequence where Ba
             try await withTaskCancellationHandler(
                 operation: {
                     try await withCheckedThrowingContinuation { continuation in
-                        state.inner.withLock { $0.registerListener(continuation) }
+                        state.inner.withLock { $0.registerListener(continuation) }?.run()
                     }
                 },
                 onCancel: {
                     pollTask.cancel()
-                    state.inner.withLock {
+                    let pending: PendingResume? = state.inner.withLock {
+                        defer { $0 = .done }
                         if case .waitingForUpstream(let continuation) = $0 {
-                            continuation.resume(returning: nil)
+                            return PendingResume(continuation, .returning(nil))
                         }
-                        $0 = .done
+                        return nil
                     }
+                    pending?.run()
                 }
             )
         }
         
         deinit {
             self.pollTask.cancel()
+        }
+    }
+}
+
+/// A continuation resumption decided under the state lock and performed AFTER it is released.
+///
+/// Resuming a continuation takes the resumed task's status-record lock, while a task
+/// cancellation runs `next()`'s `onCancel` (which takes the state lock) WHILE holding that same
+/// status-record lock. Resuming inside `withLock` therefore inverts the lock order against a
+/// concurrent cancellation and can deadlock both threads, so every state transition only
+/// returns the resumption and the caller runs it once the lock is dropped.
+private struct PendingResume {
+    enum Outcome {
+        case returning(()?)
+        case throwing(any Error)
+    }
+
+    let continuation: CheckedContinuation<()?, any Error>
+    let outcome: Outcome
+
+    init(_ continuation: CheckedContinuation<()?, any Error>, _ outcome: Outcome) {
+        self.continuation = continuation
+        self.outcome = outcome
+    }
+
+    func run() {
+        switch outcome {
+        case .returning(let value): continuation.resume(returning: value)
+        case .throwing(let error): continuation.resume(throwing: error)
         }
     }
 }
@@ -86,45 +117,47 @@ private enum MergeSequenceState {
     case failure(any Error)
     case done
     
-    mutating func registerListener(_ continuation: CheckedContinuation<()?, any Error>) {
+    mutating func registerListener(_ continuation: CheckedContinuation<()?, any Error>) -> PendingResume? {
         switch self {
         case .idle:
             self = .waitingForUpstream(continuation)
+            return nil
         case .waitingForUpstream(_):
             fatalError("Async throttle sequence has two concurrent listeners?!")
         case .hasPendingEvent:
-            continuation.resume(returning: ())
             self = .idle
+            return PendingResume(continuation, .returning(()))
         case .failure(let error):
-            continuation.resume(throwing: error)
             self = .done
+            return PendingResume(continuation, .throwing(error))
         case .done:
-            continuation.resume(returning: nil)
+            return PendingResume(continuation, .returning(nil))
         }
     }
 
-    mutating func markHasEvent() {
+    mutating func markHasEvent() -> PendingResume? {
         if case let .waitingForUpstream(continuation) = self {
-            continuation.resume(returning: ())
             self = .idle
-        } else {
-            self = .hasPendingEvent
+            return PendingResume(continuation, .returning(()))
         }
+        self = .hasPendingEvent
+        return nil
     }
 
-    mutating func markFailed(error: any Error) {
+    mutating func markFailed(error: any Error) -> PendingResume? {
         if case let .waitingForUpstream(continuation) = self {
-            continuation.resume(throwing: error)
             self = .done
-        } else {
-            self = .failure(error)
+            return PendingResume(continuation, .throwing(error))
         }
+        self = .failure(error)
+        return nil
     }
 
-    mutating func transitionToDone() {
+    mutating func transitionToDone() -> PendingResume? {
+        defer { self = .done }
         if case let .waitingForUpstream(continuation) = self {
-            continuation.resume(returning: nil)
+            return PendingResume(continuation, .returning(nil))
         }
-        self = .done
+        return nil
     }
 }
