@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.17.0 (unreleased)
+
+* Add `Authenticator` protocol and `MutationUploader` callbacks to split `PowerSyncBackendConnectorProtocol`.
+* Add new `connect()` overloads taking only an authenticator or only a mutation uploader to implement
+  download-only or upload-only sync.
+
 ## 1.16.3
 
 * Fix deadlocks around task cancellation ([#189](https://github.com/powersync-ja/powersync-swift/issues/189))

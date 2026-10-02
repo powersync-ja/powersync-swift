@@ -152,17 +152,51 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     }
 
     func connect(connector: any PowerSyncBackendConnectorProtocol, options: ConnectOptions?) async throws {
+        try await self.connectInternal(
+            authenticator: .legacy(CachingCredentialsConnector(inner: connector)),
+            uploader: { db in try await connector.uploadMutations(db) },
+            checkpointRequests: connector as? CustomCheckpointRequestConnector,
+            options: options,
+        )
+    }
+
+    func connect(mutationUploader: @escaping MutationUploader, options: ConnectOptions) async throws {
+        try await self.connectInternal(authenticator: nil, uploader: mutationUploader, checkpointRequests: nil, options: options)
+    }
+
+    func connect(endpoint: String, authenticator: any Authenticator, options: ConnectOptions) async throws {
+        try await self.connectInternal(
+            authenticator: .endpointAndAuthenticator(endpoint: endpoint, authenticator: authenticator),
+            uploader: nil,
+            checkpointRequests: nil,
+            options: options
+        )
+    }
+
+    func connect(endpoint: String, authenticator: any Authenticator, mutationUploader: @escaping MutationUploader, options: ConnectOptions) async throws {
+        try await self.connectInternal(
+            authenticator: .endpointAndAuthenticator(endpoint: endpoint, authenticator: authenticator),
+            uploader: mutationUploader,
+            checkpointRequests: nil,
+            options: options
+        )
+    }
+
+    private func connectInternal(
+        authenticator: InternalAuthenticator?,
+        uploader: MutationUploader?,
+        checkpointRequests: CustomCheckpointRequestConnector?,
+        options: ConnectOptions?,
+    ) async throws {
         try await initialize()
-
-        let options = options ?? ConnectOptions()
-        if connector is CustomCheckpointRequestConnector, case .legacy = options.checkpointMode {
-            logger.warning(
-                "The connector implements CustomCheckpointRequestConnector, but the connection uses CheckpointMode.legacy and will not post checkpoint requests to it. Connect with checkpointMode set to .requests() to use the connector's checkpoint requests.",
-                tag: "PowerSyncDatabase"
-            )
-        }
-
-        await group.syncCoordinator.connect(db: self, connector: connector, options: options, client: customHttpClient)
+        await group.syncCoordinator.connect(
+            db: self,
+            authenticator: authenticator,
+            uploader: uploader,
+            checkpointRequests: checkpointRequests,
+            options: options ?? ConnectOptions(),
+            client: customHttpClient
+        )
     }
 
     func disconnectAndClear(clearLocal: Bool, soft: Bool) async throws {
