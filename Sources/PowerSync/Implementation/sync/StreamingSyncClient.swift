@@ -73,7 +73,7 @@ final class StreamingSyncClient: Sendable {
             // waiters, so fail any that are still pending instead of leaving them suspended.
             defer { signals.tearDown() }
 
-            await withThrowingTaskGroup { group in
+            try await withThrowingTaskGroup { group in
                 let signals = self.signals
                 if let authenticator {
                     group.addTask { try await self.downloadLoop(signals: signals, authenticator: authenticator) }
@@ -85,8 +85,10 @@ final class StreamingSyncClient: Sendable {
                 } else if authenticator != nil {
                     // We can't upload mutations, but we can request a checkpoint for mutations that have already
                     // been uploaded from a potential prior upload-only connection.
-                    group.addTask { try await self.uploadTargetCheckpointRequest() }
+                    group.addTask { try await self.requestTargetCheckpointOnce() }
                 }
+
+                try await group.waitForAll()
             }
         }
     }
@@ -164,6 +166,35 @@ The next upload iteration will be delayed.
         }
     }
 
+    private func requestTargetCheckpointOnce() async throws {
+        defer {
+            db.syncStatus.maybeMutateStatus(
+                shouldUpdate: { $0.internalUploadError != nil },
+                apply: { $0.internalUploadError = nil }
+            )
+        }
+
+        while (true) {
+            do {
+                try await self.uploadTargetCheckpointRequest()
+                return
+            } catch {
+                if error is CancellationError {
+                    return
+                }
+
+                db.logger.error("Error requesting checkpoint after crud upload: \(error)", tag: tag)
+                db.syncStatus.mutateStatus { status in status.internalUploadError = error }
+                do {
+                    try await sleepForSeconds(seconds: self.options.retryDelay)
+                } catch {
+                    // Cancelled, abort
+                    return
+                }
+            }
+        }
+    }
+
     /// Updates the apply gate once all currently queued CRUD items have been uploaded.
     ///
     /// When using checkpoint requests, this stores the generated request ID as the target.
@@ -223,6 +254,9 @@ The next upload iteration will be delayed.
     func requestCheckpoint() async throws -> any CheckpointRequest {
         guard case .requests = checkpointMode else {
             throw CheckpointRequestError.checkpointRequestsNotEnabled
+        }
+        guard authenticator != nil else {
+            throw CheckpointRequestError.notConnecting
         }
 
         // Everything below can fail with a transport, auth or database error. Those are mapped to

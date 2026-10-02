@@ -168,7 +168,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         try await self.connectInternal(
             authenticator: .endpointAndAuthenticator(endpoint: endpoint, authenticator: authenticator),
             uploader: nil,
-            checkpointRequests: nil,
+            checkpointRequests: authenticator as? CustomCheckpointRequestConnector,
             options: options
         )
     }
@@ -177,7 +177,7 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         try await self.connectInternal(
             authenticator: .endpointAndAuthenticator(endpoint: endpoint, authenticator: authenticator),
             uploader: mutationUploader,
-            checkpointRequests: nil,
+            checkpointRequests: authenticator as? CustomCheckpointRequestConnector,
             options: options
         )
     }
