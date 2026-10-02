@@ -62,7 +62,7 @@ extension PowerSyncBackendConnectorProtocol {
         guard let credentials = try await self.fetchCredentials() else {
             throw PowerSyncError.operationFailed(message: "User is not signed in (fetchCredentials returned nil)", underlyingError: nil)
         }
-        return credentials.description
+        return credentials.token
     }
 
     public func uploadMutations(_ onDatabase: any PowerSyncDatabaseProtocol) async throws {
