@@ -11,7 +11,8 @@ final class StreamingSyncClient: Sendable {
 
     let db: PowerSyncDatabaseImpl
     let options: ConnectOptions
-    let connector: CachingCredentialsConnector
+    let authenticator: InternalAuthenticator?
+    let mutationUploader: MutationUploader?
     let httpClient: HttpClient
 
     let checkpointMode: CheckpointMode
@@ -22,12 +23,16 @@ final class StreamingSyncClient: Sendable {
 
     init(
         db: PowerSyncDatabaseImpl,
-        connector: PowerSyncBackendConnectorProtocol,
+        authenticator: InternalAuthenticator?,
+        mutationUploader: MutationUploader?,
+        customCheckpointRequestConnector: (any CustomCheckpointRequestConnector)?,
         httpClient: HttpClient,
         options: ConnectOptions,
     ) {
         self.db = db
-        self.connector = CachingCredentialsConnector(inner: connector)
+        self.authenticator = authenticator
+        self.mutationUploader = mutationUploader
+        self.customCheckpointRequestConnector = customCheckpointRequestConnector
         self.httpClient = httpClient
         self.options = options
         self.checkpointMode = options.checkpointMode
@@ -40,7 +45,6 @@ final class StreamingSyncClient: Sendable {
             for: options.checkpointMode,
             minimumCheckpointRequestRetryDelay: minimumCheckpointRequestRetryDelay
         )
-        self.customCheckpointRequestConnector = connector as? any CustomCheckpointRequestConnector
     }
 
     internal static func resolveCheckpointRequestRetryDelay(
@@ -69,15 +73,27 @@ final class StreamingSyncClient: Sendable {
             // waiters, so fail any that are still pending instead of leaving them suspended.
             defer { signals.tearDown() }
 
-            async let download: () = downloadLoop(signals: signals)
-            async let upload: () = uploadLoop(signals: signals)
-            async let checkpointRequestRetry: () = checkpointRequestRetryLoop(signals: signals)
+            try await withThrowingTaskGroup { group in
+                let signals = self.signals
+                if let authenticator {
+                    group.addTask { try await self.downloadLoop(signals: signals, authenticator: authenticator) }
+                    group.addTask { await self.checkpointRequestRetryLoop(signals: signals) }
+                }
 
-            let _ = try await (download, upload, checkpointRequestRetry)
+                if let mutationUploader {
+                    group.addTask { try await self.uploadLoop(signals: signals, uploader: mutationUploader) }
+                } else if authenticator != nil {
+                    // We can't upload mutations, but we can request a checkpoint for mutations that have already
+                    // been uploaded from a potential prior upload-only connection.
+                    group.addTask { try await self.requestTargetCheckpointOnce() }
+                }
+
+                try await group.waitForAll()
+            }
         }
     }
 
-    private func uploadLoop(signals: SyncSignals) async throws {
+    private func uploadLoop(signals: SyncSignals, uploader: MutationUploader) async throws {
         let updates = db.pool.tableUpdates.filter { updates in
             updates.contains("ps_crud") || updates.contains(EXTERNAL_CHANGES_MARKER)
         }.map { _ in () }
@@ -86,7 +102,7 @@ final class StreamingSyncClient: Sendable {
         // Use a do-while loop to ensure we start an upload iteration even if we can't connect to the service.
         repeat {
             async let crudThrottleDelay = sleepForSeconds(seconds: self.options.crudThrottle)
-            try await uploadAllCrud()
+            try await uploadAllCrud(uploader: uploader)
             
             db.logger.debug("crud upload: notify completion", tag: tag)
             signals.notifyCrudUploadComplete()
@@ -94,7 +110,7 @@ final class StreamingSyncClient: Sendable {
         } while try await allTriggers.next() != nil
     }
     
-    private func uploadAllCrud() async throws {
+    private func uploadAllCrud(uploader: MutationUploader) async throws {
         var lastUploadItem: Int64? = nil
         
         while (true) {
@@ -116,10 +132,13 @@ The next upload iteration will be delayed.
 
                     lastUploadItem = nextItem
                     db.syncStatus.mutateStatus { $0.uploading = true }
-                    try await connector.uploadData(database: db)
+                    try await uploader(db)
                 } else {
-                    // Uploading is completed
-                    try await self.uploadTargetCheckpointRequest()
+                    // Uploading is completed. If we're connected to a PowerSync service, request a checkpoint.
+                    if authenticator != nil {
+                        try await self.uploadTargetCheckpointRequest()
+                    }
+
                     db.syncStatus.maybeMutateStatus(
                         shouldUpdate: { $0.internalUploadError != nil },
                         apply: { $0.internalUploadError = nil }
@@ -137,6 +156,35 @@ The next upload iteration will be delayed.
                 }
 
                 db.logger.error("Error uploading crud: \(error)", tag: tag)
+                do {
+                    try await sleepForSeconds(seconds: self.options.retryDelay)
+                } catch {
+                    // Cancelled, abort
+                    return
+                }
+            }
+        }
+    }
+
+    private func requestTargetCheckpointOnce() async throws {
+        defer {
+            db.syncStatus.maybeMutateStatus(
+                shouldUpdate: { $0.internalUploadError != nil },
+                apply: { $0.internalUploadError = nil }
+            )
+        }
+
+        while (true) {
+            do {
+                try await self.uploadTargetCheckpointRequest()
+                return
+            } catch {
+                if error is CancellationError {
+                    return
+                }
+
+                db.logger.error("Error requesting checkpoint after crud upload: \(error)", tag: tag)
+                db.syncStatus.mutateStatus { status in status.internalUploadError = error }
                 do {
                     try await sleepForSeconds(seconds: self.options.retryDelay)
                 } catch {
@@ -206,6 +254,9 @@ The next upload iteration will be delayed.
     func requestCheckpoint() async throws -> any CheckpointRequest {
         guard case .requests = checkpointMode else {
             throw CheckpointRequestError.checkpointRequestsNotEnabled
+        }
+        guard authenticator != nil else {
+            throw CheckpointRequestError.notConnecting
         }
 
         // Everything below can fail with a transport, auth or database error. Those are mapped to
@@ -406,13 +457,13 @@ The next upload iteration will be delayed.
         return try StreamingSyncClient.decodeWriteCheckpointId(from: data)
     }
 
-    private func downloadLoop(signals: SyncSignals) async throws {
+    private func downloadLoop(signals: SyncSignals, authenticator: InternalAuthenticator) async throws {
         var result = SyncIterationResult()
         
         while (!Task.isCancelled) {
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
-                    let iteration = ActiveSyncIteration(syncClient: self, signals: signals)
+                    let iteration = ActiveSyncIteration(syncClient: self, authenticator: authenticator, signals: signals)
                     var group: ThrowingTaskGroup<Void, any Error>? = group
                     result = try await iteration.run(group: &group)
                 }
@@ -435,11 +486,15 @@ The next upload iteration will be delayed.
     }
     
     fileprivate func invalidateCredentials() async {
-        await self.connector.invalidateCachedCredentials()
+        await authenticator?.invalidateCredentials()
     }
     
     private func authenticatedRequest(buildUrl: (inout URLComponents) -> ()) async throws -> (URL, URLRequest) {
-        guard let credentials = try await connector.fetchCredentials() else {
+        guard let authenticator else {
+            throw PowerSyncError.operationFailed(message: "Not connected for uploading")
+        }
+
+        guard let credentials = try await authenticator.fetchCredentials() else {
             throw PowerSyncError.operationFailed(message: "fetchCredentials() returned nil")
         }
         
@@ -498,11 +553,13 @@ The next upload iteration will be delayed.
 
 private struct ActiveSyncIteration: Sendable {
     private let syncClient: StreamingSyncClient
+    private let authenticator: InternalAuthenticator
     private let localEvents = BroadcastStream<PowerSyncControlArguments>()
     private let signals: SyncSignals
 
-    init(syncClient: StreamingSyncClient, signals: SyncSignals) {
+    init(syncClient: StreamingSyncClient, authenticator: InternalAuthenticator, signals: SyncSignals) {
         self.syncClient = syncClient
+        self.authenticator = authenticator
         self.signals = signals
     }
     
@@ -665,7 +722,7 @@ private struct ActiveSyncIteration: Sendable {
             } else {
                 group?.addTask {
                     do {
-                        let _ = try await syncClient.connector.fetchCredentials(allowCached: false)
+                        let _ = try await authenticator.prefetchCredentials()
                         syncClient.db.logger.debug("Stopping because new credentials are available", tag: tag)
                         localEvents.dispatch(event: .didRefreshToken)
                     } catch {

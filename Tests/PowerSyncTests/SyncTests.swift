@@ -1249,7 +1249,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func checkpointRequestConnectorPropagatesCheckpointRequestErrors() async throws {
-        final actor BackendConnector: CustomCheckpointRequestConnector {
+        final actor BackendConnector: PowerSyncBackendConnectorProtocol, CustomCheckpointRequestConnector {
             var checkpointRequests = 0
 
             func fetchCredentials() async throws -> PowerSyncCredentials? {
@@ -1288,7 +1288,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func checkpointRequestConnectorWrapsCustomErrors() async throws {
-        final actor BackendConnector: CustomCheckpointRequestConnector {
+        final actor BackendConnector: PowerSyncBackendConnectorProtocol, CustomCheckpointRequestConnector {
             var checkpointRequests = 0
 
             func fetchCredentials() async throws -> PowerSyncCredentials? {
@@ -2315,6 +2315,86 @@ class InMemorySyncIntegrationTests {
         let _ = consume a
         try await db.close()
     }
+
+    @Test func connectDownloadOnly() async throws {
+        let didConnect = Signal()
+        let didUpload = Signal()
+        let db = openDatabase(MockHttpSession { request in
+            await didConnect.complete()
+            return AsyncThrowingChannel<Data, any Error>()
+        })
+        struct StaticAuthenticator: Authenticator {
+            func resolveCredentials() async throws -> String {
+                return "test_jwt"
+            }
+        }
+
+        try await db.connect(endpoint: "https://powersynctest.example.com", authenticator: StaticAuthenticator(), options: ConnectOptions())
+        await didConnect.await()
+
+        // Create local mutation, which is never uploaded.
+        try await db.execute("INSERT INTO users (id, name) VALUES (uuid(), 'user')")
+
+        // Upgrade to a full connection, which should upload.
+        try await db.connect(
+            endpoint: "https://powersynctest.example.com",
+            authenticator: StaticAuthenticator(),
+            mutationUploader: { db in
+                if let batch = try await db.getNextCrudTransaction() {
+                    await didUpload.complete()
+                    try await batch.complete()
+                }
+            },
+            options: ConnectOptions(),
+        )
+        await didUpload.await()
+    }
+
+    @Test func connectUploadOnly() async throws {
+        let connections = Mutex(0)
+        let didRequestCheckpoint = Signal()
+        let session = MockHttpSession(
+            handleSyncLines: { request in
+                connections.withLock { value in value = value + 1 }
+                return AsyncThrowingChannel<Data, any Error>()
+            },
+            legacyCheckpointRequestHook: {
+                connections.withLock { value in value = value + 1 }
+                await didRequestCheckpoint.complete()
+            },
+        )
+        let db = openDatabase(session)
+        let didUpload = Signal()
+
+        try await db.connect(
+            mutationUploader: { db in
+                if let batch = try await db.getNextCrudTransaction() {
+                    await didUpload.complete()
+                    try await batch.complete()
+                }
+            },
+            options: ConnectOptions(),
+        )
+        try await db.execute("INSERT INTO users (id, name) VALUES (uuid(), 'user')")
+        await didUpload.await()
+        // Connecting in upload-only mode should make no SDK-initiated HTTP requests.
+        try #require(connections.withLock { value in value } == 0)
+
+        // Reconnect in download-only mode. This should request a write checkpoint because the upload-only
+        // mode can't.
+        struct StaticAuthenticator: Authenticator {
+            func resolveCredentials() async throws -> String {
+                return "test_jwt"
+            }
+        }
+        try await db.connect(
+            endpoint: "https://powersynctest.example.org",
+            authenticator: StaticAuthenticator(),
+            options: ConnectOptions(),
+        )
+
+        await didRequestCheckpoint.await()
+    }
 }
 
 let defaultSchema = Schema(tables: [
@@ -2534,7 +2614,7 @@ private final class TestConnector: PowerSyncBackendConnectorProtocol {
 }
 
 /// A connector that handles checkpoint requests itself instead of the service endpoint.
-private final class TestCheckpointRequestConnector: CustomCheckpointRequestConnector {
+private final class TestCheckpointRequestConnector: PowerSyncBackendConnectorProtocol, CustomCheckpointRequestConnector {
     private let _postedCheckpointRequests = Mutex<[Int64]>([])
     private let _postedCheckpointClientIds = Mutex<[String]>([])
     private let _stateResponse = Mutex<Int64?>(nil)

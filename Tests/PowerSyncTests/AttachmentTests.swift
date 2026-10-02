@@ -286,31 +286,3 @@ public func waitForMatch<T: Sendable, E: Error>(
         return result!
     }
 }
-
-func waitFor(
-    timeout: TimeInterval = 0.5,
-    interval: TimeInterval = 0.1,
-    predicate: @Sendable () async throws -> Void
-) async throws {
-    let intervalNanoseconds = UInt64(interval * 1_000_000_000)
-
-    let timeoutDate = Date(
-        timeIntervalSinceNow: timeout
-    )
-
-    var lastError: Error?
-
-    while Date() < timeoutDate {
-        do {
-            try await predicate()
-            return
-        } catch {
-            lastError = error
-        }
-        try await Task.sleep(nanoseconds: intervalNanoseconds)
-    }
-
-    throw WaitForMatchError.timeout(
-        lastError: lastError
-    )
-}
