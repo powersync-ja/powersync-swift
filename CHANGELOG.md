@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.16.4
+
+- Upgrade SQLite to 3.53.4 ([#197](https://github.com/powersync-ja/powersync-swift/issues/197)).
+
 ## 1.16.3
 
 * Fix deadlocks around task cancellation ([#189](https://github.com/powersync-ja/powersync-swift/issues/189))
