@@ -1,13 +1,13 @@
 {
-  "originHash" : "64a7ed7052f52645cc4259e052a0a9df211bc9df8b89ddfca357d89300cc6e6d",
+  "originHash" : "79be8b04ba988ec74aa691ae55345306778720582a2cd88fd5ff9f43f9c25100",
   "pins" : [
     {
       "identity" : "csqlite",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/powersync-ja/CSQLite.git",
       "state" : {
-        "revision" : "9f10da4272e292c453db400342d9e16c15e59db5",
-        "version" : "3.51.2"
+        "revision" : "3e71dedbdeab0d797ead0e864adbc69b659543a1",
+        "version" : "3.53.4"
       }
     },
     {
