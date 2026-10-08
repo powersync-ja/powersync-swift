@@ -7,7 +7,7 @@ public protocol Authenticator: Sendable {
     /// database is connected. Implementations should consider caching credentials.
     func resolveCredentials() async throws -> String
     /// Invoked by the SDK when the PowerSync service has rejected credentials previously
-    /// returned yb ``Authenticator//resolveCredentials``.
+    /// returned by ``Authenticator//resolveCredentials``.
     /// 
     /// If the ocnnector returns cached tokens, it can use this as a hint to refresh its local
     /// state.
