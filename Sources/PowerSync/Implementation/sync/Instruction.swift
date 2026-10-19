@@ -13,6 +13,7 @@ enum Instruction {
     case closeSyncStream(hideDisconnect: Bool)
     case didCompleteSync
     case handleDiagnostics
+    case checkpointDelayedDueToLocalData
 }
 
 extension Instruction: Decodable {
@@ -24,6 +25,7 @@ extension Instruction: Decodable {
         case closeSyncStream = "CloseSyncStream"
         case didCompleteSync = "DidCompleteSync"
         case handleDiagnostics = "HandleDiagnostics"
+        case checkpointDelayedDueToLocalData = "CheckpointDelayedDueToLocalData"
     }
     
     enum LogLineCodingKeys: CodingKey {
@@ -84,6 +86,8 @@ extension Instruction: Decodable {
             self = Instruction.didCompleteSync
         case .handleDiagnostics:
             self = Instruction.handleDiagnostics
+        case .checkpointDelayedDueToLocalData:
+            self = .checkpointDelayedDueToLocalData
         }
     }
 }

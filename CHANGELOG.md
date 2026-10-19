@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.16.5 (unreleased)
+
+- Update PowerSync SQLite core extension to 0.5.4 ([release notes](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.5.4)).
+
 ## 1.16.4
 
 - Upgrade SQLite to 3.53.4 ([#197](https://github.com/powersync-ja/powersync-swift/issues/197)).

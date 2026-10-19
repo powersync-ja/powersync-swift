@@ -679,6 +679,9 @@ private struct ActiveSyncIteration: Sendable {
             }
         case .handleDiagnostics:
             break
+        case .checkpointDelayedDueToLocalData:
+            // With a download-only mode, this will become an error. For now, ignore.
+            break
         }
     }
     
