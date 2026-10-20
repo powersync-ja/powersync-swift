@@ -2317,7 +2317,7 @@ class InMemorySyncIntegrationTests {
     }
 
     @Test func directTables() async throws {
-        // This is mostly a smoke test, the core extension managed direct tables and covers things like migrations.
+        // This is mostly a smoke test, the core extension manages direct tables and covers things like migrations.
         let channel = AsyncThrowingChannel<Data, any Error>()
         let schema = Schema(Table(name: "users", columns: [.text("name")], direct: true))
         let db = openDatabase(MockHttpSession { request in channel }, schema: schema)
