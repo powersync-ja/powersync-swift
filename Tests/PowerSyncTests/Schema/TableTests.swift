@@ -352,7 +352,6 @@ final class TableTests: XCTestCase {
     func testDirectTable() throws {
         let table = Table(name: "users", columns: [.text("name")], direct: true)
         try table.validate()
-        XCTAssertEqual(table.internalName, "users")
 
         let withOverride = Table(name: "users", columns: [.text("name")], viewNameOverride: "forbiden", direct: true)
         XCTAssertThrowsError(try withOverride.validate()) { error in

@@ -81,10 +81,7 @@ public struct Table: TableProtocol, Encodable {
     }
 
     var internalName: String {
-        if (direct) {
-            return name
-        }
-        return localOnly ? "ps_data_local__\(name)" : "ps_data__\(name)"
+        localOnly ? "ps_data_local__\(name)" : "ps_data__\(name)"
     }
 
     private let invalidSqliteCharacters = try! NSRegularExpression(
