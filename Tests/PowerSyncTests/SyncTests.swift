@@ -2315,6 +2315,51 @@ class InMemorySyncIntegrationTests {
         let _ = consume a
         try await db.close()
     }
+
+    @Test func directTables() async throws {
+        // This is mostly a smoke test, the core extension managed direct tables and covers things like migrations.
+        let channel = AsyncThrowingChannel<Data, any Error>()
+        let schema = Schema(Table(name: "users", columns: [.text("name")], direct: true))
+        let db = openDatabase(MockHttpSession { request in channel }, schema: schema)
+
+        try await db.connect(connector: TestConnector(), options: ConnectOptions())
+        await waitForStatus(db.currentStatus) { $0.connected }
+
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [
+            BucketChecksum(bucket: "bucket", priority: .init(1), checksum: 0)
+        ])))
+        try await channel.pushLine(.syncDataBucket(SyncDataBucket(bucket: "bucket", data: [
+            OplogEntry(
+                checksum: 0,
+                op_id: "1",
+                object_id: "user",
+                object_type: "users",
+                op: .put,
+                data: String(data: StreamingSyncClient.jsonEncoder.encode(["name": "synced user"]), encoding: .utf8)
+            )
+        ])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        try await db.waitForFirstSync()
+
+        func readUser() async throws -> (String, String) {
+            try await db.get("SELECT * FROM users") { cursor in (
+                try cursor.getString(name: "id"),
+                try cursor.getString(name: "name")
+            ) }
+        }
+
+        try #require(try await readUser() == ("user", "synced user"))
+        try await db.disconnect();
+
+        try await db.execute(sql: "UPDATE users SET name = ?", parameters: ["local user"]);
+        try #require(try await readUser() == ("user", "local user"))
+
+        let tx = try #require(try await db.getNextCrudTransaction())
+        try #require(tx.crud.count == 1)
+        let entry = tx.crud[0]
+        try #require(entry.table == "users")
+        try #require(entry.opData == ["name": "local user"])
+    }
 }
 
 let defaultSchema = Schema(tables: [
