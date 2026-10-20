@@ -2322,6 +2322,9 @@ class InMemorySyncIntegrationTests {
         let schema = Schema(Table(name: "users", columns: [.text("name")], direct: true))
         let db = openDatabase(MockHttpSession { request in channel }, schema: schema)
 
+        let type = try await db.get("pragma table_list(users)") { cursor in try cursor.getString(name: "type") };
+        try #require(type == "table")
+
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
         await waitForStatus(db.currentStatus) { $0.connected }
 
