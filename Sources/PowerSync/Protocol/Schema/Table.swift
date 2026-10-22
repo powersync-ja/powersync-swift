@@ -37,6 +37,19 @@ public struct Table: TableProtocol, Encodable {
     public let options: TableOptions
     public let viewNameOverride: String?
 
+    /// Marks this table as direct, meaning that it stores data directly as SQLite rows instead of
+    /// using an intermediate view around a JSON store.
+    /// 
+    /// Direct tables are still managed by the PowerSync SDK, which is responsible for creating, altering
+    /// and dropping them.
+    /// You can query raw tables like JSON-based tables, and mutations are consistently tracked as pending uploads.
+    /// For more information on direct tables, see [the documentation](https://docs.powersync.com/client-sdks/advanced/performance-optimization#direct-tables).
+    /// 
+    /// Direct tables can't use a view name override.
+    ///
+    /// Direct tables are currently experimental.
+    public let direct: Bool
+
     public var localOnly: Bool {
         get {
             return self.options.localOnly;
@@ -85,7 +98,8 @@ public struct Table: TableProtocol, Encodable {
         viewNameOverride: String? = nil,
         trackMetadata: Bool = false,
         trackPreviousValues: TrackPreviousValuesOptions? = nil,
-        ignoreEmptyUpdates: Bool = false
+        ignoreEmptyUpdates: Bool = false,
+        direct: Bool = false
     ) {
         self.name = name
         self.columns = columns
@@ -98,6 +112,7 @@ public struct Table: TableProtocol, Encodable {
             trackPreviousValues: trackPreviousValues,
             ignoreEmptyUpdates: ignoreEmptyUpdates
         )
+        self.direct = direct
     }
 
     private func hasInvalidSqliteCharacters(_ string: String) -> Bool {
@@ -175,6 +190,10 @@ public struct Table: TableProtocol, Encodable {
 
             indexNames.insert(index.name)
         }
+
+        if direct, viewNameOverride != nil {
+            throw TableError.directTableWithViewNameOverride(tableName: name)
+        }
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -183,6 +202,7 @@ public struct Table: TableProtocol, Encodable {
             case viewName = "view_name"
             case columns
             case indexes
+            case direct
         }
         typealias Keys = TableOptionsCodingKeys<CodingKeys>
         
@@ -193,6 +213,9 @@ public struct Table: TableProtocol, Encodable {
         let indexContainer = container.nestedUnkeyedContainer(forKey: .outer(.indexes))
         for index in indexes {
             try index.encode(table: self, to: indexContainer)
+        }
+        if direct {
+            try container.encode(true, forKey: .outer(.direct))
         }
         try options.serializeTo(container)
     }
@@ -212,4 +235,6 @@ public enum TableError: Error {
     case metadataForLocalTable(tableName: String)
     /// Local-only tables can't enable ``Table/trackPreviousValues`` because no updates are tracked for those tables at all.
     case trackPreviousForLocalTable(tableName: String)
+    /// Direct tables don't use views and can't use view name overrides.
+    case directTableWithViewNameOverride(tableName: String)
 }
