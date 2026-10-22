@@ -136,7 +136,7 @@ The next upload iteration will be delayed.
                 } else {
                     // Uploading is completed. If we're connected to a PowerSync service, request a checkpoint.
                     if authenticator != nil {
-                        try await self.uploadTargetCheckpointRequest()
+                        let _ = try await self.uploadTargetCheckpointRequest()
                     }
 
                     db.syncStatus.maybeMutateStatus(
@@ -167,16 +167,16 @@ The next upload iteration will be delayed.
     }
 
     private func requestTargetCheckpointOnce() async throws {
-        defer {
-            db.syncStatus.maybeMutateStatus(
-                shouldUpdate: { $0.internalUploadError != nil },
-                apply: { $0.internalUploadError = nil }
-            )
-        }
-
         while (true) {
             do {
-                try await self.uploadTargetCheckpointRequest()
+                let didComplete = try await self.uploadTargetCheckpointRequest()
+                db.syncStatus.maybeMutateStatus(
+                    shouldUpdate: { $0.internalUploadError != nil },
+                    apply: { $0.internalUploadError = nil }
+                )
+                if didComplete {
+                    signals.notifyCrudUploadComplete()
+                }
                 return
             } catch {
                 if error is CancellationError {
@@ -200,7 +200,7 @@ The next upload iteration will be delayed.
     /// When using checkpoint requests, this stores the generated request ID as the target.
     /// The sync stream later reports the same ID once the corresponding checkpoint has been
     /// applied locally.
-    private func uploadTargetCheckpointRequest() async throws {
+    private func uploadTargetCheckpointRequest() async throws -> Bool {
         let currentTarget: Int64? = try await db.writeTransaction { tx in
             try tx.powersyncTargetCheckpointRequestId()
         }
@@ -209,33 +209,34 @@ The next upload iteration will be delayed.
             // We should only update the target if it is currently at the max value.
             // This is set after having completed a CRUD Batch/Transaction.
             // This avoids overwriting a custom write checkpoint set in the .complete handler.
-            return
+            return false
         }
         
         // If there never has been any crud items, we don't need to update the checkpoint
         guard let seqBefore = try await db.getOptional("SELECT seq FROM main.sqlite_sequence WHERE name = 'ps_crud'", mapper: { try $0.getInt64(index: 0) }) else {
-            return // Nothing to update
+            return false // Nothing to update
         }
 
         // Allocate or fetch the checkpoint ID that can satisfy this upload's local write gate.
         let opId = try await getWriteCheckpoint()
         
         // This is inside a write transaction, to prevent conflicts with other writes
-        try await db.writeTransaction { tx in
+        return try await db.writeTransaction { tx in
             let anyData = try tx.getOptional(sql: "SELECT 1 FROM ps_crud LIMIT 1", parameters: nil) { cursor in 1 }
             if anyData != nil {
                 // Additional write after we've obtained the write checkpoint
-                return
+                return false
             }
             
             let seqAfter = try tx.getOptional(sql: "SELECT seq FROM main.sqlite_sequence WHERE name = 'ps_crud'", parameters: nil, mapper: { try $0.getInt64(index: 0) })
             if seqBefore != seqAfter {
                 // New crud data may have been uploaded since we got the checkpoint, abort.
-                return
+                return false
             }
             
             // Update the target checkpoint request id.
             _ = try tx.powersyncTargetCheckpointRequestId(opId)
+            return true
         }
     }
 
@@ -539,6 +540,17 @@ The next upload iteration will be delayed.
         return ControlInvocationsFromStream(sequence: stream)
     }
 
+    fileprivate func willUpload() async throws -> Bool {
+        if mutationUploader != nil {
+            return true
+        }
+
+        // If we're connected in download-only mode, we can still request checkpoints. But if there's a local write,
+        // that won't be uploaded.
+        let has_crud = try await db.getOptional("SELECT 1 FROM ps_crud") { _cursor in () } != nil
+        return !has_crud
+    }
+
     static let jsonEncoder = JSONEncoder()
     static let jsonDecoder = JSONDecoder()
 
@@ -737,7 +749,13 @@ private struct ActiveSyncIteration: Sendable {
         case .handleDiagnostics:
             break
         case .checkpointDelayedDueToLocalData:
-            // With a download-only mode, this will become an error. For now, ignore.
+            // With an uploader, the delay will resolve after the next upload. In download-only
+            // mode, local mutations can't be uploaded so we report an error.
+            if !(try await syncClient.willUpload()) {
+                let message = "Applying checkpoint is blocked on local mutations, but no uploader is set. The sync client cannot proceed."
+                syncClient.db.logger.error(message, tag: tag)
+                syncClient.db.syncStatus.mutateStatus { $0.internalDownloadError = PowerSyncError.operationFailed(message: message, underlyingError: nil) }
+            }
             break
         }
     }

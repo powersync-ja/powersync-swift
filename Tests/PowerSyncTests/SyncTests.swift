@@ -2366,10 +2366,11 @@ class InMemorySyncIntegrationTests {
 
     @Test func connectDownloadOnly() async throws {
         let didConnect = Signal()
+        let channel = AsyncThrowingChannel<Data, any Error>()
         let didUpload = Signal()
         let db = openDatabase(MockHttpSession { request in
             await didConnect.complete()
-            return AsyncThrowingChannel<Data, any Error>()
+            return channel
         })
         struct StaticAuthenticator: Authenticator {
             func resolveCredentials() async throws -> String {
@@ -2382,6 +2383,13 @@ class InMemorySyncIntegrationTests {
 
         // Create local mutation, which is never uploaded.
         try await db.execute("INSERT INTO users (id, name) VALUES (uuid(), 'user')")
+
+        // A new checkpoint can't be applied in this state, and should report an error.
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        await waitForStatus(db.currentStatus) { $0.downloadError != nil }
+        let error = try #require(db.currentStatus.downloadError as? PowerSyncError)
+        try #require(error.errorDescription!.contains("blocked on local mutations, but no uploader is set"))
 
         // Upgrade to a full connection, which should upload.
         try await db.connect(
@@ -2400,48 +2408,84 @@ class InMemorySyncIntegrationTests {
 
     @Test func connectUploadOnly() async throws {
         let connections = Mutex(0)
-        let didRequestCheckpoint = Signal()
-        let session = MockHttpSession(
-            handleSyncLines: { request in
-                connections.withLock { value in value = value + 1 }
-                return AsyncThrowingChannel<Data, any Error>()
-            },
-            legacyCheckpointRequestHook: {
-                connections.withLock { value in value = value + 1 }
-                await didRequestCheckpoint.complete()
-            },
-        )
+        let channel = AsyncThrowingChannel<Data, any Error>()
+        let session = MockHttpSession { request in
+            connections.withLock { value in value = value + 1 }
+            return channel
+        }
         let db = openDatabase(session)
         let didUpload = Signal()
+        var isFirst = false
 
+        try await db.execute("INSERT INTO users (id, name) VALUES ('a', 'user')")
         try await db.connect(
-            mutationUploader: { db in
+            mutationUploader: { @MainActor db in
                 if let batch = try await db.getNextCrudTransaction() {
+                    if isFirst {
+                        isFirst = false
+                        throw PowerSyncError.operationFailed(message: "Expected error to ensure we retry", underlyingError: nil)
+                    }
                     await didUpload.complete()
                     try await batch.complete()
                 }
             },
             options: ConnectOptions(),
         )
-        try await db.execute("INSERT INTO users (id, name) VALUES (uuid(), 'user')")
         await didUpload.await()
         // Connecting in upload-only mode should make no SDK-initiated HTTP requests.
         try #require(connections.withLock { value in value } == 0)
 
         // Reconnect in download-only mode. This should request a write checkpoint because the upload-only
         // mode can't.
-        struct StaticAuthenticator: Authenticator {
+        actor StaticAuthenticator: Authenticator, CustomCheckpointRequestConnector {
+            nonisolated let didRequestCheckpoint = Signal()
+            nonisolated let completeCheckpointRequest = Signal()
+            var isSeedRequest = true
+            
             func resolveCredentials() async throws -> String {
                 return "test_jwt"
             }
+
+            func postCheckpointRequest(_ checkpointRequestId: Int64, clientId: String) async throws -> Int64 {
+                if isSeedRequest {
+                    isSeedRequest = false
+                } else {
+                    await didRequestCheckpoint.complete()
+                    await completeCheckpointRequest.await()
+                }
+
+                return checkpointRequestId
+            }
         }
+        let authenticator = StaticAuthenticator()
         try await db.connect(
             endpoint: "https://powersynctest.example.org",
-            authenticator: StaticAuthenticator(),
-            options: ConnectOptions(),
+            authenticator: authenticator,
+            options: ConnectOptions(checkpointMode: .requests(checkpointRequestRetryDelay: 10)),
         )
 
-        await didRequestCheckpoint.await()
+        var query = try db.watch("SELECT name FROM users") { try $0.getString(index: 0) }.makeAsyncIterator()
+        try #require(try await query.next() == ["user"])
+
+        await authenticator.didRequestCheckpoint.await()
+        try await channel.pushLine(.fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [
+            BucketChecksum(bucket: "a", checksum: 0)
+        ], writeCheckpoint: "2")))
+        try await channel.pushLine(.syncDataBucket(.init(bucket: "a", data: [
+            OplogEntry(
+                checksum: 0,
+                op_id: "1",
+                object_id: "a",
+                object_type: "users",
+                op: .put,
+                data: String(data: StreamingSyncClient.jsonEncoder.encode([
+                    "name": "synced user"
+                ]), encoding: .utf8)!
+            )
+        ])))
+        try await channel.pushLine(.checkpointComplete(lastOpId: "1"))
+        await authenticator.completeCheckpointRequest.complete()
+        try #require(try await query.next() == ["synced user"])
     }
 }
 
