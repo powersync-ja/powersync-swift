@@ -20,9 +20,46 @@ actor CachingCredentialsConnector {
     func invalidateCachedCredentials() {
         self.cachedCredentials = nil
     }
-    
-    nonisolated func uploadData(database: any PowerSyncDatabaseProtocol) async throws {
-        // Nonisolated because we don't want this to block fetching credentials.
-        try await self.inner.uploadData(database: database)
+}
+
+enum InternalAuthenticator {
+    case legacy(CachingCredentialsConnector)
+    case endpointAndAuthenticator(
+        endpoint: String,
+        authenticator: Authenticator,
+    )
+}
+
+extension InternalAuthenticator {
+    func fetchCredentials() async throws -> PowerSyncCredentials? {
+        switch self {
+        case .legacy(let connector):
+            return try await connector.fetchCredentials()
+        case .endpointAndAuthenticator(let endpoint, let authenticator):
+            let token = try await authenticator.resolveCredentials();
+            return PowerSyncCredentials(
+                endpoint: endpoint,
+                token: token
+            )
+        }
+    }
+
+    func invalidateCredentials() async {
+        switch self {
+        case .legacy(let connector):
+            await connector.invalidateCachedCredentials()
+        case .endpointAndAuthenticator(endpoint: _, authenticator: let authenticator):
+            await authenticator.invalidateCredentials()
+        }
+    }
+
+    func prefetchCredentials() async throws {
+        switch self {
+        case .legacy(let connector):
+            let _ = try await connector.fetchCredentials(allowCached: false)
+        case .endpointAndAuthenticator(endpoint: _, authenticator: let authenticator):
+            await authenticator.invalidateCredentials()
+            let _ = try await authenticator.resolveCredentials()
+        }
     }
 }

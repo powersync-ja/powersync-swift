@@ -7,10 +7,10 @@ final class MockHttpSession: PowerSyncUrlSession {
     typealias Response = ChunksToBytes
 
     private let _writeCheckpoint = PowerSync.Mutex(1000)
-    private let _requestPaths = PowerSync.Mutex<[String]>([])
     let handleSyncLines: @Sendable (_ request: URLRequest) async throws -> AsyncThrowingChannel<Data, any Error>
     let checkpointRequestHook: @Sendable (_ request: MockCheckpointRequest) async throws -> MockCheckpointRequestResponse
-    
+    let legacyCheckpointRequestHook: @Sendable () async throws -> ()
+
     var writeCheckpoint: Int {
         get {
             _writeCheckpoint.withLock { $0 }
@@ -19,24 +19,21 @@ final class MockHttpSession: PowerSyncUrlSession {
             _writeCheckpoint.withLock { $0 = newValue }
         }
     }
-
-    var requestPaths: [String] {
-        _requestPaths.withLock { $0 }
-    }
     
     init(
         handleSyncLines: @Sendable @escaping (_ request: URLRequest) async throws -> AsyncThrowingChannel<Data, any Error>,
         checkpointRequestHook: @Sendable @escaping (_ request: MockCheckpointRequest) async throws -> MockCheckpointRequestResponse = { request in
             .checkpointRequestId(request.requestId)
-        }
+        },
+        legacyCheckpointRequestHook: @Sendable @escaping () async throws -> () = { },
     ) {
         self.handleSyncLines = handleSyncLines
         self.checkpointRequestHook = checkpointRequestHook
+        self.legacyCheckpointRequestHook = legacyCheckpointRequestHook
     }
 
     func readStreamed(request: URLRequest) async throws -> (HTTPURLResponse, Response) {
         try #require(request.url?.path == "/sync/stream")
-        _requestPaths.withLock { $0.append("/sync/stream") }
 
         let channel = try await handleSyncLines(request)
         let response = HTTPURLResponse(url: request.url!, mimeType: "application/x-ndjson", expectedContentLength: 0, textEncodingName: "utf-8")
@@ -46,7 +43,6 @@ final class MockHttpSession: PowerSyncUrlSession {
 
     func readFully(request: URLRequest) async throws -> (HTTPURLResponse, Data) {
         let path = try #require(request.url?.path)
-        _requestPaths.withLock { $0.append(path) }
 
         switch path {
         case "/sync/checkpoint-request":
@@ -73,12 +69,12 @@ final class MockHttpSession: PowerSyncUrlSession {
             }
 
         case "/write-checkpoint2.json":
+            try await self.legacyCheckpointRequestHook()
             let checkpoint = writeCheckpoint
             let body = WriteCheckpointResponse(data: WriteCheckpointData(write_checkpoint: Int64(checkpoint)))
             let data = try StreamingSyncClient.jsonEncoder.encode(body)
             let response = HTTPURLResponse(url: request.url!, mimeType: "application/json", expectedContentLength: data.count, textEncodingName: "utf-8")
             return (response, data)
-
         default:
             throw PowerSyncError.operationFailed(message: "Unsupported mock request path: \(path)")
         }

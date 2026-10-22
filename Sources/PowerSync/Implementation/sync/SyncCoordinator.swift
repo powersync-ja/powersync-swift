@@ -13,7 +13,21 @@ actor SyncCoordinator {
         currentClient.withLock { $0 }
     }
 
-    func connect(db: PowerSyncDatabaseImpl, connector: PowerSyncBackendConnectorProtocol, options: ConnectOptions, client: HttpClient?) async {
+    func connect(
+        db: PowerSyncDatabaseImpl,
+        authenticator: InternalAuthenticator?,
+        uploader: MutationUploader?,
+        checkpointRequests: CustomCheckpointRequestConnector?,
+        options: ConnectOptions,
+        client: HttpClient?
+    ) async {
+        if checkpointRequests != nil, case .legacy = options.checkpointMode {
+            db.logger.warning(
+                "The connector implements CustomCheckpointRequestConnector, but the connection uses CheckpointMode.legacy and will not post checkpoint requests to it. Connect with checkpointMode set to .requests() to use the connector's checkpoint requests.",
+                tag: "PowerSyncDatabase"
+            )
+        }
+
         if let task = activeSync {
             await self.finishSyncTask(task: task)
         }
@@ -24,7 +38,14 @@ actor SyncCoordinator {
         }
 
         let client = client ?? defaultHttpClient()
-        let sync = StreamingSyncClient(db: db, connector: connector, httpClient: client, options: options)
+        let sync = StreamingSyncClient(
+            db: db,
+            authenticator: authenticator,
+            mutationUploader: uploader,
+            customCheckpointRequestConnector: checkpointRequests,
+            httpClient: client,
+            options: options
+        )
         currentClient.withLock { $0 = sync }
         activeSync = sync.run()
     }
