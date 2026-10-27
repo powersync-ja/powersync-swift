@@ -249,12 +249,71 @@ public protocol PowerSyncDatabaseProtocol: Queries, Sendable {
     /// ```swift
     /// try await database.connect(connector: connector)
     /// ```
+    /// 
+    /// As an alternative to this method, ``PowerSyncDatabaseProtocol//connect(endpoint:authenticator:mutationUploader:options:)``
+    /// can be used to pass distinct ``Authenticator`` and ``MutationUploader`` implementations driving the download and
+    /// upload process. Additionally, overloads allow passing just one of them to connect in download-only or upload-only mode.
     ///
     /// - Throws: An error if the connection fails or if the database is not properly configured.
     func connect(
         connector: PowerSyncBackendConnectorProtocol,
         options: ConnectOptions?
     ) async throws
+
+
+    /// Connects to the PowerSync service and keeps the local database in sync with the remote database.
+    ///
+    /// The connection is automatically re-opened if it fails for any reason.
+    /// You can customize connection behavior using the `ConnectOptions` parameter.
+    ///
+    /// - Parameters:
+    ///   - connector: The `PowerSyncBackendConnector` used to manage the backend connection.
+    ///   - options: Optional `ConnectOptions` to customize CRUD throttling, retry delays, and sync parameters.
+    ///     If `nil`, default options are used (1000ms CRUD throttle, 5000ms retry delay, empty parameters).
+    ///
+    /// Example usage:
+    /// ```swift
+    /// try await database.connect(
+    ///     endpoint: "https://<instanceid>.powersync.journeyapps.com",
+    ///     authenticator: myAuthenticator,
+    ///     mutationUploader: myMutationUploader,
+    ///     options: ConnectOptions(
+    ///         crudThrottleMs: 2000,
+    ///         retryDelayMs: 10000,
+    ///         params: [
+    ///             "deviceId": .string("abc123"),
+    ///             "platform": .string("iOS")
+    ///         ]
+    ///     )
+    /// )
+    /// ```
+    ///
+    /// You can also omit the `options` parameter to use the default connection behavior:
+    /// ```swift
+    /// try await database.connect(connector: connector)
+    /// ```
+    /// 
+    /// As an alternative to this method, ``PowerSyncDatabaseProtocol//connect(endpoint:authenticator:mutationUploader:options:)``
+    /// can be used to pass distinct ``Authenticator`` and ``MutationUploader`` implementations driving the download and
+    /// upload process. Additionally, overloads allow passing just one of them to connect in download-only or upload-only mode.
+    ///
+    /// - Throws: An error if the connection fails or if the database is not properly configured.
+    func connect(endpoint: String, authenticator: Authenticator, mutationUploader: @escaping MutationUploader, options: ConnectOptions) async throws
+
+    /// Connects to a PowerSync service instance to download data.
+    /// 
+    /// This method only downloads data, no uploads will be processed.
+    /// 
+    /// Each `connect` call replaces all prior connect calls. For example, first calling this for downloads and then
+    /// calling another `connect` method for uploads will not put the database in bidirectional sync mode (it would only
+    /// drive uploads).
+    func connect(endpoint: String, authenticator: Authenticator, options: ConnectOptions) async throws
+
+    /// Uploads local mutations to the source database.
+    /// 
+    /// This invokes ``MutationUploader`` for mutations recorded against the local database, and invokes it again for
+    /// new mutations after the `connect` call (until `disconnect` or `connect` is called).
+    func connect(mutationUploader: @escaping MutationUploader, options: ConnectOptions) async throws
 
     /// Convenience method to get the current version of PowerSync.
     func getPowerSyncVersion() async throws -> String

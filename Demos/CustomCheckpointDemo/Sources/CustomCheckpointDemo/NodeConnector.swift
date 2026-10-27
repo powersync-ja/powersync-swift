@@ -9,7 +9,7 @@ import PowerSync
 /// `/sync/checkpoint-request` endpoint, they are posted to the backend. This suits backends
 /// that process uploads asynchronously (for example through a message queue): the backend can
 /// create the matching checkpoint once the uploads preceding the request have been processed.
-final class NodeConnector: CustomCheckpointRequestConnector {
+final class NodeConnector: PowerSyncBackendConnectorProtocol, CustomCheckpointRequestConnector {
     private let backendUrl: URL
     private let powerSyncUrl: String?
     private let userId: String
