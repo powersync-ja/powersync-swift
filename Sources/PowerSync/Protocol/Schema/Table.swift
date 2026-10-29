@@ -37,17 +37,20 @@ public struct Table: TableProtocol, Encodable {
     public let options: TableOptions
     public let viewNameOverride: String?
 
-    /// Marks this table as direct, meaning that it stores data directly as SQLite rows instead of
-    /// using an intermediate view around a JSON store.
-    /// 
-    /// Direct tables are still managed by the PowerSync SDK, which is responsible for creating, altering
+    /// Marks this table as a direct, managed table.
+    ///
+    /// Enabling this flag makes PowerSync store data directly as SQLite rows instead of using an
+    /// intermediate view around a JSON store.
+    ///
+    /// The table is still managed by the PowerSync SDK, which is responsible for creating, altering
     /// and dropping them.
-    /// You can query raw tables like JSON-based tables, and mutations are consistently tracked as pending uploads.
-    /// For more information on direct tables, see [the documentation](https://docs.powersync.com/client-sdks/advanced/performance-optimization#direct-tables).
-    /// 
+    /// You can query raw tables like JSON-based tables, and mutations are consistently tracked as
+    /// pending uploads.
+    /// For more information on managed tables, see [the documentation](https://docs.powersync.com/client-sdks/advanced/performance-optimization#managed-views-vs-managed-tables).
+    ///
     /// Direct tables can't use a view name override.
     ///
-    /// Direct tables are currently experimental.
+    /// Direct tables are currently in alpha.
     public let direct: Bool
 
     public var localOnly: Bool {

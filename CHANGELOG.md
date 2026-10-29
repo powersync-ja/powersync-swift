@@ -1,9 +1,9 @@
 # Changelog
 
-## 1.17.0 (unreleased)
+## 1.17.0
 
 - Update PowerSync SQLite core extension to 0.5.4 ([release notes](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.5.4)).
-- Support [direct tables](https://docs.powersync.com/client-sdks/advanced/performance-optimization#direct-tables).
+- Support [direct tables](https://docs.powersync.com/client-sdks/advanced/performance-optimization#managed-views-vs-managed-tables).
 - Add `Authenticator` protocol and `MutationUploader` callbacks to split `PowerSyncBackendConnectorProtocol`.
 - Add new `connect()` overloads taking only an authenticator or only a mutation uploader to implement
   download-only or upload-only sync.
