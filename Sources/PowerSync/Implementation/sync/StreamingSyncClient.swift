@@ -585,6 +585,9 @@ private struct ActiveSyncIteration: Sendable {
 
         let pendingLocalEvents = localEvents.subscribe()
 
+        // The watchers below are Tasks rather than `async let _`: tearing down unnamed `async let`
+        // bindings here aborted the process on cancellation (#206, likely swiftlang/swift#81771).
+
         // Notify the core extension for changed Sync Stream subscriptions, as we might have to reconnect.
         let (currentStreams, streamChanges) = syncClient.db.group.syncCoordinator.streams.observeActiveStreams()
         let streamsWatcher = Task { try await watchSyncStreams(changes: streamChanges) }
