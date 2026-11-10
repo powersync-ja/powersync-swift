@@ -587,10 +587,14 @@ private struct ActiveSyncIteration: Sendable {
 
         // Notify the core extension for changed Sync Stream subscriptions, as we might have to reconnect.
         let (currentStreams, streamChanges) = syncClient.db.group.syncCoordinator.streams.observeActiveStreams()
-        async let _ = watchSyncStreams(changes: streamChanges)
+        let streamsWatcher = Task { try await watchSyncStreams(changes: streamChanges) }
         // Notify the core extension for completed crud uploads, as we might want to retry applying a
         // checkpoint in that case.
-        async let _ = watchCompletedCrudUploads()
+        let uploadsWatcher = Task { try await watchCompletedCrudUploads() }
+        defer {
+            streamsWatcher.cancel()
+            uploadsWatcher.cancel()
+        }
 
         let initialInstructions = try await powersyncControl(.start(start: StartSyncIteration(
             parameters: syncClient.options.params,

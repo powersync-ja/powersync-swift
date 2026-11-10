@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix a process abort (`freed pointer was not the last allocation`) when disconnecting while sync is running: the sync iteration's watchers are now plain `Task`s cancelled on exit instead of unnamed `async let` bindings ([#206](https://github.com/powersync-ja/powersync-swift/issues/206)).
+
 ## 1.17.0
 
 - Update PowerSync SQLite core extension to 0.5.4 ([release notes](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.5.4)).
