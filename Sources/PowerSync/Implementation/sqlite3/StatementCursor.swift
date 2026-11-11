@@ -1,3 +1,4 @@
+import Foundation
 import CSQLite
 
 /// A temporary lease of a SQLite statement used to implement cursors
@@ -117,6 +118,34 @@ class StatementCursor: SqlCursor {
             return try getString(index: index)
         } catch {
             return nil
+        }
+    }
+
+    func columnName(index: Int) -> String {
+        return withStatement { stmt in
+            String(cString: sqlite3_column_name(stmt.stmt, Int32(index)))
+        }
+    }
+
+    func getValue(index: Int) -> PowerSyncDataType? {
+        return withStatement { stmt in
+            let column = Int32(index)
+            switch sqlite3_column_type(stmt.stmt, column) {
+            case SQLITE_INTEGER:
+                return .int64(sqlite3_column_int64(stmt.stmt, column))
+            case SQLITE_FLOAT:
+                return .double(sqlite3_column_double(stmt.stmt, column))
+            case SQLITE_TEXT:
+                let length = Int(sqlite3_column_bytes(stmt.stmt, column))
+                let text = sqlite3_column_text(stmt.stmt, column)
+                return .string(String(decoding: UnsafeBufferPointer(start: text, count: length), as: UTF8.self))
+            case SQLITE_BLOB:
+                let length = Int(sqlite3_column_bytes(stmt.stmt, column))
+                guard length > 0, let bytes = sqlite3_column_blob(stmt.stmt, column) else { return .data(Data()) }
+                return .data(Data(bytes: bytes, count: length))
+            default:
+                return nil
+            }
         }
     }
 }
