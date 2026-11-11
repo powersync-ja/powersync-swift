@@ -10,6 +10,26 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
     private let initializer = DatabaseInitializationAction()
     let pool: any SQLiteConnectionPoolProtocol
     let schema: AsyncMutex<Schema>
+    /// The arguments of the last `connect`, so tooling can connect again after a disconnect.
+    let lastConnection = Mutex<LastConnection?>(nil)
+
+    struct LastConnection: @unchecked Sendable {
+        let authenticator: InternalAuthenticator?
+        let uploader: MutationUploader?
+        let checkpointRequests: CustomCheckpointRequestConnector?
+        let options: ConnectOptions?
+    }
+
+    var databaseFilename: String? { dbFilename }
+
+    /// Receivers of the core's diagnostics events, emitted while connected with `diagnostics: true`.
+    let diagnosticsListeners = Mutex<[UUID: @Sendable (JsonValue) -> Void]>([:])
+
+    func emitDiagnostics(_ event: JsonValue) {
+        for listener in diagnosticsListeners.withLock({ Array($0.values) }) {
+            listener(event)
+        }
+    }
 
     #if DEBUG
     /// Per-instance retry floor override used by tests that exercise checkpoint request retries.
@@ -182,13 +202,21 @@ final class PowerSyncDatabaseImpl: PowerSyncDatabaseProtocol {
         )
     }
 
-    private func connectInternal(
+    func connectInternal(
         authenticator: InternalAuthenticator?,
         uploader: MutationUploader?,
         checkpointRequests: CustomCheckpointRequestConnector?,
         options: ConnectOptions?,
     ) async throws {
         try await initialize()
+        lastConnection.withLock {
+            $0 = LastConnection(
+                authenticator: authenticator,
+                uploader: uploader,
+                checkpointRequests: checkpointRequests,
+                options: options
+            )
+        }
         await group.syncCoordinator.connect(
             db: self,
             authenticator: authenticator,

@@ -80,6 +80,21 @@ public final class DefaultLogger: LoggerProtocol,
         }
     }
 
+    /// Adds a writer next to the existing ones, for example a tool that collects logs while the app
+    /// keeps its own writers.
+    public func addWriter(_ writer: any LogWriterProtocol & AnyObject) {
+        queue.sync {
+            writers.append(writer)
+        }
+    }
+
+    /// Removes a writer added with ``addWriter(_:)``.
+    public func removeWriter(_ writer: any LogWriterProtocol & AnyObject) {
+        queue.sync {
+            writers.removeAll { ($0 as AnyObject) === writer }
+        }
+    }
+
     public func setMinSeverity(_ severity: LogSeverity) {
         queue.sync {
             minSeverity = severity

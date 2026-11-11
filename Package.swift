@@ -57,6 +57,10 @@ let package = Package(
         .library(
             name: "PowerSyncGRDB",
             targets: ["PowerSyncGRDB"]
+        ),
+        .library(
+            name: "PowerSyncDevTools",
+            targets: ["PowerSyncDevTools"]
         )
     ],
     dependencies: conditionalDependencies + [
@@ -91,6 +95,20 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift")
             ]
         ),
+        .target(
+            name: "PowerSyncDevTools",
+            dependencies: [
+                .target(name: "PowerSync"),
+            ],
+            resources: [
+                // The DevTools page: the standalone build of `@powersync/diagnostics-ui`.
+                .copy("Resources/ui")
+            ],
+            swiftSettings: [
+                // The server exists only in debug builds of the app; release builds compile it out.
+                .define("POWERSYNC_DEVTOOLS", .when(configuration: .debug))
+            ]
+        ),
         .executableTarget(
             name: "CustomCheckpointDemo",
             dependencies: [
@@ -101,6 +119,10 @@ let package = Package(
         .testTarget(
             name: "PowerSyncTests",
             dependencies: ["PowerSync"]
+        ),
+        .testTarget(
+            name: "PowerSyncDevToolsTests",
+            dependencies: ["PowerSync", "PowerSyncDevTools"]
         ),
         .testTarget(
             name: "PowerSyncGRDBTests",

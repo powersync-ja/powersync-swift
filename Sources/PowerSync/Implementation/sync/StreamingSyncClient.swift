@@ -599,6 +599,7 @@ private struct ActiveSyncIteration: Sendable {
             activeStreams: currentStreams,
             appMetadata: syncClient.options.appMetadata,
             checkpointMode: syncClient.checkpointMode,
+            diagnostics: syncClient.options.diagnostics ? [:] : nil,
         )))
 
         var controlArgs: SyncControlEvents?
@@ -746,8 +747,8 @@ private struct ActiveSyncIteration: Sendable {
             syncClient.db.syncStatus.mutateStatus {
                 $0.internalDownloadError = nil
             }
-        case .handleDiagnostics:
-            break
+        case .handleDiagnostics(let event):
+            syncClient.db.emitDiagnostics(event)
         case .checkpointDelayedDueToLocalData:
             // With an uploader, the delay will resolve after the next upload. In download-only
             // mode, local mutations can't be uploaded so we report an error.

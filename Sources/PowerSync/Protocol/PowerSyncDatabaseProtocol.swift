@@ -137,6 +137,10 @@ public struct ConnectOptions: Sendable {
     /// > Warning: Checkpoint requests are an alpha API. It may change in future releases.
     public var checkpointMode: CheckpointMode
 
+    /// Asks the SQLite core for diagnostics events while connected, such as the total operation count
+    /// of each bucket. Diagnostics tools such as PowerSync DevTools read them. Defaults to `false`.
+    public var diagnostics: Bool = false
+
     /// Initializes a `ConnectOptions` instance with optional values.
     ///
     /// - Parameters:
