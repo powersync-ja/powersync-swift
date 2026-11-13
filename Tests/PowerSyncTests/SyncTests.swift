@@ -298,7 +298,9 @@ class InMemorySyncIntegrationTests {
 
     @Test func disconnectAndClearThenCloseWhileSyncing() async throws {
         // https://github.com/powersync-ja/powersync-swift/issues/206: with `async let` watchers in the sync
-        // iteration, this aborted the process on the iOS 26.4 simulator runtime (not on 26.5 or macOS).
+        // iteration, this aborted the process when built with Swift 6.3.0 (Xcode 26.4), on both the iOS 26.4 and 26.5
+        // simulator runtimes. It's a compiler bug (swiftlang/swift#81771), reported fixed in Swift 6.3.1, so newer
+        // toolchains pass even without the fix.
         let channel = AsyncThrowingChannel<Data, any Error>()
         let db = openDatabase(MockHttpSession { request in channel })
         try await db.connect(connector: TestConnector(), options: ConnectOptions())
