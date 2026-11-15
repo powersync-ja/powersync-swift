@@ -70,6 +70,8 @@ struct StartSyncIteration: Encodable {
     let activeStreams: [StreamKey]
     let appMetadata: [String: String]
     let checkpointMode: CheckpointMode
+    /// An empty object turns on the core's diagnostics events; omitted when they are off.
+    let diagnostics: [String: JsonValue]?
     
     enum CodingKeys: String, CodingKey {
         case parameters
@@ -78,6 +80,7 @@ struct StartSyncIteration: Encodable {
         case activeStreams = "active_streams"
         case appMetadata = "app_metadata"
         case checkpointMode = "checkpoint_mode"
+        case diagnostics
     }
 }
 

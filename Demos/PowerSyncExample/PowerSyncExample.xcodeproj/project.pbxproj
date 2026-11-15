@@ -45,8 +45,8 @@
 		B69F7D862C8EE27400565448 /* AnyCodable in Frameworks */ = {isa = PBXBuildFile; productRef = B69F7D852C8EE27400565448 /* AnyCodable */; };
 		B6B3698A2C64F4B30033C307 /* Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B369892C64F4B30033C307 /* Navigation.swift */; };
 		BE2F26EC2DA54B2F0080F1AE /* SupabaseRemoteStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2F26EB2DA54B2A0080F1AE /* SupabaseRemoteStorage.swift */; };
-		BE4079B02F0E776400103811 /* PowerSyncDynamic in Frameworks */ = {isa = PBXBuildFile; productRef = BE4079AF2F0E776400103811 /* PowerSyncDynamic */; };
-		BE4079B12F0E776800103811 /* PowerSyncDynamic in Embed Frameworks */ = {isa = PBXBuildFile; productRef = BE4079AF2F0E776400103811 /* PowerSyncDynamic */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		BE4079B02F0E776400103811 /* PowerSync in Frameworks */ = {isa = PBXBuildFile; productRef = BE4079AF2F0E776400103811 /* PowerSync */; };
+		BE4079C02F0E776400103811 /* PowerSyncDevTools in Frameworks */ = {isa = PBXBuildFile; productRef = BE4079C12F0E776400103811 /* PowerSyncDevTools */; };
 		BEE4708B2E3BBB2500140D11 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE4708A2E3BBB2500140D11 /* Secrets.swift */; };
 /* End PBXBuildFile section */
 
@@ -57,7 +57,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				BE4079B12F0E776800103811 /* PowerSyncDynamic in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -135,7 +134,8 @@
 				6A9669002B9EE4FE00B05DCF /* PostgREST in Frameworks */,
 				6A9668FE2B9EE4FE00B05DCF /* Auth in Frameworks */,
 				B666587A2C63B88700159A81 /* SwiftUINavigation in Frameworks */,
-				BE4079B02F0E776400103811 /* PowerSyncDynamic in Frameworks */,
+				BE4079B02F0E776400103811 /* PowerSync in Frameworks */,
+				BE4079C02F0E776400103811 /* PowerSyncDevTools in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -494,7 +494,8 @@
 				B66658792C63B88700159A81 /* SwiftUINavigation */,
 				B666587B2C63B88700159A81 /* SwiftUINavigationCore */,
 				B69F7D852C8EE27400565448 /* AnyCodable */,
-				BE4079AF2F0E776400103811 /* PowerSyncDynamic */,
+				BE4079AF2F0E776400103811 /* PowerSync */,
+				BE4079C12F0E776400103811 /* PowerSyncDevTools */,
 			);
 			productName = PowerSyncExample;
 			productReference = 6A7315842B9854220004CB17 /* PowerSyncExample.app */;
@@ -530,7 +531,7 @@
 				B66658752C63B7BB00159A81 /* XCRemoteSwiftPackageReference "swift-identified-collections" */,
 				B66658782C63B88700159A81 /* XCRemoteSwiftPackageReference "swiftui-navigation" */,
 				B69F7D842C8EE27300565448 /* XCRemoteSwiftPackageReference "AnyCodable" */,
-				BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../../../powersync-swift" */,
+				BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../.." */,
 			);
 			productRefGroup = 6A7315852B9854220004CB17 /* Products */;
 			projectDirPath = "";
@@ -821,9 +822,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../../../powersync-swift" */ = {
+		BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../../powersync-swift";
+			relativePath = "../..";
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -898,10 +899,15 @@
 			package = B69F7D842C8EE27300565448 /* XCRemoteSwiftPackageReference "AnyCodable" */;
 			productName = AnyCodable;
 		};
-		BE4079AF2F0E776400103811 /* PowerSyncDynamic */ = {
+		BE4079AF2F0E776400103811 /* PowerSync */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../../../powersync-swift" */;
-			productName = PowerSyncDynamic;
+			package = BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../.." */;
+			productName = PowerSync;
+		};
+		BE4079C12F0E776400103811 /* PowerSyncDevTools */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE4079AE2F0E776400103811 /* XCLocalSwiftPackageReference "../.." */;
+			productName = PowerSyncDevTools;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

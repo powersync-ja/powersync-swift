@@ -89,4 +89,24 @@ struct RowSqlCursor: PowerSync.SqlCursor {
     public var columnCount: Int {
         row.count
     }
+
+    public func columnName(index: Int) -> String {
+        return Array(row.columnNames)[index]
+    }
+
+    public func getValue(index: Int) -> PowerSync.PowerSyncDataType? {
+        let value: DatabaseValue = row[index]
+        switch value.storage {
+        case .null:
+            return nil
+        case .int64(let value):
+            return .int64(value)
+        case .double(let value):
+            return .double(value)
+        case .string(let value):
+            return .string(value)
+        case .blob(let value):
+            return .data(value)
+        }
+    }
 }

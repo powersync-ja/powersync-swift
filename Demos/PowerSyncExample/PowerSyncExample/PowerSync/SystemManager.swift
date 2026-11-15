@@ -1,5 +1,6 @@
 import Foundation
 import PowerSync
+import PowerSyncDevTools
 
 func getAttachmentsDirectoryPath() throws -> String {
     guard let documentsURL = FileManager.default.urls(
@@ -33,7 +34,12 @@ final class SystemManager {
             db: db,
             connector: connector
         )
+        // PowerSync DevTools: prints a URL to open in a browser on this Mac, and an MCP endpoint.
+        // Debug builds only; in a release build `start` returns nil.
+        Task { [db] in self.devTools = try? await PowerSyncDevTools.start(database: db) }
     }
+
+    @ObservationIgnored private var devTools: PowerSyncDevTools?
 
     /// Creates an AttachmentQueue if a Supabase Storage bucket has been specified in the config
     private static func createAttachmentQueue(
@@ -107,21 +113,21 @@ final class SystemManager {
         config.httpAdditionalHeaders = ["x-my-custom-header": "example"]
         let session = URLSession(configuration: config)
 
-        try await db.connect(
-            connector: connector,
-            options: ConnectOptions(
-                clientConfiguration: SyncClientConfiguration(
-                    requestLogger: SyncRequestLoggerConfiguration(
-                        requestLevel: .headers
-                    ) { message in
-                        self.db.logger.debug(message, tag: "SyncRequest")
-                    },
-                    urlSession: session
-                ),
-                // This enables the requestCheckpoint method
-                checkpointMode: .requests()
-            )
+        var options = ConnectOptions(
+            clientConfiguration: SyncClientConfiguration(
+                requestLogger: SyncRequestLoggerConfiguration(
+                    requestLevel: .headers
+                ) { message in
+                    self.db.logger.debug(message, tag: "SyncRequest")
+                },
+                urlSession: session
+            ),
+            // This enables the requestCheckpoint method
+            checkpointMode: .requests()
         )
+        // Per-bucket download totals in PowerSync DevTools.
+        options.diagnostics = true
+        try await db.connect(connector: connector, options: options)
         try await attachments?.startSync()
         try await configureFts(db: db, schema: AppSchema)
     }

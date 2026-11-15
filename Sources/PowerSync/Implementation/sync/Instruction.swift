@@ -12,7 +12,7 @@ enum Instruction {
     case fetchCredentials(didExpire: Bool)
     case closeSyncStream(hideDisconnect: Bool)
     case didCompleteSync
-    case handleDiagnostics
+    case handleDiagnostics(event: JsonValue)
     case checkpointDelayedDueToLocalData
 }
 
@@ -85,7 +85,7 @@ extension Instruction: Decodable {
         case .didCompleteSync:
             self = Instruction.didCompleteSync
         case .handleDiagnostics:
-            self = Instruction.handleDiagnostics
+            self = Instruction.handleDiagnostics(event: try container.decode(JsonValue.self, forKey: .handleDiagnostics))
         case .checkpointDelayedDueToLocalData:
             self = .checkpointDelayedDueToLocalData
         }

@@ -62,6 +62,14 @@ public protocol SqlCursor {
 
     /// A dictionary mapping column names to their zero-based indices.
     var columnNames: [String: Int] { get }
+
+    /// The name of the column at the specified zero-based index. Unlike ``columnNames``, it keeps
+    /// columns that share a name apart.
+    func columnName(index: Int) -> String
+
+    /// The value at the specified column index with its SQLite storage type (integer, real, text or
+    /// blob), or `nil` if the value is null.
+    func getValue(index: Int) -> PowerSyncDataType?
 }
 
 public extension SqlCursor {
