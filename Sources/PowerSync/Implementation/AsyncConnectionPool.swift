@@ -140,6 +140,9 @@ final class AsyncConnectionPool: SQLiteConnectionPoolProtocol {
 
         let _ = try context.execute(sql: "pragma journal_size_limit = \(6 * 1024 * 1024)", parameters: [])
         let _ = try context.execute(sql: "pragma cache_size = -\(50 * 1024)", parameters: [])
+        // Run DELETE triggers for rows removed by REPLACE and allow triggers to fire recursively, so
+        // triggers behave the same across PowerSync SDKs.
+        let _ = try context.execute(sql: "pragma recursive_triggers = TRUE", parameters: [])
 
         if isWriter {
             // Older versions of the SDK used to set up an empty schema and raise the user version to 1.

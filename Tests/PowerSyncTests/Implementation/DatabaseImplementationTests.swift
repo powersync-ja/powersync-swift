@@ -24,6 +24,22 @@ struct DatabaseImplementationTests {
         #expect(description.contains("attempt to write a readonly database"))
     }
     
+    @Test func enablesRecursiveTriggers() async throws {
+        let db = PowerSyncDatabase(
+            schema: Schema(),
+            dbFilename: ":memory:",
+            logger: DefaultLogger()
+        )
+
+        let enabled = try await db.writeTransaction { tx in
+            try tx.get(sql: "PRAGMA recursive_triggers", parameters: []) { cursor in
+                try cursor.getInt64(index: 0)
+            }
+        }
+        try await db.close()
+        #expect(enabled == 1)
+    }
+
     @Test func canUseConnectionInCallback() async throws {
         let db = PowerSyncDatabase(
             schema: Schema(),
