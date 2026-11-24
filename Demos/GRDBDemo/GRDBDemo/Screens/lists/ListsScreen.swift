@@ -79,11 +79,7 @@ struct ListsScreen: View {
         .task {
             // Automatically connect on startup
             try? await viewModels.errorViewModel.withReportingAsync {
-                try await viewModels.databases.powerSync.connect(
-                    connector: SupabaseConnector(
-                        supabase: viewModels.supabaseViewModel
-                    )
-                )
+                try await viewModels.connectPowerSync()
             }
         }
     }

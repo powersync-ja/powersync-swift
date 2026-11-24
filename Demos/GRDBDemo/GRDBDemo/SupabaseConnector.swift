@@ -1,30 +1,30 @@
-import Auth
+import Foundation
 import PowerSync
 import Supabase
-import SwiftUI
 
-@MainActor // _session is mutable, limiting to the MainActor satisfies Sendable constraints
-final class SupabaseConnector: PowerSyncBackendConnectorProtocol {
-    let supabase: SupabaseViewModel
-    
-    init(
-        supabase: SupabaseViewModel
-    ) {
-        self.supabase = supabase
+@MainActor
+final class SupabaseConnector: Authenticator {
+    private let client: SupabaseClient
+    private var refreshRequired = false
+
+    init(client: SupabaseClient) {
+        self.client = client
     }
 
-    func fetchCredentials() async throws -> PowerSyncCredentials? {
-        guard let session = supabase.session else {
-            return nil
+    func resolveCredentials() async throws -> String {
+        if refreshRequired {
+            let session = try await client.auth.refreshSession()
+            refreshRequired = false
+            return session.accessToken
         }
-        
-        return PowerSyncCredentials(
-            endpoint: Secrets.powerSyncEndpoint,
-            token: session.accessToken
-        )
+        return try await client.auth.session.accessToken
     }
 
-    func uploadData(database: PowerSyncDatabaseProtocol) async throws {
+    func invalidateCredentials() async {
+        refreshRequired = true
+    }
+
+    nonisolated func uploadData(_ database: PowerSyncDatabaseProtocol) async throws {
         guard let transaction = try await database.getNextCrudTransaction() else { return }
 
         var lastEntry: CrudEntry?
@@ -33,7 +33,7 @@ final class SupabaseConnector: PowerSyncBackendConnectorProtocol {
                 lastEntry = entry
                 let tableName = entry.table
 
-                let table = supabase.client.from(tableName)
+                let table = client.from(tableName)
 
                 switch entry.op {
                 case .put:
@@ -72,8 +72,7 @@ final class SupabaseConnector: PowerSyncBackendConnectorProtocol {
     }
 }
 
-
-private enum PostgresFatalCodes {
+nonisolated private enum PostgresFatalCodes {
     /// Postgres Response codes that we cannot recover from by retrying.
     static let fatalResponseCodes: [String] = [
         // Class 22 — Data Exception
