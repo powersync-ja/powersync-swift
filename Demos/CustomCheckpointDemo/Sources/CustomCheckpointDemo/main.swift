@@ -23,7 +23,6 @@ let db = PowerSyncDatabase(
 )
 let connector = NodeConnector(
     backendUrl: backendUrl,
-    powerSyncUrl: powerSyncUrl,
     userId: userId,
     logger: logger
 )
@@ -41,14 +40,16 @@ defer {
 }
 
 try await db.connect(
-    connector: connector,
+    endpoint: powerSyncUrl,
+    authenticator: connector,
+    mutationUploader: connector.uploadData,
     options: ConnectOptions(checkpointMode: .requests())
 )
 
 print("Waiting for first sync...")
 try await db.waitForFirstSync()
 
-// Make a local write, which the sync client uploads through the connector.
+// Make a local write, which the connector uploads to the backend.
 let listName = "Custom checkpoint demo \(Date())"
 try await db.execute(
     sql: "INSERT INTO \(LISTS_TABLE) (id, name, created_at, owner_id) VALUES (uuid(), ?, datetime(), ?)",

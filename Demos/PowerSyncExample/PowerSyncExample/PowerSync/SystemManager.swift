@@ -108,7 +108,9 @@ final class SystemManager {
         let session = URLSession(configuration: config)
 
         try await db.connect(
-            connector: connector,
+            endpoint: Secrets.powerSyncEndpoint,
+            authenticator: connector,
+            mutationUploader: connector.uploadData,
             options: ConnectOptions(
                 clientConfiguration: SyncClientConfiguration(
                     requestLogger: SyncRequestLoggerConfiguration(

@@ -1,5 +1,4 @@
-import AnyCodable
-import Auth
+import Foundation
 import PowerSync
 import Supabase
 import SwiftUI
@@ -38,26 +37,25 @@ private enum PostgresFatalCodes {
 }
 
 @Observable
-@MainActor // _session is mutable, limiting to the MainActor satisfies Sendable constraints
-final class SupabaseConnector: PowerSyncBackendConnectorProtocol {
-    let powerSyncEndpoint: String = Secrets.powerSyncEndpoint
+@MainActor
+final class SupabaseConnector: Authenticator {
     let client: SupabaseClient = .init(
         supabaseURL: Secrets.supabaseURL,
         supabaseKey: Secrets.supabaseAnonKey,
     )
     private(set) var session: Session?
-    private var errorCode: String?
+    @ObservationIgnored
+    private var refreshRequired = false
 
     @ObservationIgnored
-    private var observeAuthStateChangesTask: Task<Void, Error>?
+    private var observeAuthStateChangesTask: Task<Void, Never>?
 
     init() {
         session = client.auth.currentSession
-        observeAuthStateChangesTask = Task { [weak self] in
-            guard let self = self else { return }
-
-            for await (event, session) in self.client.auth.authStateChanges {
-                guard [.initialSession, .signedIn, .signedOut].contains(event) else { throw AuthError.sessionMissing }
+        observeAuthStateChangesTask = Task { [weak self, client] in
+            for await (event, session) in client.auth.authStateChanges {
+                guard [.initialSession, .signedIn, .signedOut, .tokenRefreshed].contains(event) else { continue }
+                guard let self else { return }
 
                 self.session = session
             }
@@ -76,23 +74,24 @@ final class SupabaseConnector: PowerSyncBackendConnectorProtocol {
         guard let bucket = Secrets.supabaseStorageBucket else {
             return nil
         }
-        
-        return client.storage.from(bucket)       
+
+        return client.storage.from(bucket)
     }
 
-    func fetchCredentials() async throws -> PowerSyncCredentials? {
-        session = try await client.auth.session
-
-        if session == nil {
-            throw AuthError.sessionMissing
+    func resolveCredentials() async throws -> String {
+        if refreshRequired {
+            let session = try await client.auth.refreshSession()
+            refreshRequired = false
+            return session.accessToken
         }
-
-        let token = session!.accessToken
-
-        return PowerSyncCredentials(endpoint: powerSyncEndpoint, token: token)
+        return try await client.auth.session.accessToken
     }
 
-    func uploadData(database: PowerSyncDatabaseProtocol) async throws {
+    func invalidateCredentials() async {
+        refreshRequired = true
+    }
+
+    nonisolated func uploadData(_ database: PowerSyncDatabaseProtocol) async throws {
         guard let transaction = try await database.getNextCrudTransaction() else { return }
 
         var lastEntry: CrudEntry?

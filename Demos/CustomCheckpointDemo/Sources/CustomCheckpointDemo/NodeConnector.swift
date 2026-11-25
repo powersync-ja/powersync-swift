@@ -1,28 +1,30 @@
 import Foundation
 import PowerSync
 
-/// A connector for the PowerSync Node.js demo backend
-/// (https://github.com/powersync-ja/powersync-nodejs-backend-todolist-demo) that also handles
-/// checkpoint requests itself through ``CustomCheckpointRequestConnector``.
+/// Uses the [PowerSync Node.js demo backend](https://github.com/powersync-ja/powersync-nodejs-backend-todolist-demo)
+/// for authentication, mutation uploads, and custom checkpoint requests.
 ///
 /// Instead of the sync client posting checkpoint requests to the PowerSync service's
 /// `/sync/checkpoint-request` endpoint, they are posted to the backend. This suits backends
 /// that process uploads asynchronously (for example through a message queue): the backend can
 /// create the matching checkpoint once the uploads preceding the request have been processed.
-final class NodeConnector: PowerSyncBackendConnectorProtocol, CustomCheckpointRequestConnector {
+actor NodeConnector: CustomCheckpointRequestConnector {
     private let backendUrl: URL
-    private let powerSyncUrl: String?
     private let userId: String
     private let logger: any LoggerProtocol
+    private var token: String?
 
-    init(backendUrl: URL, powerSyncUrl: String?, userId: String, logger: any LoggerProtocol) {
+    init(backendUrl: URL, userId: String, logger: any LoggerProtocol) {
         self.backendUrl = backendUrl
-        self.powerSyncUrl = powerSyncUrl
         self.userId = userId
         self.logger = logger
     }
 
-    func fetchCredentials() async throws -> PowerSyncCredentials? {
+    func resolveCredentials() async throws -> String {
+        if let token {
+            return token
+        }
+
         let tokenUrl = try backendEndpoint(
             "api/auth/token",
             queryItems: [URLQueryItem(name: "user_id", value: userId)]
@@ -32,19 +34,17 @@ final class NodeConnector: PowerSyncBackendConnectorProtocol, CustomCheckpointRe
 
         struct TokenResponse: Decodable {
             let token: String
-            let powersync_url: String?
         }
-        let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-        guard let endpoint = powerSyncUrl ?? tokenResponse.powersync_url else {
-            throw PowerSyncError.operationFailed(
-                message: "POWERSYNC_URL was not set and the backend did not return powersync_url"
-            )
-        }
-
-        return PowerSyncCredentials(endpoint: endpoint, token: tokenResponse.token)
+        let credentials = try JSONDecoder().decode(TokenResponse.self, from: data)
+        token = credentials.token
+        return credentials.token
     }
 
-    func uploadData(database: PowerSyncDatabaseProtocol) async throws {
+    func invalidateCredentials() async {
+        token = nil
+    }
+
+    nonisolated func uploadData(_ database: PowerSyncDatabaseProtocol) async throws {
         guard let transaction = try await database.getNextCrudTransaction() else {
             return
         }
@@ -109,7 +109,7 @@ final class NodeConnector: PowerSyncBackendConnectorProtocol, CustomCheckpointRe
     }
 
     /// Uploads one PowerSync CRUD transaction through the backend's batch endpoint.
-    private func upload(batch: [CrudUpload]) async throws {
+    private nonisolated func upload(batch: [CrudUpload]) async throws {
         var request = URLRequest(url: try backendEndpoint("api/data"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -119,7 +119,7 @@ final class NodeConnector: PowerSyncBackendConnectorProtocol, CustomCheckpointRe
         try requireSuccess(response, data: data, context: "Batch upload")
     }
 
-    private func backendEndpoint(_ path: String, queryItems: [URLQueryItem] = []) throws -> URL {
+    private nonisolated func backendEndpoint(_ path: String, queryItems: [URLQueryItem] = []) throws -> URL {
         guard var components = URLComponents(url: backendUrl, resolvingAgainstBaseURL: false) else {
             throw PowerSyncError.operationFailed(message: "Invalid backend URL: \(backendUrl)")
         }
@@ -135,7 +135,7 @@ final class NodeConnector: PowerSyncBackendConnectorProtocol, CustomCheckpointRe
         return url
     }
 
-    private func requireSuccess(_ response: URLResponse, data: Data, context: String) throws {
+    private nonisolated func requireSuccess(_ response: URLResponse, data: Data, context: String) throws {
         guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
             let body = String(data: data, encoding: .utf8)

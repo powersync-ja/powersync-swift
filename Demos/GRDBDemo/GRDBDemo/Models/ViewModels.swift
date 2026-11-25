@@ -29,5 +29,16 @@ class ViewModels {
             errorModel: errorViewModel
         )
     }
+
+    @MainActor
+    func connectPowerSync() async throws {
+        let connector = SupabaseConnector(client: supabaseViewModel.client)
+        try await databases.powerSync.connect(
+            endpoint: Secrets.powerSyncEndpoint,
+            authenticator: connector,
+            mutationUploader: connector.uploadData,
+            options: ConnectOptions()
+        )
+    }
     
 }

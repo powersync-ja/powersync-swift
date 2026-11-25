@@ -41,9 +41,7 @@ struct StatusIndicatorView<Content: View>: View {
                         } else {
                             Button("Connect") {
                                 Task {
-                                    try await powerSync.connect(
-                                        connector: SupabaseConnector(supabase: viewModels.supabaseViewModel)
-                                    )
+                                    try await viewModels.connectPowerSync()
                                 }
                             }
                         }
