@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.17.1
+## 1.17.1 (unreleased)
 
 - Fix `disconnect()` leaving connected and downloading set to true when a sync iteration is cancelled while processing a line ([#212](https://github.com/powersync-ja/powersync-swift/issues/212)).
 
