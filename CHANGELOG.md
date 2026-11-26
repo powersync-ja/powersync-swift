@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.17.1
+
+- Fix `disconnect()` leaving connected and downloading set to true when a sync iteration is cancelled while processing a line ([#212](https://github.com/powersync-ja/powersync-swift/issues/212)).
+
 ## 1.17.0
 
 - Update PowerSync SQLite core extension to 0.5.4 ([release notes](https://github.com/powersync-ja/powersync-sqlite-core/releases/tag/v0.5.4)).

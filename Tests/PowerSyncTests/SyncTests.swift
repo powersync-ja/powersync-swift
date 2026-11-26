@@ -251,6 +251,24 @@ class InMemorySyncIntegrationTests {
         try await db.close()
     }
     
+    @Test func disconnectClearsStatusAfterSyncStreamThrows() async throws {
+        let channel = AsyncThrowingChannel<Data, any Error>()
+        try await useDatabase(MockHttpSession { _ in channel }) { db in
+            try await db.connect(connector: TestConnector(), options: ConnectOptions(retryDelay: 60))
+            try await channel.pushLine(
+                .fullCheckpoint(Checkpoint(last_op_id: "1", buckets: [.init(bucket: "bkt", checksum: 0)])))
+            try await waitUntil { db.currentStatus.connected && db.currentStatus.downloading }
+
+            // Exercise the throwing exit before disconnect; cancelling an idle stream can end it normally.
+            channel.fail(CancellationError())
+            try await waitUntil { db.currentStatus.downloadError is CancellationError }
+            try await db.disconnect()
+
+            #expect(!db.currentStatus.connected)
+            #expect(!db.currentStatus.downloading)
+        }
+    }
+
     @Test func setsConnectingState() async throws {
         let didSeeConnecting = Signal()
 
