@@ -652,27 +652,37 @@ private struct ActiveSyncIteration: Sendable {
         }
 
         var hadSyncLine = false
-        for try await arg in controlArgs {
-            let control = try await powersyncControl(arg)
-            for instr in control {
-                if case let .closeSyncStream(hideDisconnect) = instr {
-                    return SyncIterationResult(hideDisconnect: hideDisconnect)
+        do {
+            for try await arg in controlArgs {
+                let control = try await powersyncControl(arg)
+                for instr in control {
+                    if case let .closeSyncStream(hideDisconnect) = instr {
+                        return SyncIterationResult(hideDisconnect: hideDisconnect)
+                    }
+
+                    try await execute(instr: instr, group: &group)
                 }
 
-                try await execute(instr: instr, group: &group)
+                if !hadSyncLine && arg.isSyncLine() {
+                    // Trigger a crud upload when receiving the first sync line: We could have
+                    // pending local writes made while disconnected, so in addition to listening on
+                    // updates to `ps_crud`, we also need to trigger a CRUD upload in some other cases.
+                    // We do this on the first sync line because the client is likely to be online in
+                    // that case.
+                    hadSyncLine = true
+                    signals.triggerAsyncCrudUpload()
+                }
             }
-
-            if !hadSyncLine && arg.isSyncLine() {
-                // Trigger a crud upload when receiving the first sync line: We could have
-                // pending local writes made while disconnected, so in addition to listening on
-                // updates to `ps_crud`, we also need to trigger a CRUD upload in some other cases.
-                // We do this on the first sync line because the client is likely to be online in
-                // that case.
-                hadSyncLine = true
-                signals.triggerAsyncCrudUpload()
-            }
+        } catch {
+            // Let core publish the disconnected status, but preserve the original download error.
+            _ = try? await stop()
+            throw error
         }
-        
+
+        return try await stop()
+    }
+
+    private func stop() async throws -> SyncIterationResult {
         // We use an immediately-awaited Task.detached here because running the stop command shouldn't
         // get aborted.
         return try await Task.detached {
